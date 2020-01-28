@@ -27,9 +27,10 @@ Now lets build a new publisher that publishes the local weather forecast. Lets c
   ```
   
 2. Create a project folder using go modules.
-  Go modules lets you use your own folder structure.
+  Go modules lets you use your own folder structure. More info here: https://blog.golang.org/using-go-modules
 ```bash
 $ mkdir -p ~/Projects/myweather
+$ cd ~/Projects/myweather
 $ go mod init myweather
    > go: creating new go.mod: module myweather
 ```
