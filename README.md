@@ -15,6 +15,10 @@ The convention can be found at: https://github.com/hspaay/myzone.convention
 
 ## Getting Started (Linux)
 
+Below to build your own publisher in golang as a go module. This lets you pick your own project folder.
+Lets say you are building multiple publishers and have a dedicated myzone project folder in: ~/Projects/myzone.
+Now lets build a new publisher that publishes the local weather forecast. Lets call the publisher 'myweather' and build it from scratch.
+
 1. Install golang 
   If you are new to golang, check out their website: https://golang.org/doc/install
   This depends on your linux distribution. On Ubuntu:
@@ -22,29 +26,40 @@ The convention can be found at: https://github.com/hspaay/myzone.convention
   $ sudo apt install golang
   ```
   
-2. Create a project folder, lets call it mysensor 
+2. Create a project folder using go modules.
+  Go modules lets you use your own folder structure.
 ```bash
-$ mkdir -p ~/go/src/mysensor
-$ cd ~/go/src/mysensor
-```  
-  If you use a different project root folder then set GOPATH to the project home folder. 
-  See also https://github.com/golang/go/wiki/SettingGOPATH
-  In Go 1.13 and newer use "go env":
-```bash
-$ go env -w GOPATH=~/Projects
-```  
-
-3. Start with hello mysensor
-  Create a file named ${GOPATH}/src/mysensor/mysensor.go that looks like:
+$ mkdir -p ~/Projects/myweather
+$ go mod init myweather
+   > go: creating new go.mod: module myweather
+```
+Create a file named 'myweather.go' that looks like:
 ```golang
 package main
+import "github.com/hspaay/myzone.golang"
 import "fmt"
 func main() {
-  fmt.Printf("hello, mysensor\n")
+  fmt.Printf("hello, myweather\n")
+}
+```
+4. Build
+```bash
+$ go build
+```
+A file go.mod contains the module info include dependencies and versions of the dependencies. 
+Make sure go.mod and go.sum are added to your version control.
+
+5. Initialize the publisher
+The publisher is hooked into the MyZone library. MyZone handles the launching arguments, sets-up logging, and loads the configuration. Change the example to look like this:
+```golang
+import "github.com/hspaay/myzone.golang"
+
+class MyWeather extends MyZonePublisher {
+}
+
+func main() {
+  myzone.run(MyWeather)
 }
 ```
 
-4. Add the myzone.golang package as a dependency (using dep)
-```bash
-$ dep ensure -add github.com/hspaay/myzone.golang
-```  
+... work in progress ...
