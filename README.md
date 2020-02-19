@@ -1,28 +1,30 @@
 # myzone.golang
-myzone.golang is the core library in the Golang language *for developers of MyZone publishers*. If you just want to run a publisher, then download a binary of that publisher and run it according its instructions. 
+myzone.golang is the core library in the Golang language *for developers of MyZone publishers*. It serves as a reference implementation in the golang language. 
 
 myzone is a convention for publishing information on a message bus. This library is part of the reference implementation.
 The convention can be found at: https://github.com/hspaay/myzone.convention
 
-## This provides
+## This Library Provides
 * systemd launcher for linux 
+* Management of nodes, inputs and outputs (see myzone.convention for further explanation)
 * Auto publish discovery when nodes and configuration are updated 
 * Auto publish updates to output values 
-* Management of nodes, inputs and outputs
-* Functions for publishing output and discovery messages
-* Functions for handling input and configure messages
-* MyZone convention data types in Golang
+* Provide hooks to handle control input messages
+* Provide hooks to handle configuration updates
+* Define the MyZone data types in Golang
 
 ## Getting Started (Linux)
 
-This section describes how to get started building your own MyZone publisher on Linux using this library. The first part describes the project setup to start building. The second part shows how to create a simple weather forecast publisher. The instructions are for Linux but building for MacOs or Windows should not be too different. 
+This section describes how to get started building your own MyZone publisher in golang using this library. The first part describes the project setup to start building. The second part shows how to create a simple weather forecast publisher. The instructions are for Linux but building for MacOS or Windows should not be too different. 
 
-This example uses Go modules as this lets you choose your own project folder location.
+This example uses Go modules as this lets you control versioning and choose your own project folder location.
 
 ## Prerequisites
-This guide assumes that you are familiar with programming in golang and golang 1.13 or newer is installed on your development PC. If you are new to golang, check out their website https://golang.org/doc/install for more information. 
+This guide assumes that you are familiar with programming in golang, and golang 1.13 or newer is installed on your development PC. If you are new to golang, check out their website https://golang.org/doc/install for more information. 
 
 A working MQTT broker (server) is needed to test and run a publisher. Mosquitto is a lightweight MQTT broker that runs nicely on Linux (including Raspberry-pi), Mac, and Windows. More info can be found here: https://mosquitto.org/. Only a single broker is needed for all you publishers. For a home automation application you will do fine with running Mosquitto on a Raspberry-pi 2, 3 or 4 connected to a small UPS and park it somewhere out of sight.
+
+For commercial, industrial, or government applications the bus requirements are likely more demanding. Various commercial 
 
 Access to git and github.com is needed to retrieve the development libraries. 
 
@@ -101,18 +103,70 @@ $ ./myweather
 A file go.mod contains the module info include dependencies and versions of the dependencies. 
 Make sure go.mod and go.sum are added to your version control.
 
-## Step 2. Initialize The MyZone Publisher
-The MyZone publisher is initialized by starting the MyZone running from the library. The runner takes care of starting a process, reading the configuration file, managing nodes,  publishing discovery and output values and reading input values and configuration updates.
+## Step 2. Implement The Publisher
+A basic publisher is implemented through only a few functions as shown below.
 
-Change myweather.go to look like this:
+Change myweather.go to look like this (pseudocode):
 ```golang
 import "github.com/hspaay/myzone.golang"
 
-class MyWeather extends MyZonePublisher {
+const PublisherId = "myweather"
+const NodeId = "amsterdam"  
+const ConfigLatitude = "latitude"
+const ConfigLongitude = "longitude"
+const ConfigWeatherServiceUrl = "url"
+const OutputTypeForecast = "forecast"
+const DefaultWeatherServiceUrl = "http://weatherservice.com/forecast?latitude=${latitude}&longitude=${longitude}"
+
+struct MyZoneConfig {
+    Zone: string,
+    Publisher: string,
+    DiscoveryInterval: int,
+    
+}
+function Initialize(myzone *Myzone) {
+
+  myzone.log.warn("Starting myweather")
+  // update discovery once a day
+  myzone.SetDefaultDiscoveryInterval(3600*24, this.Discover) 
+  // update the forecast once an hour
+  myzone.SetDefaultOutputInterval(3600, this.PollOutputs)
+  // The default config handler is good for basic use
+  // myzone.SetConfigHandler(this.ConfigHandler)
+  // The node has no control inputs to handle
+  // myzone.SetInputHandler(this.InputHandler)
+}
+
+function Terminate(myzone *MyZone) {
+  myzone.log.warn("Stopping myweather")
+}
+
+function Discover(myzone *MyZone) {
+  // Discovery of node. Discovery can be updated any time.
+  node = myzone.UpdateNode(NodeId) // add/update node with ID forecast
+  myzone.SetNodeDefaultConfig(node, ConfigLatitude, DataTypeFloat, "55")
+  myzone.SetNodeDefaultConfig(node, ConfigLongitude, DataTypeFloat, "123")
+  myzone.SetNodeDefaultConfig(node, ConfigWeatherServiceUrl, DataTypeString, DefaultWeatherServiceUrl)
+}
+
+function Poll(myzone *MyZone) {
+  node = myzone.GetNode(NodeId)
+  configValues = myzone.GetNodeConfigValues(node)
+  url = configValues[ConfigWeatherServiceUrl] % configValues
+  forecastRaw = httplib.get(url)
+  if (forecastRaw) {
+      forecastObject = JSON.parse(forecastRaw)
+      // MyZone implements the convention; Only the output value needs to be set
+      // This publishes the forecast on myzone/myweather/forecast/amsterdam/0/value|latest|history (see convention)
+      myzone.UpdateOutput(node, OutputTypeForecast, "0", forecastObject.value)
+  } else {
+    myzone.UpdateOutputError(node, OutputTypeForecast, "0", "Server provided no forecast")
+  }
 }
 
 func main() {
-  myWeather = myzone.start(MyWeather)
+  myWeather = myzone.New(DefaultZone, PublisherId)
+  myWeather.Start(Initialize, Terminate, Discover, Poll)
 }
 ```
 

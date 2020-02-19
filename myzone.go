@@ -1,7 +1,9 @@
+// Package myzone exported functions for managing and publishing nodes and their in/outputs
 package myzone
 
-func Hello() string {
-	return "Hello MyZone"
-}
+import (
+	"github.com/sirupsen/logrus"
+)
 
-
+// Logger for myzone publishers
+var Logger = logrus.New()
