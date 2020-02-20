@@ -1,5 +1,5 @@
-// Package node constants for attributes, node types, I/O types and units
-package node
+// Package nodes constants for attributes, node types, I/O types and units
+package nodes
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ const (
 
 	// Information attributes that describe the device or sensor
 	AttrNameAddress      string = "address"
-	AttrNameAlias        string = "alias"        // device alias for publishing sensors
+	AttrNameAlias        string = "alias"        // node alias for publishing inputs and outputs
 	AttrNameDescription  string = "description"  // device description
 	AttrNameDisabled     string = "disabled"     // device or sensor is disabled
 	AttrNameNodeType     string = "type"         // type of node. See NodeTypeXxx
@@ -63,7 +63,7 @@ const (
 	DataTypeSecret DataType = "secret"  // a secret string that is not published
 	DataTypeString DataType = "string"  // value is a string
 	DataTypeVector DataType = "vector"  // 3D vector (x, y, z) or (lat, lon, 0)
-	DataTypeJson   DataType = "json"    // value is a json object
+	DataTypeJSON   DataType = "json"    // value is a json object
 )
 
 // NodeType identifying  the purpose of the node

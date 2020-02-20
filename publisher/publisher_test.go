@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"myzone/messenger"
-	node "myzone/node"
+	"myzone/nodes"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -18,10 +18,11 @@ var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, PublisherNode
 const node1ID = "node1"
 
 var node1Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, node1ID)
-var node1 = node.NewNode(zone1ID, publisher1ID, node1ID)
+var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
 var node1InputAddr = fmt.Sprintf("%s/%s/%s/$input/switch/0", zone1ID, publisher1ID, node1ID)
-var node1Input1 = node.NewInput(node1, "switch", "0")
-var node1Output1 = node.NewOutput(node1, "switch", "0")
+var node1Output1Addr = fmt.Sprintf("%s/%s/%s/$output/switch/0", zone1ID, publisher1ID, node1ID)
+var node1Input1 = nodes.NewInput(node1, "switch", "0")
+var node1Output1 = nodes.NewOutput(node1, "switch", "0")
 
 var testMessenger = messenger.NewDummyMessenger()
 
@@ -82,7 +83,23 @@ func TestNodePublication(t *testing.T) {
 		return
 	}
 	p1 := testMessenger.Publications[0]
-	if !assert.Equal(t, pubAddr, p1.Address, "Publication has different address") {
-		return
-	}
+	assert.Equal(t, pubAddr, p1.Address, "Publication has different address")
+	assert.NotEmpty(t, p1.Signature, "Missing signature in publication")
+}
+
+// TestAliasConfig tests if the node configuration is updated and if the alias is used in the inout address
+func TestAliasConfig(t *testing.T) {
+	// update the node alias and see if its output is published with alias' as node id
+	pub := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	pub.Start(true)         // p0
+	pub.DiscoverNode(node1) // p1
+
+	c := map[string]string{"alias": "myalias"}
+	pub.UpdateNodeConfig(node1, c)      // p2
+	pub.DiscoverOutput(node1Output1)    // p3
+	p3 := testMessenger.Publications[3] // the output discovery publication
+	assert.Equal(t, "$local/publisher1/myalias/$output/switch/0", p3.Address, "output discovery address should use myalias, got %s instead", p3.Address)
+
+	// node1.Config["alias"] = &nodes.ConfigAttr{Value: "alias"}
+
 }

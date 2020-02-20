@@ -1,5 +1,5 @@
-// Package node with inputs and output definitions
-package node
+// Package nodes with inputs and output definitions
+package nodes
 
 import (
 	"fmt"
@@ -16,6 +16,7 @@ type InOutput struct {
 	EnumValues  []string      `yaml:"enum,omitempty"          json:"enum,omitempty"`        // enum valid values
 	Instance    string        `yaml:"instance,omitempty"      json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
 	IOType      string        `yaml:"type,omitempty"          json:"type,omitempty"`        // type of input or output as per IOType...
+	NodeID      string        `yaml:"nodeID"                  json:"nodeID"`                // The node ID
 	Unit        Unit          `yaml:"unit,omitempty"          json:"unit,omitempty"`        // unit of value
 
 	history     []HistoryValue // change history

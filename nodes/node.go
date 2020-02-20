@@ -1,5 +1,5 @@
-// Package node with definition for nodes, inputs and outputs
-package node
+// Package nodes with definition for nodes, inputs and outputs
+package nodes
 
 import "fmt"
 

@@ -21,8 +21,8 @@ type IMessenger interface {
 
 	// Sign and Publish a message
 	// address to subscribe top as per MyZone standard
-	// object to transmit, this is an object that will be converted into a JSON message.
-	Publish(address string, object interface{})
+	// message object to transmit, this is an object that will be converted into a JSON and signed before being sent.
+	Publish(address string, message interface{})
 
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent

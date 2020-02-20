@@ -8,7 +8,8 @@ package publisher
 import (
 	"encoding/json"
 	"myzone/messenger"
-	node "myzone/node"
+	"myzone/nodes"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -28,35 +29,36 @@ const (
 
 // State carries the operating state of this publisher
 type State struct {
-	discoverCountdown int                       // countdown each heartbeat
-	discoveryInterval int                       // discovery polling interval
-	discoveryHandler  func(publisher *State)    // function that performs discovery
-	nodes             map[string]*node.Node     // nodes by discovery address
-	inputs            map[string]*node.InOutput // inputs by discovery address
-	isRunning         bool                      // publisher was started and is running
-	logger            *log.Logger               //
-	messenger         messenger.IMessenger      // Message bus messenger to use
-	outputs           map[string]*node.InOutput // outputs by discovery address
-	pollHandler       func(publisher *State)    // function that performs value polling
-	pollCountdown     int                       // countdown each heartbeat
-	pollInterval      int                       // value polling interval
-	publisherID       string                    // for easy access to the pub ID
-	publisherNode     *node.Node                // This publisher's node
-	synchroneous      bool                      // publish synchroneous with updates for testing
-	updatedNodes      map[string]*node.Node
-	updatedInOutputs  map[string]*node.InOutput
+	// configHandler     func(map[string]string) map[string]string // handle before applying configuration
+	discoverCountdown int                        // countdown each heartbeat
+	discoveryInterval int                        // discovery polling interval
+	discoveryHandler  func(publisher *State)     // function that performs discovery
+	nodes             map[string]*nodes.Node     // nodes by discovery address
+	inputs            map[string]*nodes.InOutput // inputs by discovery address
+	isRunning         bool                       // publisher was started and is running
+	logger            *log.Logger                //
+	messenger         messenger.IMessenger       // Message bus messenger to use
+	outputs           map[string]*nodes.InOutput // outputs by discovery address
+	pollHandler       func(publisher *State)     // function that performs value polling
+	pollCountdown     int                        // countdown each heartbeat
+	pollInterval      int                        // value polling interval
+	publisherID       string                     // for easy access to the pub ID
+	publisherNode     *nodes.Node                // This publisher's node
+	synchroneous      bool                       // publish synchroneous with updates for testing
+	updatedNodes      map[string]*nodes.Node
+	updatedInOutputs  map[string]*nodes.InOutput
 	zoneID            string // Easy access to zone ID
 }
 
 // DiscoverNode is invoked when a node is (re)discovered by this publisher
 // The given node replaces the existing node if one exists
-func (publisher *State) DiscoverNode(discoNode *node.Node) {
-	log.Info("publisher.DiscoverNode: Node Address=", discoNode.Address)
-	publisher.nodes[discoNode.Address] = discoNode
+func (publisher *State) DiscoverNode(node *nodes.Node) {
+	log.Info("publisher.DiscoverNode: Node Address=", node.Address)
+	publisher.nodes[node.Address] = node
 	if publisher.updatedNodes == nil {
-		publisher.updatedNodes = make(map[string]*node.Node)
+		publisher.updatedNodes = make(map[string]*nodes.Node)
 	}
-	publisher.updatedNodes[discoNode.Address] = discoNode
+	publisher.updatedNodes[node.Address] = node
 	if publisher.synchroneous {
 		publisher.publishUpdates()
 	}
@@ -64,10 +66,11 @@ func (publisher *State) DiscoverNode(discoNode *node.Node) {
 
 // DiscoverInput is invoked when a node input is (re)discovered by this publisher
 // The given input replaces the existing input if one exists
-func (publisher *State) DiscoverInput(input *node.InOutput) {
+// If a node alias is set then the input and outputs are published under the alias instead of the node id
+func (publisher *State) DiscoverInput(input *nodes.InOutput) {
 	publisher.inputs[input.Address] = input
 	if publisher.updatedInOutputs == nil {
-		publisher.updatedInOutputs = make(map[string]*node.InOutput)
+		publisher.updatedInOutputs = make(map[string]*nodes.InOutput)
 	}
 	publisher.updatedInOutputs[input.Address] = input
 	if publisher.synchroneous {
@@ -77,10 +80,10 @@ func (publisher *State) DiscoverInput(input *node.InOutput) {
 
 // DiscoverOutput is invoked when a node output is (re)discovered by this publisher
 // The given output replaces the existing output if one exists
-func (publisher *State) DiscoverOutput(output *node.InOutput) {
+func (publisher *State) DiscoverOutput(output *nodes.InOutput) {
 	publisher.outputs[output.Address] = output
 	if publisher.updatedInOutputs == nil {
-		publisher.updatedInOutputs = make(map[string]*node.InOutput)
+		publisher.updatedInOutputs = make(map[string]*nodes.InOutput)
 	}
 	publisher.updatedInOutputs[output.Address] = output
 	if publisher.synchroneous {
@@ -88,23 +91,27 @@ func (publisher *State) DiscoverOutput(output *node.InOutput) {
 	}
 }
 
-// GetNode returns a discovered node by its discovery address
+// GetNode returns a discovered node by the node address
+// address of the node, only the zone, publisher and nodeID are used. Any command suffix is ignored
 // Returns nil if address has no known node
-func (publisher *State) GetNode(address string) *node.Node {
-	var node = publisher.nodes[address]
+func (publisher *State) GetNode(address string) *nodes.Node {
+	segments := strings.Split(address, "/")
+	segments[3] = "$node"
+	nodeAddr := strings.Join(segments[:4], "/")
+	var node = publisher.nodes[nodeAddr]
 	return node
 }
 
 // GetInput returns a discovered input by its discovery address
 // Returns nil if address has no known input
-func (publisher *State) GetInput(address string) *node.InOutput {
+func (publisher *State) GetInput(address string) *nodes.InOutput {
 	var input = publisher.inputs[address]
 	return input
 }
 
 // GetOutput returns a discovered output by its discovery address
 // Returns nil if address has no known output
-func (publisher *State) GetOutput(address string) *node.InOutput {
+func (publisher *State) GetOutput(address string) *nodes.InOutput {
 	var output = publisher.outputs[address]
 	return output
 }
@@ -144,13 +151,50 @@ func (publisher *State) Stop() {
 	publisher.isRunning = false
 }
 
+// UpdateNodeConfig updates a node's configuration
+// Call this after the configuration has been processed by the publisher and
+// only apply the configuration that take effect immediately. If the configuration
+// has to be processed by a node then excluded it from the map and wait for the node's
+// confirmation.
+func (publisher *State) UpdateNodeConfig(node *nodes.Node, param map[string]string) {
+	var appliedParams map[string]string = param
+	for key, value := range appliedParams {
+		config := node.Config[key]
+		if config == nil {
+			config = &nodes.ConfigAttr{}
+			node.Config[key] = config
+		}
+		config.Value = value
+	}
+	// re-discover the node for publication
+	publisher.DiscoverNode(node)
+}
+
 // UpdateOutputValue is invoked when an output value is updated
 // Ignores the value if such output is not known
 func (publisher *State) UpdateOutputValue(address string, newValue string) {
 	var output = publisher.GetOutput(address)
 	if output != nil {
-		node.UpdateValue(output, newValue)
+		nodes.UpdateValue(output, newValue)
+		// publish output value, latest, history, event, ...
 	}
+}
+
+// Replace the address with the node's alias instead the node ID, if available
+// return the address if the node doesn't have an alias
+func (publisher *State) getAliasAddress(address string) string {
+	node := publisher.GetNode(address)
+	if node == nil {
+		return address
+	}
+	aliasConfig := node.Config[nodes.AttrNameAlias]
+	if (aliasConfig == nil) || (aliasConfig.Value == "") {
+		return address
+	}
+	parts := strings.Split(address, "/")
+	parts[2] = aliasConfig.Value
+	aliasAddr := strings.Join(parts, "/")
+	return aliasAddr
 }
 
 // Main heartbeat loop to publish, discove and poll value updates
@@ -158,8 +202,10 @@ func (publisher *State) heartbeatLoop() {
 	for publisher.isRunning {
 		time.Sleep(time.Second)
 
-		// publish changes onto the bus (when synchroneous is set there won't be any)
-		publisher.publishUpdates()
+		// Dont mess with pending changes during debugging
+		if !publisher.synchroneous {
+			publisher.publishUpdates()
+		}
 
 		// discover new nodes
 		if (publisher.discoverCountdown <= 0) && (publisher.discoveryHandler != nil) {
@@ -200,15 +246,16 @@ func (publisher *State) publishUpdates() {
 	// publish changes to inputs or outputs
 	if publisher.updatedInOutputs != nil {
 		for addr, inoutput := range publisher.updatedInOutputs {
+			aliasAddress := publisher.getAliasAddress(addr)
 			buffer, err := json.MarshalIndent(inoutput, " ", " ")
 			if err != nil {
-				publisher.logger.Errorf("convention.publishUpdates: Error marshalling in/output '"+inoutput.Address+"' to json:", err)
+				publisher.logger.Errorf("convention.publishUpdates: Error marshalling in/output '"+aliasAddress+"' to json:", err)
 			} else {
-				publisher.logger.Infof("Convention.publishUpdates: node '%s'", inoutput.Address)
+				publisher.logger.Infof("Convention.publishUpdates: in/output '%s'", aliasAddress)
 				if publisher.synchroneous {
-					publisher.messenger.Publish(addr, string(buffer))
+					publisher.messenger.Publish(aliasAddress, string(buffer))
 				} else {
-					go publisher.messenger.Publish(addr, string(buffer))
+					go publisher.messenger.Publish(aliasAddress, string(buffer))
 				}
 			}
 		}
@@ -223,16 +270,16 @@ func (publisher *State) publishUpdates() {
 // messenger for publishing onto the message bus
 func NewPublisher(zoneID string, publisherID string, messenger messenger.IMessenger) *State {
 
-	var pubNode = node.NewNode(zoneID, publisherID, PublisherNodeID)
+	var pubNode = nodes.NewNode(zoneID, publisherID, PublisherNodeID)
 
 	// MyZone core running state of the publisher
 	var publisher = &State{
 		discoveryInterval: DefaultDiscoveryInterval,
-		inputs:            make(map[string]*node.InOutput, 0),
+		inputs:            make(map[string]*nodes.InOutput, 0),
 		logger:            log.New(),
 		messenger:         messenger,
-		nodes:             make(map[string]*node.Node),
-		outputs:           make(map[string]*node.InOutput),
+		nodes:             make(map[string]*nodes.Node),
+		outputs:           make(map[string]*nodes.InOutput),
 		pollInterval:      DefaultPollInterval,
 		publisherID:       publisherID,
 		publisherNode:     pubNode,
