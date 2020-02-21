@@ -21,6 +21,7 @@ type ECDSASignature struct {
 
 // DummyMessenger that implements IMessenger
 type DummyMessenger struct {
+	Logger         *log.Logger
 	Publications   []*Publication
 	signPrivateKey *ecdsa.PrivateKey
 }
@@ -55,6 +56,16 @@ func (messenger *DummyMessenger) Connect(lastWillAddress string, lastWillValue s
 func (messenger *DummyMessenger) Disconnect() {
 }
 
+// FindPublication with the address
+func (messenger *DummyMessenger) FindPublication(addr string) *Publication {
+	for _, p := range messenger.Publications {
+		if p.Address == addr {
+			return p
+		}
+	}
+	return nil
+}
+
 // Publish a message
 func (messenger *DummyMessenger) Publish(address string, message interface{}) {
 	buffer, err := json.MarshalIndent(message, " ", " ")
@@ -65,9 +76,9 @@ func (messenger *DummyMessenger) Publish(address string, message interface{}) {
 		Signature: string(signature),
 	}
 	if err != nil {
-		// log.Errorf("convention.publishUpdates: Error marshalling node '"+payload.Address+"' to json:", err)
+		messenger.Logger.Errorf("Messenger Publish: Error marshalling object on address %s' to json:", address, err)
 	} else {
-		log.Infof("Convention.publishUpdates: node '%s'", "...") //payload.Address)
+		messenger.Logger.Infof("Messenger Publish address=%s", address)
 		messenger.Publications = append(messenger.Publications, &payload)
 	}
 }
@@ -77,16 +88,21 @@ func (messenger *DummyMessenger) Subscribe(address string, onMessage func(addres
 }
 
 // NewDummyMessenger provides a messenger for messages that go no.where...
+// logger to use for debug messages
 func NewDummyMessenger() *DummyMessenger {
+	var logger = log.New()
+	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
+
 	// generate private/public key for signing
 	rng := rand.Reader
 	curve := elliptic.P256()
 	signPrivateKey, err := ecdsa.GenerateKey(curve, rng)
 	if err != nil {
-		log.Errorf("DummyMessenger:constructor Failed to create keys for signing ", err)
+		logger.Errorf("Failed to create keys for signing: ", err)
 	}
 
 	var messenger = &DummyMessenger{
+		Logger:         logger,
 		Publications:   make([]*Publication, 0),
 		signPrivateKey: signPrivateKey,
 	}

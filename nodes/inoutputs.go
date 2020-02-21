@@ -15,7 +15,7 @@ type InOutput struct {
 	Description string        `yaml:"description,omitempty"   json:"description,omitempty"` // optional description
 	EnumValues  []string      `yaml:"enum,omitempty"          json:"enum,omitempty"`        // enum valid values
 	Instance    string        `yaml:"instance,omitempty"      json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
-	IOType      string        `yaml:"type,omitempty"          json:"type,omitempty"`        // type of input or output as per IOType...
+	IOType      string        `yaml:"type,omitempty"          json:"type,omitempty"`        // type of input or output as per IOTypeXyz
 	NodeID      string        `yaml:"nodeID"                  json:"nodeID"`                // The node ID
 	Unit        Unit          `yaml:"unit,omitempty"          json:"unit,omitempty"`        // unit of value
 
@@ -28,6 +28,11 @@ type HistoryValue struct {
 	time      time.Time
 	TimeStamp string `yaml:"timestamp"`
 	Value     string `yaml:"value"`
+}
+
+// GetLatest returns the last updated time and value
+func GetLatest(inout *InOutput) HistoryValue {
+	return inout.history[0]
 }
 
 // UpdateValue inserts a new value at the front of the output history
@@ -46,6 +51,7 @@ func UpdateValue(inout *InOutput, newValue string) {
 			TimeStamp: timeStampStr,
 			Value:     newValue,
 		}
+		// TODO: max history depth = 24 hours or limit count
 		copy(inout.history[1:], inout.history[0:])
 		inout.history[0] = latest
 	}
