@@ -19,6 +19,10 @@ var node1Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, node1ID)
 var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
 var node1InputAddr = fmt.Sprintf("%s/%s/%s/$input/switch/0", zone1ID, publisher1ID, node1ID)
 var node1Output1Addr = fmt.Sprintf("%s/%s/%s/$output/switch/0", zone1ID, publisher1ID, node1ID)
+var node1valueAddr = fmt.Sprintf("%s/%s/%s/$value/switch/0", zone1ID, publisher1ID, node1ID)
+var node1latestAddr = fmt.Sprintf("%s/%s/%s/$latest/switch/0", zone1ID, publisher1ID, node1ID)
+var node1historyAddr = fmt.Sprintf("%s/%s/%s/$history/switch/0", zone1ID, publisher1ID, node1ID)
+
 var node1Input1 = nodes.NewInput(node1, "switch", "0")
 var node1Output1 = nodes.NewOutput(node1, "switch", "0")
 var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, PublisherNodeID)
@@ -134,5 +138,24 @@ func TestOutputValue(t *testing.T) {
 	publisher.DiscoverOutput(node1Output1) // p3
 	publisher.UpdateOutputValue(node1Output1Addr, "true")
 	publisher.Stop()
+
+	// test raw $value publication
+	p1 := testMessenger.FindPublication(node1valueAddr)
+	assert.Equal(t, "true", p1.Message, "Published $value differs")
+
+	// test $latest publication
+	p2 := testMessenger.FindPublication(node1latestAddr)
+	var latest nodes.Latest
+	if !assert.NotNil(t, p2.Message) {
+		return
+	}
+	json.Unmarshal([]byte(p2.Message), &latest)
+	assert.Equal(t, "true", latest.Value, "Published $latest differs")
+
+	// test $history publication
+	p3 := testMessenger.FindPublication(node1historyAddr)
+	var history nodes.History
+	json.Unmarshal([]byte(p3.Message), &history)
+	assert.Len(t, history.History, 1, "History length differs")
 
 }

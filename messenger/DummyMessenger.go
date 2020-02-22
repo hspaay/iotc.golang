@@ -66,7 +66,7 @@ func (messenger *DummyMessenger) FindPublication(addr string) *Publication {
 	return nil
 }
 
-// Publish a message
+// Publish a JSON encoded message
 func (messenger *DummyMessenger) Publish(address string, message interface{}) {
 	buffer, err := json.MarshalIndent(message, " ", " ")
 	signature := messenger.ECDSAsign(buffer)
@@ -81,6 +81,15 @@ func (messenger *DummyMessenger) Publish(address string, message interface{}) {
 		messenger.Logger.Infof("Messenger Publish address=%s", address)
 		messenger.Publications = append(messenger.Publications, &payload)
 	}
+}
+
+// PublishRaw message
+func (messenger *DummyMessenger) PublishRaw(address string, message string) {
+	payload := Publication{
+		Address: address,
+		Message: message,
+	}
+	messenger.Publications = append(messenger.Publications, &payload)
 }
 
 // Subscribe to a message by address

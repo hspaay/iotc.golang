@@ -24,6 +24,11 @@ type IMessenger interface {
 	// message object to transmit, this is an object that will be converted into a JSON and signed before being sent.
 	Publish(address string, message interface{})
 
+	// Publis raw data
+	// address to subscribe top as per MyZone standard
+	// raw data, published as-is
+	PublishRaw(address string, raw string)
+
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent
 	// onMessage callback is invoked when a message on this address is received
