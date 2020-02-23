@@ -25,7 +25,7 @@ type Node struct {
 }
 
 // AttrMap for use in node attributes and node status attributes
-type AttrMap map[string]interface{}
+type AttrMap map[string]string
 
 // ConfigAttrMap for use in node and in/output configuration
 type ConfigAttrMap map[string]*ConfigAttr
@@ -75,16 +75,16 @@ type InOutput struct {
 	repeatDelay int            // debounce interval in seconds before repeating updates with the same value
 }
 
-// Event message with multiple output values
-type Event struct {
+// EventMessage message with multiple output values
+type EventMessage struct {
 	Address   string            `json:"address"`
 	Event     map[string]string `json:"event"`
 	Sender    string            `json:"sender"`
 	Timestamp string            `json:"timestamp"`
 }
 
-// Latest struct to send/receive the '$latest' command
-type Latest struct {
+// LatestMessage struct to send/receive the '$latest' command
+type LatestMessage struct {
 	Address   string `json:"address"`
 	Sender    string `json:"sender"`
 	Timestamp string `json:"timestamp"` // timestamp of value
@@ -92,8 +92,8 @@ type Latest struct {
 	Value     string `json:"value"`
 }
 
-// History struct to send/receive the '$latest' command
-type History struct {
+// HistoryMessage struct to send/receive the '$latest' command
+type HistoryMessage struct {
 	Address   string         `json:"address"`
 	Duration  int            `json:"duration,omitempty"`
 	History   []HistoryValue `json:"history"`

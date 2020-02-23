@@ -14,7 +14,7 @@ type IMessenger interface {
 	// lastWillValue payload to use with the last will publication
 	Connect(lastWillAddress string, lastWillValue string)
 
-	// Gracefully disconnect the messenger.
+	// Gracefully disconnect the messenger and unsubscribe to all subscribed messages.
 	// This will prevent the LWT publication so publishers must publish a graceful disconnect
 	// message.
 	Disconnect()
@@ -32,5 +32,5 @@ type IMessenger interface {
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent
 	// onMessage callback is invoked when a message on this address is received
-	Subscribe(address string, onMessage func(address string, payload interface{}))
+	Subscribe(address string, onMessage func(address string, message interface{}))
 }

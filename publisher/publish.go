@@ -42,7 +42,7 @@ func (publisher *ThisPublisherState) publishEventCommand(aliasAddress string, no
 		attrID := output.IOType + "/" + output.Instance
 		event[attrID] = history[0].Value
 	}
-	eventMessage := &nodes.Event{
+	eventMessage := &nodes.EventMessage{
 		Address:   addr,
 		Event:     event,
 		Sender:    publisher.publisherNode.Address,
@@ -61,7 +61,7 @@ func (publisher *ThisPublisherState) publishLatestCommand(aliasAddress string, o
 	history := nodes.GetHistory(output)
 	latest := history[0]
 	publisher.Logger.Infof("publish output latest: %s", addr)
-	latestMessage := &nodes.Latest{
+	latestMessage := &nodes.LatestMessage{
 		Address:   addr,
 		Sender:    publisher.publisherNode.Address,
 		Timestamp: latest.TimeStamp,
@@ -78,7 +78,7 @@ func (publisher *ThisPublisherState) publishHistoryCommand(aliasAddress string, 
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
-	historyMessage := &nodes.History{
+	historyMessage := &nodes.HistoryMessage{
 		Address:   addr,
 		Duration:  0, // tbd
 		Sender:    publisher.publisherNode.Address,

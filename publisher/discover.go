@@ -78,28 +78,6 @@ func (publisher *ThisPublisherState) SetPollingInterval(interval int, handler fu
 	publisher.pollHandler = handler
 }
 
-// UpdateNodeConfig updates a node's configuration
-// Call this after the configuration has been processed by the publisher and
-// only apply the configuration that take effect immediately. If the configuration
-// has to be processed by a node then excluded it from the map and wait for the node's
-// confirmation.
-// address must start with the node address zone/publisher/node
-func (publisher *ThisPublisherState) UpdateNodeConfig(address string, param map[string]string) {
-	node := publisher.GetNode(address)
-
-	var appliedParams map[string]string = param
-	for key, value := range appliedParams {
-		config := node.Config[key]
-		if config == nil {
-			config = &nodes.ConfigAttr{}
-			node.Config[key] = config
-		}
-		config.Value = value
-	}
-	// re-discover the node for publication
-	publisher.DiscoverNode(node)
-}
-
 // UpdateOutputValue is invoked when an output value is updated
 // Ignores the value if such output has not yet been discovered
 func (publisher *ThisPublisherState) UpdateOutputValue(outputAddress string, newValue string) {

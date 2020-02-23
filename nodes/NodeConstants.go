@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+const TimeFormat = "2006-01-02T15:04:05.000-0700"
+
 // Standard attribute names for device and sensor attributes and config
 const (
 	// Status attributes that mutate easily

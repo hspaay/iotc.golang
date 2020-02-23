@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"myzone/messenger"
 	"myzone/nodes"
@@ -15,13 +16,15 @@ const node1ID = "node1"
 const publisher1ID = "publisher1"
 const zone1ID = "$local"
 
-var node1Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, node1ID)
+var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
+var node1Addr = node1Base + "/$node"
 var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
-var node1InputAddr = fmt.Sprintf("%s/%s/%s/$input/switch/0", zone1ID, publisher1ID, node1ID)
-var node1Output1Addr = fmt.Sprintf("%s/%s/%s/$output/switch/0", zone1ID, publisher1ID, node1ID)
-var node1valueAddr = fmt.Sprintf("%s/%s/%s/$value/switch/0", zone1ID, publisher1ID, node1ID)
-var node1latestAddr = fmt.Sprintf("%s/%s/%s/$latest/switch/0", zone1ID, publisher1ID, node1ID)
-var node1historyAddr = fmt.Sprintf("%s/%s/%s/$history/switch/0", zone1ID, publisher1ID, node1ID)
+var node1ConfigureAddr = node1Base + "/$configure"
+var node1InputAddr = node1Base + "/$input/switch/0"
+var node1Output1Addr = node1Base + "/$output/switch/0"
+var node1valueAddr = node1Base + "/$value/switch/0"
+var node1latestAddr = node1Base + "/$latest/switch/0"
+var node1historyAddr = node1Base + "/$history/switch/0"
 
 var node1Input1 = nodes.NewInput(node1, "switch", "0")
 var node1Output1 = nodes.NewOutput(node1, "switch", "0")
@@ -79,7 +82,7 @@ func TestNodePublication(t *testing.T) {
 	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// Start synchroneous publications to verify publications in order
-	publisher.Start(false)                 // publisher is first publication [0]
+	publisher.Start(false, nil, nil)       // publisher is first publication [0]
 	publisher.DiscoverNode(node1)          // 2nd [1]
 	publisher.DiscoverInput(node1Input1)   // 3rd [2]
 	publisher.DiscoverOutput(node1Output1) // 4th [3]
@@ -102,14 +105,14 @@ func TestNodePublication(t *testing.T) {
 	assert.NotNilf(t, p3, "Publication for output %s not found", node1Output1Addr)
 }
 
-// TestAliasConfig tests if the node configuration is updated and if the alias is used in the inout address publication
-func TestAliasConfig(t *testing.T) {
+// TestAlias tests if the node configuration is updated and if the alias is used in the inout address publication
+func TestAlias(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger()
 	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	publisher.Start(true)         // p0
-	publisher.DiscoverNode(node1) // p1
+	publisher.Start(true, nil, nil) // p0
+	publisher.DiscoverNode(node1)   // p1
 
 	config := map[string]string{"alias": "myalias"}
 	publisher.UpdateNodeConfig(node1Addr, config) // p2
@@ -128,13 +131,47 @@ func TestAliasConfig(t *testing.T) {
 	assert.Equal(t, nodes.IOTypeOnOffSwitch, out.IOType, "published output has unexpected iotype")
 }
 
+// TestConfigure tests if the node configuration is handled
+func TestConfigure(t *testing.T) {
+	var testMessenger = messenger.NewDummyMessenger()
+	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
+
+	// update the node alias and see if its output is published with alias' as node id
+	publisher.Start(true, nil, nil) // start to subscribe
+	publisher.DiscoverNode(node1)
+	publisher.DiscoverNodeConfig(node1, "name", &nodes.ConfigAttr{Description: "Friendly Name"})
+
+	message := fmt.Sprintf(
+		"{"+
+			"\"address\":\"%s\","+
+			"\"signature\": \"123\","+
+			"\"amessage\": {\"address\":\"%s\", \"sender\": \"%s\", \"timestamp\": \"%s\", \"config\": {\"name\":\"NewName\"}},"+
+			"\"message\": \"hello world\""+
+			"}",
+		node1ConfigureAddr,
+		node1ConfigureAddr, pubAddr, time.Now().Format(nodes.TimeFormat))
+	testMessenger.OnReceive(node1ConfigureAddr, message)
+
+	// config := map[string]string{"alias": "myalias"}
+	// publisher.UpdateNodeConfig(node1Addr, config) // p2
+	// publisher.DiscoverOutput(node1Output1)        // p3
+	publisher.Stop()
+	node1 := publisher.GetNode(node1Addr)
+	c := node1.Config["name"]
+	if !assert.NotNil(t, c, "Can't find configuration for name") {
+		return
+	}
+	assert.Equal(t, "NewName", c.Value, "Configuration wasn't applied")
+
+}
+
 // TestOutputValue tests publication of output values
 func TestOutputValue(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger()
 	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	publisher.Start(false)                 // p0
+	publisher.Start(false, nil, nil)       // p0
 	publisher.DiscoverOutput(node1Output1) // p3
 	publisher.UpdateOutputValue(node1Output1Addr, "true")
 	publisher.Stop()
@@ -145,7 +182,7 @@ func TestOutputValue(t *testing.T) {
 
 	// test $latest publication
 	p2 := testMessenger.FindPublication(node1latestAddr)
-	var latest nodes.Latest
+	var latest nodes.LatestMessage
 	if !assert.NotNil(t, p2.Message) {
 		return
 	}
@@ -154,8 +191,19 @@ func TestOutputValue(t *testing.T) {
 
 	// test $history publication
 	p3 := testMessenger.FindPublication(node1historyAddr)
-	var history nodes.History
+	var history nodes.HistoryMessage
 	json.Unmarshal([]byte(p3.Message), &history)
 	assert.Len(t, history.History, 1, "History length differs")
+}
 
+// TestReceiveInput tests receiving input control commands
+func TestReceiveInput(t *testing.T) {
+	var testMessenger = messenger.NewDummyMessenger()
+	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
+
+	// update the node alias and see if its output is published with alias' as node id
+	publisher.Start(false, nil, nil)
+	publisher.DiscoverNode(node1) // p1
+	publisher.DiscoverInput(node1Input1)
+	publisher.Stop()
 }

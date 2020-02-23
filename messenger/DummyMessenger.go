@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"math/big"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -24,6 +25,7 @@ type DummyMessenger struct {
 	Logger         *log.Logger
 	Publications   []*Publication
 	signPrivateKey *ecdsa.PrivateKey
+	subscriptions  map[string]func(address string, message interface{})
 }
 
 // Publication ...
@@ -66,6 +68,44 @@ func (messenger *DummyMessenger) FindPublication(addr string) *Publication {
 	return nil
 }
 
+// OnReceive function to simulate a received message
+func (messenger *DummyMessenger) OnReceive(address string, payload string) {
+	messageParts := strings.Split(address, "/")
+	var publication Publication
+	err := json.Unmarshal([]byte(payload), &publication)
+	if err != nil {
+		messenger.Logger.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
+		return
+	}
+
+	for subscription, handler := range messenger.subscriptions {
+		subscriptionSegments := strings.Split(subscription, "/")
+		// Match the subscription. Rather crude but only intended for testing.
+		match := true
+		for index, addrSegment := range messageParts {
+			if index >= len(subscriptionSegments) {
+				match = false
+				break // no match, message address is longer
+			}
+			subscriptionSegment := subscriptionSegments[index]
+			if subscriptionSegment == "#" {
+				match = true
+				break
+			} else if subscriptionSegment == "+" {
+				// match, continue
+			} else if addrSegment == subscriptionSegment {
+				// match continue
+			} else {
+				match = false
+				break // no match
+			}
+		}
+		if match {
+			handler(address, publication)
+		}
+	}
+}
+
 // Publish a JSON encoded message
 func (messenger *DummyMessenger) Publish(address string, message interface{}) {
 	buffer, err := json.MarshalIndent(message, " ", " ")
@@ -93,7 +133,10 @@ func (messenger *DummyMessenger) PublishRaw(address string, message string) {
 }
 
 // Subscribe to a message by address
-func (messenger *DummyMessenger) Subscribe(address string, onMessage func(address string, payload interface{})) {
+func (messenger *DummyMessenger) Subscribe(
+	address string, onMessage func(address string, message interface{})) {
+
+	messenger.subscriptions[address] = onMessage
 }
 
 // NewDummyMessenger provides a messenger for messages that go no.where...
@@ -114,6 +157,7 @@ func NewDummyMessenger() *DummyMessenger {
 		Logger:         logger,
 		Publications:   make([]*Publication, 0),
 		signPrivateKey: signPrivateKey,
+		subscriptions:  make(map[string]func(addr string, message interface{})),
 	}
 	return messenger
 }

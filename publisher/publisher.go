@@ -3,10 +3,11 @@
 // - configuration of nodes
 // - control of inputs
 // - update of security keys and identity signature
-// Thread-safe. The publisher can be invoked from multiple goroutines
+// Thread-safe. All public functions can be invoked from multiple goroutines
 package publisher
 
 import (
+	"fmt"
 	"myzone/messenger"
 	"myzone/nodes"
 	"strings"
@@ -27,27 +28,30 @@ const (
 	// DefaultPollInterval in which the output values are queried for polling based sources
 	DefaultPollInterval = 24 * 3600
 	//
-	EventCommand   = "$event"
-	HistoryCommand = "$history"
-	LatestCommand  = "$latest"
-	ValueCommand   = "$value"
+	ConfigureCommand = "$configure"
+	EventCommand     = "$event"
+	HistoryCommand   = "$history"
+	LatestCommand    = "$latest"
+	SetCommand       = "$set"
+	ValueCommand     = "$value"
 )
 
 // ThisPublisherState carries the operating state of 'this' publisher
 type ThisPublisherState struct {
-	// configHandler     func(map[string]string) map[string]string // handle before applying configuration
-	discoverCountdown int                                 // countdown each heartbeat
-	discoveryInterval int                                 // discovery polling interval
-	discoveryHandler  func(publisher *ThisPublisherState) // function that performs discovery
-	Logger            *log.Logger                         //
-	messenger         messenger.IMessenger                // Message bus messenger to use
-	pollHandler       func(publisher *ThisPublisherState) // function that performs value polling
-	pollCountdown     int                                 // countdown each heartbeat
-	pollInterval      int                                 // value polling interval
-	publisherID       string                              // for easy access to the pub ID
-	publisherNode     *nodes.Node                         // This publisher's node
-	synchroneous      bool                                // publish synchroneous with updates for testing
-	zoneID            string                              // Easy access to zone ID
+	discoverCountdown int                                                        // countdown each heartbeat
+	discoveryInterval int                                                        // discovery polling interval
+	discoveryHandler  func(publisher *ThisPublisherState)                        // function that performs discovery
+	Logger            *log.Logger                                                //
+	messenger         messenger.IMessenger                                       // Message bus messenger to use
+	onConfig          func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap // handle before applying configuration
+	onInput           func(input *nodes.InOutput, message string)                // handle to update device/service input
+	pollHandler       func(publisher *ThisPublisherState)                        // function that performs value polling
+	pollCountdown     int                                                        // countdown each heartbeat
+	pollInterval      int                                                        // value polling interval
+	publisherID       string                                                     // for easy access to the pub ID
+	publisherNode     *nodes.Node                                                // This publisher's node
+	synchroneous      bool                                                       // publish synchroneous with updates for testing
+	zoneID            string                                                     // Easy access to zone ID
 
 	// handle updates in the background or synchroneous. background publications require a mutex to prevent concurrent access
 	exitChannel         chan bool
@@ -94,10 +98,18 @@ func (publisher *ThisPublisherState) GetOutput(address string) *nodes.InOutput {
 	return output
 }
 
-// Start publishing
+// Start publishing and listen for configuration and input messages
 // synchroneous publications for testing
-func (publisher *ThisPublisherState) Start(synchroneous bool) {
+// onConfig handles updates to configuration, nil if no config to process
+// onInput handles commands to update inputs, nil if there are no inputs to control
+func (publisher *ThisPublisherState) Start(
+	synchroneous bool,
+	onConfig func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap,
+	onInput func(input *nodes.InOutput, message string)) {
+
 	publisher.synchroneous = synchroneous
+	publisher.onConfig = onConfig
+	publisher.onInput = onInput
 	if !publisher.isRunning {
 		publisher.Logger.Warningf("Starting publisher %s", publisher.publisherID)
 		publisher.updateMutex.Lock()
@@ -106,6 +118,12 @@ func (publisher *ThisPublisherState) Start(synchroneous bool) {
 		go publisher.heartbeatLoop()
 		// wait for the heartbeat to start
 		<-publisher.exitChannel
+
+		// TODO: support LWT
+		messenger.NewDummyMessenger().Connect("", "")
+		// handle configuration and set messages
+		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, ConfigureCommand)
+		messenger.NewDummyMessenger().Subscribe(configAddr, publisher.handleNodeConfig)
 		publisher.Logger.Warningf("Publisher %s started", publisher.publisherID)
 	}
 }
@@ -117,6 +135,7 @@ func (publisher *ThisPublisherState) Stop() {
 	publisher.updateMutex.Lock()
 	if publisher.isRunning {
 		publisher.isRunning = false
+		go messenger.NewDummyMessenger().Disconnect()
 		publisher.updateMutex.Unlock()
 		// wait for heartbeat to end
 		<-publisher.exitChannel
@@ -198,7 +217,13 @@ func (publisher *ThisPublisherState) heartbeatLoop() {
 // zoneID for the zone this publisher lives in
 // publisherID of this publisher, unique within the zone
 // messenger for publishing onto the message bus
-func NewPublisher(zoneID string, publisherID string, messenger messenger.IMessenger) *ThisPublisherState {
+// onConfig method handles incoming configuration requests. Default is to update the config directly
+// onInput method handles commands to control published inputs
+func NewPublisher(
+	zoneID string,
+	publisherID string,
+	messenger messenger.IMessenger,
+) *ThisPublisherState {
 
 	var pubNode = nodes.NewNode(zoneID, publisherID, PublisherNodeID)
 
