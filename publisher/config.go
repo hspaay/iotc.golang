@@ -6,7 +6,7 @@
 // Not thread-safe.
 package publisher
 
-import "myzone/nodes"
+import "iotzone/nodes"
 
 // ConfigureMessage with configuration parameters
 type ConfigureMessage struct {

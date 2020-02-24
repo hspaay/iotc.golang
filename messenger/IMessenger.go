@@ -20,12 +20,12 @@ type IMessenger interface {
 	Disconnect()
 
 	// Sign and Publish a message
-	// address to subscribe top as per MyZone standard
+	// address to subscribe to as per IotConnect standard
 	// message object to transmit, this is an object that will be converted into a JSON and signed before being sent.
 	Publish(address string, message interface{})
 
 	// Publis raw data
-	// address to subscribe top as per MyZone standard
+	// address to subscribe top as per IotConnect standard
 	// raw data, published as-is
 	PublishRaw(address string, raw string)
 

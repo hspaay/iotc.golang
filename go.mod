@@ -1,4 +1,4 @@
-module myzone
+module iotzone
 
 go 1.13
 

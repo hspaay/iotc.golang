@@ -1,14 +1,14 @@
-package myzone
+package iotzone
 
 import (
-	publisher "myzone/publisher"
+	publisher "iotzone/publisher"
 	"testing"
 )
 
 const PublisherID = "test1"
 
 type Test1 struct {
-	// myzone.Publisher   // this makes test1 a publisher
+	// iotzone.Publisher   // this makes test1 a publisher
 }
 
 func TestInitialize(t *testing.T) {
@@ -33,7 +33,7 @@ func Poll() {
 	// configValues = publisher.GetNodeConfigValues(node)
 	// publisher.UpdateOutput(node, OutputTypeForecast, "0", forecastObject.value)
 
-	// myzone.UpdateOutputError(node, OutputTypeForecast, "0", "Server provided no forecast")
+	// iotzone.UpdateOutputError(node, OutputTypeForecast, "0", "Server provided no forecast")
 }
 
 func main() {

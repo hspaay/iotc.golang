@@ -1,21 +1,21 @@
-# myzone.golang
-myzone.golang is the core library in the Golang language *for developers of MyZone publishers*. It serves as a reference implementation in the golang language. 
+# iotzone.golang
+iotzone.golang is the core library in the Golang language *for developers of iotzone publishers*. It serves as a reference implementation in the golang language. 
 
-myzone is a convention for publishing information on a message bus. This library is part of the reference implementation.
-The convention can be found at: https://github.com/hspaay/myzone.convention
+iotzone is an implementation of the iotconnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation.
+The convention can be found at: https://github.com/hspaay/iotzone.convention
 
 ## This Library Provides
 * systemd launcher for linux 
-* Management of nodes, inputs and outputs (see myzone.convention for further explanation)
+* Management of nodes, inputs and outputs (see iotconnect standard for further explanation)
 * Auto publish discovery when nodes and configuration are updated 
 * Auto publish updates to output values 
 * Provide hooks to handle control input messages
 * Provide hooks to handle configuration updates
-* Define the MyZone data types in Golang
+* Define the iotzone data types in Golang
 
 ## Getting Started (Linux)
 
-This section describes how to get started building your own MyZone publisher in golang using this library. The first part describes the project setup to start building. The second part shows how to create a simple weather forecast publisher. The instructions are for Linux but building for MacOS or Windows should not be too different. 
+This section describes how to get started building your own iotzone publisher in golang using this library. The first part describes the project setup to start building. The second part shows how to create a simple weather forecast publisher. The instructions are for Linux but building for MacOS or Windows should not be too different. 
 
 This example uses Go modules as this lets you control versioning and choose your own project folder location.
 
@@ -32,7 +32,7 @@ A code editor or IDE is needed to edit source code. Visual Studio Code is a free
 
 ## Installing
 
-Other than the prerequisites above no other software needs to be installed to start developing a MyZone publisher in golang. 
+Other than the prerequisites above no other software needs to be installed to start developing a iotzone publisher in golang. 
 
 
 ## Developing Tests
@@ -42,26 +42,26 @@ It is highly recommended to use the golang testing facilities. Included in the e
 ## Deployment (Linux)
 
 The folder structure for deployment as a normal user is:
-* ~/bin/myzone/bin      location of the publisher binaries
-* ~/bin/myzone/config   location of the configuration files, including myzone.conf
-* ~/bin/myzone/logs     logging output
+* ~/bin/iotzone/bin      location of the publisher binaries
+* ~/bin/iotzone/config   location of the configuration files, including iotzone.conf
+* ~/bin/iotzone/logs     logging output
 
-When deploying as an application, create these folders and update /etc/myzone.conf
-* /opt/myzone/             location of the publisher binaries
-* /etc/myzone,cibf         location of myzone.conf main configuration file
-* /var/lib/myzone/         location of the persistence files
-* /var/log/myzone/         location of myzone log files
+When deploying as an application, create these folders and update /etc/iotzone.conf
+* /opt/iotzone/             location of the publisher binaries
+* /etc/iotzone,cibf         location of iotzone.conf main configuration file
+* /var/lib/iotzone/         location of the persistence files
+* /var/log/iotzone/         location of iotzone log files
 
 Starting a publisher using systemd 
-1. Copy the myzone@.service and myzone.target files to /etc/systemd/system/
-2. Edit the paths in myzone.service to make sure the folder and user IDs are correct
+1. Copy the iotzone@.service and iotzone.target files to /etc/systemd/system/
+2. Edit the paths in iotzone.service to make sure the folder and user IDs are correct
 3. Start manually using systemd:
-   $ sudo service myzone@myweather start
+   $ sudo service iotzone@myweather start
 4. To start on bootup:
-   $ sudo systemctl enable myzone@myweather
+   $ sudo systemctl enable iotzone@myweather
 
 ## Contributing
-Contribution to the MyZone project is welcome. There are many areas where help is needed, especially with building publishers for IoT and other devices.
+Contribution to the iotzone project is welcome. There are many areas where help is needed, especially with building publishers for IoT and other devices.
 See [CONTRIBUTING](docs/CONTRIBUTING.md) for guidelines.
 
 ## Questions
@@ -71,7 +71,7 @@ Common questions will be captured in the [Q&A](docs/FAQ.md).
 
 # Creating A Publisher 
 
-This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/myzone/myweather*
+This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/iotzone/myweather*
 
 ## Step 1: Create A New Project
 
@@ -79,15 +79,15 @@ This uses golang module so you can use the folder of your choice. More info here
 
 
 ```bash
-$ mkdir -p ~/Projects/myzone/myweather
-$ cd ~/Projects/myzone/myweather
+$ mkdir -p ~/Projects/iotzone/myweather
+$ cd ~/Projects/iotzone/myweather
 $ go mod init myweather
    > go: creating new go.mod: module myweather
 ```
 Create a file named 'myweather.go' that looks like:
 ```golang
 package main
-import "github.com/hspaay/myzone.golang"
+import "github.com/hspaay/iotzone.golang"
 import "fmt"
 func main() {
   fmt.Printf("hello, myweather\n")
@@ -108,7 +108,7 @@ A basic publisher is implemented through only a few functions as shown below.
 
 Change myweather.go to look like this (pseudocode):
 ```golang
-import "github.com/hspaay/myzone.golang"
+import "github.com/hspaay/iotzone.golang"
 
 const PublisherId = "myweather"
 const NodeId = "amsterdam"  
@@ -118,65 +118,65 @@ const ConfigWeatherServiceUrl = "url"
 const OutputTypeForecast = "forecast"
 const DefaultWeatherServiceUrl = "http://weatherservice.com/forecast?latitude=${latitude}&longitude=${longitude}"
 
-struct MyZoneConfig {
+struct iotzoneConfig {
     Zone: string,
     Publisher: string,
     DiscoveryInterval: int,
     
 }
-function Initialize(myzone *Myzone) {
+function Initialize(iotzone *iotzone) {
 
-  myzone.log.warn("Starting myweather")
+  iotzone.log.warn("Starting myweather")
   // update discovery once a day
-  myzone.SetDefaultDiscoveryInterval(3600*24, this.Discover) 
+  iotzone.SetDefaultDiscoveryInterval(3600*24, this.Discover) 
   // update the forecast once an hour
-  myzone.SetDefaultOutputInterval(3600, this.PollOutputs)
+  iotzone.SetDefaultOutputInterval(3600, this.PollOutputs)
   // The default config handler is good for basic use
-  // myzone.SetConfigHandler(this.ConfigHandler)
+  // iotzone.SetConfigHandler(this.ConfigHandler)
   // The node has no control inputs to handle
-  // myzone.SetInputHandler(this.InputHandler)
+  // iotzone.SetInputHandler(this.InputHandler)
 }
 
-function Terminate(myzone *MyZone) {
-  myzone.log.warn("Stopping myweather")
+function Terminate(iotzone *iotzone) {
+  iotzone.log.warn("Stopping myweather")
 }
 
-function Discover(myzone *MyZone) {
+function Discover(iotzone *iotzone) {
   // Discovery of node. Discovery can be updated any time.
-  node = myzone.UpdateNode(NodeId) // add/update node with ID forecast
-  myzone.SetNodeDefaultConfig(node, ConfigLatitude, DataTypeFloat, "55")
-  myzone.SetNodeDefaultConfig(node, ConfigLongitude, DataTypeFloat, "123")
-  myzone.SetNodeDefaultConfig(node, ConfigWeatherServiceUrl, DataTypeString, DefaultWeatherServiceUrl)
+  node = iotzone.UpdateNode(NodeId) // add/update node with ID forecast
+  iotzone.SetNodeDefaultConfig(node, ConfigLatitude, DataTypeFloat, "55")
+  iotzone.SetNodeDefaultConfig(node, ConfigLongitude, DataTypeFloat, "123")
+  iotzone.SetNodeDefaultConfig(node, ConfigWeatherServiceUrl, DataTypeString, DefaultWeatherServiceUrl)
 }
 
-function Poll(myzone *MyZone) {
-  node = myzone.GetNode(NodeId)
-  configValues = myzone.GetNodeConfigValues(node)
+function Poll(iotzone *iotzone) {
+  node = iotzone.GetNode(NodeId)
+  configValues = iotzone.GetNodeConfigValues(node)
   url = configValues[ConfigWeatherServiceUrl] % configValues
   forecastRaw = httplib.get(url)
   if (forecastRaw) {
       forecastObject = JSON.parse(forecastRaw)
-      // MyZone implements the convention; Only the output value needs to be set
-      // This publishes the forecast on myzone/myweather/forecast/amsterdam/0/value|latest|history (see convention)
-      myzone.UpdateOutput(node, OutputTypeForecast, "0", forecastObject.value)
+      // iotzone implements the convention; Only the output value needs to be set
+      // This publishes the forecast on iotzone/myweather/forecast/amsterdam/0/value|latest|history (see convention)
+      iotzone.UpdateOutput(node, OutputTypeForecast, "0", forecastObject.value)
   } else {
-    myzone.UpdateOutputError(node, OutputTypeForecast, "0", "Server provided no forecast")
+    iotzone.UpdateOutputError(node, OutputTypeForecast, "0", "Server provided no forecast")
   }
 }
 
 func main() {
-  myWeather = myzone.New(DefaultZone, PublisherId)
+  myWeather = iotzone.New(DefaultZone, PublisherId)
   myWeather.Start(Initialize, Terminate, Discover, Poll)
 }
 ```
 
 # Step 3. Add Nodes
 Create a weather forecase node with configuration for latitude, longitude and location name.
-The MyZone library will automatically publish the node with any updates including the configuration.
+The iotzone library will automatically publish the node with any updates including the configuration.
 
 # Step 4. Add Output Values
 Obtain the forcast and add it as an output value to the node.
-The MyZone library will automatically publish the output discovery and values.
+The iotzone library will automatically publish the output discovery and values.
 
 
 

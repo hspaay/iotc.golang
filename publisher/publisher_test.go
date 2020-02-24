@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"myzone/messenger"
-	"myzone/nodes"
+	"iotzone/messenger"
+	"iotzone/nodes"
 
 	"github.com/stretchr/testify/assert"
 )

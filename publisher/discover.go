@@ -1,7 +1,7 @@
 // Package publisher with Discovery and update methods
 package publisher
 
-import "myzone/nodes"
+import "iotzone/nodes"
 
 // DiscoverNode is invoked when a node is (re)discovered by this publisher
 // The given node replaces the existing node if one exists

@@ -6,8 +6,8 @@ type MqttMessenger struct {
 }
 
 // NewMqttMessenger provides a messager for the MQTT message bus
-// url with host and port of the server, eg "mqtt://mqtt.myzone.world:5883/"
-// login name
+// url with host and port of the server, eg "mqtt://mqtt.iotzone.network:5883/"
+// login name: zone/id
 // cred with password
 // zone namespace for multi-tenant message busses
 func NewMqttMessenger(url string, login string, cred string, zone string) *MqttMessenger {

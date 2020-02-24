@@ -2,7 +2,7 @@
 package publisher
 
 import (
-	"myzone/nodes"
+	"iotzone/nodes"
 	"strings"
 	"time"
 )

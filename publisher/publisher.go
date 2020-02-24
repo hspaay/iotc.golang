@@ -8,8 +8,8 @@ package publisher
 
 import (
 	"fmt"
-	"myzone/messenger"
-	"myzone/nodes"
+	"iotzone/messenger"
+	"iotzone/nodes"
 	"strings"
 	"sync"
 	"time"
@@ -227,7 +227,7 @@ func NewPublisher(
 
 	var pubNode = nodes.NewNode(zoneID, publisherID, PublisherNodeID)
 
-	// MyZone core running state of the publisher
+	// IotZone core running state of the publisher
 	var publisher = &ThisPublisherState{
 		discoveryInterval: DefaultDiscoveryInterval,
 		exitChannel:       make(chan bool),
