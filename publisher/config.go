@@ -6,15 +6,11 @@
 // Not thread-safe.
 package publisher
 
-import "iotzone/nodes"
-
-// ConfigureMessage with configuration parameters
-type ConfigureMessage struct {
-	Address   string        `json:"address"` // zone/publisher/node/$configure
-	Config    nodes.AttrMap `json:"config"`
-	Sender    string        `json:"sender"`
-	Timestamp string        `json:"timestamp"`
-}
+import (
+	"encoding/json"
+	"iotzone/messenger"
+	"iotzone/nodes"
+)
 
 // DiscoverNodeConfig adds configuration to the node
 // node whose config has been discovered
@@ -67,19 +63,24 @@ func (publisher *ThisPublisherState) UpdateNodeConfig(address string, param map[
 // The message has already be unmarshalled and the signature verified by the messenger.
 // address of the node to be configured
 // message object with the configuration
-func (publisher *ThisPublisherState) handleNodeConfig(address string, message interface{}) {
+func (publisher *ThisPublisherState) handleNodeConfig(address string, publication *messenger.Publication) {
 	// TODO: authorization check
 	node := publisher.GetNode(address)
-	if node == nil || message == nil {
+	if node == nil || publication.Message == "" {
 		publisher.Logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
 		return
 	}
-	configMessage := message.(ConfigureMessage)
-	params := configMessage.Config
-	if publisher.onConfig != nil {
-		publisher.onConfig(node, params)
-	} else {
-		// process the requested configuration
-		publisher.UpdateNodeConfig(address, params)
+	var configureMessage ConfigureMessage
+	err := json.Unmarshal([]byte(publication.Message), &configureMessage)
+	if err != nil {
+		publisher.Logger.Infof("Unable to unmarshal ConfigureMessage in %s", address)
+		return
 	}
+	params := configureMessage.Config
+	if publisher.onConfig != nil {
+		// config handler returnst the parameters that must be applied directly
+		params = publisher.onConfig(node, params)
+	}
+	// process the requested configuration
+	publisher.UpdateNodeConfig(address, params)
 }

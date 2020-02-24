@@ -95,5 +95,7 @@ func (publisher *ThisPublisherState) UpdateOutputValue(outputAddress string, new
 			publisher.publishUpdates()
 		}
 		publisher.updateMutex.Unlock()
+	} else {
+		publisher.Logger.Warningf("Output to update not found. Address %s", outputAddress)
 	}
 }

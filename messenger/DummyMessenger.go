@@ -2,52 +2,24 @@
 package messenger
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/asn1"
-	"encoding/base64"
 	"encoding/json"
-	"math/big"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
 
-// ECDSASignature ...
-type ECDSASignature struct {
-	R, S *big.Int
-}
-
 // DummyMessenger that implements IMessenger
 type DummyMessenger struct {
-	Logger         *log.Logger
-	Publications   []*Publication
-	signPrivateKey *ecdsa.PrivateKey
-	subscriptions  map[string]func(address string, message interface{})
+	Logger        *log.Logger
+	Publications  map[string]*Publication
+	subscriptions map[string]func(address string, publication *Publication)
 }
 
-// Publication ...
-type Publication struct {
-	Address   string `json:"address"`
-	Signature string `json:"signature"`
-	Message   string `json:"message"`
-}
-
-// ECDSAsign the message and return the base64 encoded signature
-// This requires the signing private key to be set
-func (messenger *DummyMessenger) ECDSAsign(message []byte) string {
-	if messenger.signPrivateKey == nil {
-		return ""
-	}
-	hashed := sha256.Sum256(message)
-	r, s, err := ecdsa.Sign(rand.Reader, messenger.signPrivateKey, hashed[:])
-	if err != nil {
-		return ""
-	}
-	sig, err := asn1.Marshal(ECDSASignature{r, s})
-	return base64.StdEncoding.EncodeToString(sig)
+// Payload for parsing raw message without parsing Message.
+// At this stage we don't know the type yet
+type Payload struct {
+	Signature string          `json:"signature"`
+	Message   json.RawMessage `json:"message"`
 }
 
 // Connect the messenger
@@ -58,25 +30,27 @@ func (messenger *DummyMessenger) Connect(lastWillAddress string, lastWillValue s
 func (messenger *DummyMessenger) Disconnect() {
 }
 
-// FindPublication with the address
-func (messenger *DummyMessenger) FindPublication(addr string) *Publication {
-	for _, p := range messenger.Publications {
-		if p.Address == addr {
-			return p
-		}
-	}
-	return nil
+// FindLastPublication with the given address
+func (messenger *DummyMessenger) FindLastPublication(addr string) *Publication {
+	pub := messenger.Publications[addr]
+	return pub
 }
 
 // OnReceive function to simulate a received message
-func (messenger *DummyMessenger) OnReceive(address string, payload string) {
+func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 	messageParts := strings.Split(address, "/")
+	var payload Payload
 	var publication Publication
-	err := json.Unmarshal([]byte(payload), &publication)
+	var rawStr = string(rawPayload)
+	_ = rawStr
+	err := json.Unmarshal(rawPayload, &payload)
+	// messageStr := string(publication.Message)
 	if err != nil {
 		messenger.Logger.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
 		return
 	}
+	publication.Signature = payload.Signature
+	publication.Message = string(payload.Message)
 
 	for subscription, handler := range messenger.subscriptions {
 		subscriptionSegments := strings.Split(subscription, "/")
@@ -101,40 +75,27 @@ func (messenger *DummyMessenger) OnReceive(address string, payload string) {
 			}
 		}
 		if match {
-			handler(address, publication)
+			handler(address, &publication)
 		}
 	}
 }
 
 // Publish a JSON encoded message
-func (messenger *DummyMessenger) Publish(address string, message interface{}) {
-	buffer, err := json.MarshalIndent(message, " ", " ")
-	signature := messenger.ECDSAsign(buffer)
-	payload := Publication{
-		Address:   address,
-		Message:   string(buffer),
-		Signature: string(signature),
-	}
-	if err != nil {
-		messenger.Logger.Errorf("Messenger Publish: Error marshalling object on address %s' to json:", address, err)
-	} else {
-		messenger.Logger.Infof("Messenger Publish address=%s", address)
-		messenger.Publications = append(messenger.Publications, &payload)
-	}
+func (messenger *DummyMessenger) Publish(address string, publication *Publication) {
+	messenger.Publications[address] = publication
 }
 
 // PublishRaw message
 func (messenger *DummyMessenger) PublishRaw(address string, message string) {
 	payload := Publication{
-		Address: address,
 		Message: message,
 	}
-	messenger.Publications = append(messenger.Publications, &payload)
+	messenger.Publications[address] = &payload
 }
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
-	address string, onMessage func(address string, message interface{})) {
+	address string, onMessage func(address string, publication *Publication)) {
 
 	messenger.subscriptions[address] = onMessage
 }
@@ -145,19 +106,10 @@ func NewDummyMessenger() *DummyMessenger {
 	var logger = log.New()
 	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	// generate private/public key for signing
-	rng := rand.Reader
-	curve := elliptic.P256()
-	signPrivateKey, err := ecdsa.GenerateKey(curve, rng)
-	if err != nil {
-		logger.Errorf("Failed to create keys for signing: ", err)
-	}
-
 	var messenger = &DummyMessenger{
-		Logger:         logger,
-		Publications:   make([]*Publication, 0),
-		signPrivateKey: signPrivateKey,
-		subscriptions:  make(map[string]func(addr string, message interface{})),
+		Logger:        logger,
+		Publications:  make(map[string]*Publication, 0),
+		subscriptions: make(map[string]func(addr string, publication *Publication)),
 	}
 	return messenger
 }

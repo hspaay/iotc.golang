@@ -75,33 +75,6 @@ type InOutput struct {
 	repeatDelay int            // debounce interval in seconds before repeating updates with the same value
 }
 
-// EventMessage message with multiple output values
-type EventMessage struct {
-	Address   string            `json:"address"`
-	Event     map[string]string `json:"event"`
-	Sender    string            `json:"sender"`
-	Timestamp string            `json:"timestamp"`
-}
-
-// LatestMessage struct to send/receive the '$latest' command
-type LatestMessage struct {
-	Address   string `json:"address"`
-	Sender    string `json:"sender"`
-	Timestamp string `json:"timestamp"` // timestamp of value
-	Unit      Unit   `json:"unit,omitempty"`
-	Value     string `json:"value"`
-}
-
-// HistoryMessage struct to send/receive the '$latest' command
-type HistoryMessage struct {
-	Address   string         `json:"address"`
-	Duration  int            `json:"duration,omitempty"`
-	History   []HistoryValue `json:"history"`
-	Sender    string         `json:"sender"`
-	Timestamp string         `json:"timestamp"`
-	Unit      Unit           `json:"unit,omitempty"`
-}
-
 // HistoryValue of node output
 type HistoryValue struct {
 	time      time.Time

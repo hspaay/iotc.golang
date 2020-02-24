@@ -7,6 +7,9 @@
 package publisher
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
 	"iotzone/messenger"
 	"iotzone/nodes"
@@ -50,6 +53,7 @@ type ThisPublisherState struct {
 	pollInterval      int                                                        // value polling interval
 	publisherID       string                                                     // for easy access to the pub ID
 	publisherNode     *nodes.Node                                                // This publisher's node
+	signPrivateKey    *ecdsa.PrivateKey                                          // key for singing published messages
 	synchroneous      bool                                                       // publish synchroneous with updates for testing
 	zoneID            string                                                     // Easy access to zone ID
 
@@ -120,10 +124,10 @@ func (publisher *ThisPublisherState) Start(
 		<-publisher.exitChannel
 
 		// TODO: support LWT
-		messenger.NewDummyMessenger().Connect("", "")
+		publisher.messenger.Connect("", "")
 		// handle configuration and set messages
 		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, ConfigureCommand)
-		messenger.NewDummyMessenger().Subscribe(configAddr, publisher.handleNodeConfig)
+		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfig)
 		publisher.Logger.Warningf("Publisher %s started", publisher.publisherID)
 	}
 }
@@ -243,6 +247,16 @@ func NewPublisher(
 		zoneID:            zoneID,
 	}
 	publisher.Logger.SetReportCaller(true) // publisher logging includes caller and file:line#
+
+	// generate private/public key for signing
+	rng := rand.Reader
+	curve := elliptic.P256()
+	privKey, err := ecdsa.GenerateKey(curve, rng)
+	publisher.signPrivateKey = privKey
+	if err != nil {
+		publisher.Logger.Errorf("Failed to create keys for signing: %s", err)
+	}
+
 	publisher.DiscoverNode(pubNode)
 	return publisher
 }

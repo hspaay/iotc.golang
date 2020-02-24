@@ -2,10 +2,38 @@
 package publisher
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/asn1"
+	"encoding/base64"
+	"encoding/json"
+	"iotzone/messenger"
 	"iotzone/nodes"
+	"math/big"
 	"strings"
 	"time"
 )
+
+// ECDSASignature ...
+type ECDSASignature struct {
+	R, S *big.Int
+}
+
+// ecdsaSign the message and return the base64 encoded signature
+// This requires the signing private key to be set
+func (publisher *ThisPublisherState) ecdsaSign(message []byte) string {
+	if publisher.signPrivateKey == nil {
+		return ""
+	}
+	hashed := sha256.Sum256(message)
+	r, s, err := ecdsa.Sign(rand.Reader, publisher.signPrivateKey, hashed[:])
+	if err != nil {
+		return ""
+	}
+	sig, err := asn1.Marshal(ECDSASignature{r, s})
+	return base64.StdEncoding.EncodeToString(sig)
+}
 
 // Replace the address with the node's alias instead the node ID, if available
 // return the address if the node doesn't have an alias
@@ -42,13 +70,13 @@ func (publisher *ThisPublisherState) publishEventCommand(aliasAddress string, no
 		attrID := output.IOType + "/" + output.Instance
 		event[attrID] = history[0].Value
 	}
-	eventMessage := &nodes.EventMessage{
+	eventMessage := &EventMessage{
 		Address:   addr,
 		Event:     event,
 		Sender:    publisher.publisherNode.Address,
 		Timestamp: timeStampStr,
 	}
-	publisher.messenger.Publish(addr, eventMessage)
+	publisher.publishMessage(addr, eventMessage)
 }
 
 // publish the $latest output value
@@ -61,14 +89,14 @@ func (publisher *ThisPublisherState) publishLatestCommand(aliasAddress string, o
 	history := nodes.GetHistory(output)
 	latest := history[0]
 	publisher.Logger.Infof("publish output latest: %s", addr)
-	latestMessage := &nodes.LatestMessage{
+	latestMessage := &LatestMessage{
 		Address:   addr,
 		Sender:    publisher.publisherNode.Address,
 		Timestamp: latest.TimeStamp,
 		Unit:      output.Unit,
 		Value:     latest.Value,
 	}
-	publisher.messenger.Publish(addr, latestMessage)
+	publisher.publishMessage(addr, latestMessage)
 }
 
 // publish the $history output values
@@ -78,7 +106,7 @@ func (publisher *ThisPublisherState) publishHistoryCommand(aliasAddress string, 
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
-	historyMessage := &nodes.HistoryMessage{
+	historyMessage := &HistoryMessage{
 		Address:   addr,
 		Duration:  0, // tbd
 		Sender:    publisher.publisherNode.Address,
@@ -86,7 +114,23 @@ func (publisher *ThisPublisherState) publishHistoryCommand(aliasAddress string, 
 		Unit:      output.Unit,
 		History:   nodes.GetHistory(output),
 	}
-	publisher.messenger.Publish(addr, historyMessage)
+	publisher.publishMessage(addr, historyMessage)
+}
+
+// publishMessage encapsulates the message object in a payload, signs, and sends it
+func (publisher *ThisPublisherState) publishMessage(address string, message interface{}) {
+	buffer, err := json.MarshalIndent(message, " ", " ")
+	if err != nil {
+		publisher.Logger.Errorf("Error marshalling message for address %s: %s", address, err)
+		return
+	}
+	signature := publisher.ecdsaSign(buffer)
+
+	publication := &messenger.Publication{
+		Message:   string(buffer),
+		Signature: signature,
+	}
+	publisher.messenger.Publish(address, publication)
 }
 
 // publish the raw output $value
@@ -99,7 +143,11 @@ func (publisher *ThisPublisherState) publishValueCommand(aliasAddress string, ou
 	latest := history[0]
 	aliasSegments[3] = ValueCommand
 	alias := strings.Join(aliasSegments, "/")
-	publisher.Logger.Infof("publish output value: %s", aliasAddress)
+	s := latest.Value
+	if len(s) > 30 {
+		s = s[:30]
+	}
+	publisher.Logger.Infof("publish output value '%s' on %s", s, aliasAddress)
 
 	publisher.messenger.PublishRaw(alias, latest.Value) // raw
 }
@@ -118,7 +166,7 @@ func (publisher *ThisPublisherState) publishUpdates() {
 	if publisher.updatedNodes != nil {
 		for addr, node := range publisher.updatedNodes {
 			publisher.Logger.Infof("publish node discovery: %s", addr)
-			publisher.messenger.Publish(addr, node)
+			publisher.publishMessage(addr, node)
 		}
 		publisher.updatedNodes = nil
 	}
@@ -128,7 +176,7 @@ func (publisher *ThisPublisherState) publishUpdates() {
 		for addr, inoutput := range publisher.updatedInOutputs {
 			aliasAddress := publisher.getAliasAddress(addr)
 			publisher.Logger.Infof("publish in/output discovery: %s", aliasAddress)
-			publisher.messenger.Publish(aliasAddress, inoutput)
+			publisher.publishMessage(aliasAddress, inoutput)
 		}
 		publisher.updatedInOutputs = nil
 	}
