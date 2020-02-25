@@ -1,14 +1,14 @@
 # iotzone.golang
 iotzone.golang is the core library in the Golang language *for developers of iotzone publishers*. It serves as a reference implementation in the golang language. 
 
-iotzone is an implementation of the iotconnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation.
-The convention can be found at: https://github.com/hspaay/iotzone.convention
+iotzone is an implementation of the IotConnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation. The standard can be found at: https://github.com/hspaay/iotzone.standard
 
 ## This Library Provides
 * systemd launcher for linux 
-* Management of nodes, inputs and outputs (see iotconnect standard for further explanation)
+* Management of nodes, inputs and outputs (see IotConnect standard for further explanation)
 * Auto publish discovery when nodes and configuration are updated 
 * Auto publish updates to output values 
+* Signing of published messages
 * Provide hooks to handle control input messages
 * Provide hooks to handle configuration updates
 * Define the iotzone data types in Golang
@@ -48,7 +48,7 @@ The folder structure for deployment as a normal user is:
 
 When deploying as an application, create these folders and update /etc/iotzone.conf
 * /opt/iotzone/             location of the publisher binaries
-* /etc/iotzone,cibf         location of iotzone.conf main configuration file
+* /etc/iotzone/conf         location of iotzone.conf main configuration file
 * /var/lib/iotzone/         location of the persistence files
 * /var/log/iotzone/         location of iotzone log files
 
