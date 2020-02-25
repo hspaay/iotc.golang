@@ -1,5 +1,5 @@
-// Package nodes with definition for nodes, inputs and outputs
-package nodes
+// Package standard with type definitions from the iotconnect standard
+package standard
 
 import (
 	"fmt"
@@ -22,27 +22,6 @@ type Node struct {
 	// historySize int                  `yaml:"-" json:"-"`                                 // size of history for inputs and outputs
 	// repeatDelay int                  `yaml:"-" json:"-"`
 	// modified    bool                 `yaml:"-" json:"-"` // Node/service attribute or config has been updated
-}
-
-// AttrMap for use in node attributes and node status attributes
-type AttrMap map[string]string
-
-// ConfigAttrMap for use in node and in/output configuration
-type ConfigAttrMap map[string]*ConfigAttr
-
-// ConfigAttr describing the configuration of the device/service or sensor
-type ConfigAttr struct {
-	DataType    DataType `yaml:"datatype,omitempty" json:"datatype,omitempty"`       // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
-	Default     string   `yaml:"default,omitempty" json:"default,omitempty"`         // Default value
-	Description string   `yaml:"description,omitempty" json:"description,omitempty"` // Description of the attribute
-	Enum        []string `yaml:"enum,omitempty" json:"enum,omitempty"`               // Possible valid enum values
-	Max         float64  `yaml:"max,omitempty" json:"max,omitempty"`                 // Max value for numbers
-	Min         float64  `yaml:"min,omitempty" json:"min,omitempty"`                 // Min value for numbers
-	//Name        string   `yaml:"name,omitempty" json:"name,omitempty"`               // Friendly name
-	Secret bool   `yaml:"secret,omitempty" json:"secret,omitempty"` // the attribute value was set encrypted. Don't publish the value.
-	Value  string `yaml:"value,omitempty" json:"value,omitempty"`   // Current value of the attribute. Could be a string or map
-	//ValueList   []interface{} `yaml:"valuelist,omitempty" json:"valuelist,omitempty"`             // Current value of the attribute. Could be a string or map
-	//ValueList   []interface{} `yaml:"-" json:"-"`             // Current value of the attribute. Could be a string or map
 }
 
 // Identity contains the identity information of a publisher node
@@ -75,11 +54,75 @@ type InOutput struct {
 	repeatDelay int            // debounce interval in seconds before repeating updates with the same value
 }
 
+// AttrMap for use in node attributes and node status attributes
+type AttrMap map[string]string
+
+// ConfigAttrMap for use in node and in/output configuration
+type ConfigAttrMap map[string]*ConfigAttr
+
+// ConfigAttr describing the configuration of the device/service or sensor
+type ConfigAttr struct {
+	DataType    DataType `yaml:"datatype,omitempty" json:"datatype,omitempty"`       // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
+	Default     string   `yaml:"default,omitempty" json:"default,omitempty"`         // Default value
+	Description string   `yaml:"description,omitempty" json:"description,omitempty"` // Description of the attribute
+	Enum        []string `yaml:"enum,omitempty" json:"enum,omitempty"`               // Possible valid enum values
+	Max         float64  `yaml:"max,omitempty" json:"max,omitempty"`                 // Max value for numbers
+	Min         float64  `yaml:"min,omitempty" json:"min,omitempty"`                 // Min value for numbers
+	//Name        string   `yaml:"name,omitempty" json:"name,omitempty"`               // Friendly name
+	Secret bool   `yaml:"secret,omitempty" json:"secret,omitempty"` // the attribute value was set encrypted. Don't publish the value.
+	Value  string `yaml:"value,omitempty" json:"value,omitempty"`   // Current value of the attribute. Could be a string or map
+	//ValueList   []interface{} `yaml:"valuelist,omitempty" json:"valuelist,omitempty"`             // Current value of the attribute. Could be a string or map
+	//ValueList   []interface{} `yaml:"-" json:"-"`             // Current value of the attribute. Could be a string or map
+}
+
+// ConfigureMessage with configuration parameters
+type ConfigureMessage struct {
+	Address   string  `json:"address"` // zone/publisher/node/$configure
+	Config    AttrMap `json:"config"`
+	Sender    string  `json:"sender"`
+	Timestamp string  `json:"timestamp"`
+}
+
+// EventMessage message with multiple output values
+type EventMessage struct {
+	Address   string            `json:"address"`
+	Event     map[string]string `json:"event"`
+	Sender    string            `json:"sender"`
+	Timestamp string            `json:"timestamp"`
+}
+
+// HistoryMessage struct to send/receive the '$latest' command
+type HistoryMessage struct {
+	Address   string         `json:"address"`
+	Duration  int            `json:"duration,omitempty"`
+	History   []HistoryValue `json:"history"`
+	Sender    string         `json:"sender"`
+	Timestamp string         `json:"timestamp"`
+	Unit      Unit           `json:"unit,omitempty"`
+}
+
 // HistoryValue of node output
 type HistoryValue struct {
 	time      time.Time
 	TimeStamp string `yaml:"timestamp"`
 	Value     string `yaml:"value"`
+}
+
+// LatestMessage struct to send/receive the '$latest' command
+type LatestMessage struct {
+	Address   string `json:"address"`
+	Sender    string `json:"sender"`
+	Timestamp string `json:"timestamp"` // timestamp of value
+	Unit      Unit   `json:"unit,omitempty"`
+	Value     string `json:"value"`
+}
+
+// SetMessage to set node input
+type SetMessage struct {
+	Address   string `json:"address"` // zone/publisher/node/$set/type/instance
+	Sender    string `json:"sender"`
+	Timestamp string `json:"timestamp"`
+	Value     string `json:"value"`
 }
 
 // GetHistory returns the last updated time and value
@@ -118,7 +161,7 @@ func UpdateValue(inout *InOutput, newValue string) {
 // NewInput instance
 func NewInput(node *Node, ioType string, instance string) *InOutput {
 	segments := strings.Split(node.Address, "/")
-	address := fmt.Sprintf("%s/%s/%s/$input/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
+	address := fmt.Sprintf("%s/%s/%s/"+InputDiscoveryCommand+"/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
 	io := &InOutput{
 		Address:  address,
 		Config:   ConfigAttrMap{},
@@ -132,7 +175,7 @@ func NewInput(node *Node, ioType string, instance string) *InOutput {
 // NewOutput instance
 func NewOutput(node *Node, ioType string, instance string) *InOutput {
 	segments := strings.Split(node.Address, "/")
-	address := fmt.Sprintf("%s/%s/%s/$output/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
+	address := fmt.Sprintf("%s/%s/%s/"+OutputDiscoveryCommand+"/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
 	io := &InOutput{
 		Address:  address,
 		Config:   ConfigAttrMap{},
@@ -145,7 +188,7 @@ func NewOutput(node *Node, ioType string, instance string) *InOutput {
 
 // NewNode instance
 func NewNode(zoneID string, publisherID string, nodeID string) *Node {
-	address := fmt.Sprintf("%s/%s/%s/$node", zoneID, publisherID, nodeID)
+	address := fmt.Sprintf("%s/%s/%s/"+NodeDiscoveryCommand, zoneID, publisherID, nodeID)
 	return &Node{
 		Address:   address,
 		Attr:      AttrMap{},

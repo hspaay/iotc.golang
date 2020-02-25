@@ -12,7 +12,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"iotzone/messenger"
-	"iotzone/nodes"
+	"iotzone/standard"
 	"strings"
 	"sync"
 	"time"
@@ -22,60 +22,49 @@ import (
 
 // reserved keywords
 const (
-	// LocalZone ID for local-only zones (eg, no sharing outside this zone)
-	LocalZoneID = "$local"
-	// PublisherNodeID to use when none is provided
-	PublisherNodeID = "$publisher"
 	// DefaultDiscoveryInterval in which node discovery information is republished
 	DefaultDiscoveryInterval = 24 * 3600
 	// DefaultPollInterval in which the output values are queried for polling based sources
 	DefaultPollInterval = 24 * 3600
-	//
-	ConfigureCommand = "$configure"
-	EventCommand     = "$event"
-	HistoryCommand   = "$history"
-	LatestCommand    = "$latest"
-	SetCommand       = "$set"
-	ValueCommand     = "$value"
 )
 
 // ThisPublisherState carries the operating state of 'this' publisher
 type ThisPublisherState struct {
-	discoverCountdown int                                                        // countdown each heartbeat
-	discoveryInterval int                                                        // discovery polling interval
-	discoveryHandler  func(publisher *ThisPublisherState)                        // function that performs discovery
-	Logger            *log.Logger                                                //
-	messenger         messenger.IMessenger                                       // Message bus messenger to use
-	onConfig          func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap // handle before applying configuration
-	onSetMessage      func(input *nodes.InOutput, message *SetMessage)           // handle to update device/service input
-	pollHandler       func(publisher *ThisPublisherState)                        // function that performs value polling
-	pollCountdown     int                                                        // countdown each heartbeat
-	pollInterval      int                                                        // value polling interval
-	publisherID       string                                                     // for easy access to the pub ID
-	publisherNode     *nodes.Node                                                // This publisher's node
-	signPrivateKey    *ecdsa.PrivateKey                                          // key for singing published messages
-	synchroneous      bool                                                       // publish synchroneous with updates for testing
-	zoneID            string                                                     // Easy access to zone ID
+	discoverCountdown int                                                                 // countdown each heartbeat
+	discoveryInterval int                                                                 // discovery polling interval
+	discoveryHandler  func(publisher *ThisPublisherState)                                 // function that performs discovery
+	Logger            *log.Logger                                                         //
+	messenger         messenger.IMessenger                                                // Message bus messenger to use
+	onConfig          func(node *standard.Node, config standard.AttrMap) standard.AttrMap // handle before applying configuration
+	onSetMessage      func(input *standard.InOutput, message *standard.SetMessage)        // handle to update device/service input
+	pollHandler       func(publisher *ThisPublisherState)                                 // function that performs value polling
+	pollCountdown     int                                                                 // countdown each heartbeat
+	pollInterval      int                                                                 // value polling interval
+	publisherID       string                                                              // for easy access to the pub ID
+	publisherNode     *standard.Node                                                      // This publisher's node
+	signPrivateKey    *ecdsa.PrivateKey                                                   // key for singing published messages
+	synchroneous      bool                                                                // publish synchroneous with updates for testing
+	zoneID            string                                                              // Easy access to zone ID
 
 	// handle updates in the background or synchroneous. background publications require a mutex to prevent concurrent access
 	exitChannel         chan bool
-	updateMutex         *sync.Mutex                     // mutex for async updating and publishing
-	configs             map[string]*nodes.ConfigAttrMap // node configuration
-	nodes               map[string]*nodes.Node          // nodes by discovery address
-	isRunning           bool                            // publisher was started and is running
-	inputs              map[string]*nodes.InOutput      // inputs by discovery address
-	outputs             map[string]*nodes.InOutput      // outputs by discovery address
-	updatedNodes        map[string]*nodes.Node          // nodes that have been rediscovered/updated since last publication
-	updatedInOutputs    map[string]*nodes.InOutput      // in/output that have been rediscovered/updated since last publication
-	updatedOutputValues map[string]*nodes.InOutput      // outputs whose values have updated since last publication
+	updateMutex         *sync.Mutex                        // mutex for async updating and publishing
+	configs             map[string]*standard.ConfigAttrMap // node configuration
+	nodes               map[string]*standard.Node          // nodes by discovery address
+	isRunning           bool                               // publisher was started and is running
+	inputs              map[string]*standard.InOutput      // inputs by discovery address
+	outputs             map[string]*standard.InOutput      // outputs by discovery address
+	updatedNodes        map[string]*standard.Node          // nodes that have been rediscovered/updated since last publication
+	updatedInOutputs    map[string]*standard.InOutput      // in/output that have been rediscovered/updated since last publication
+	updatedOutputValues map[string]*standard.InOutput      // outputs whose values have updated since last publication
 }
 
 // GetNode returns a discovered node by the node address
 // address of the node, only the zone, publisher and nodeID are used. Any command suffix is ignored
 // Returns nil if address has no known node
-func (publisher *ThisPublisherState) GetNode(address string) *nodes.Node {
+func (publisher *ThisPublisherState) GetNode(address string) *standard.Node {
 	segments := strings.Split(address, "/")
-	segments[3] = "$node"
+	segments[3] = standard.NodeDiscoveryCommand
 	nodeAddr := strings.Join(segments[:4], "/")
 
 	publisher.updateMutex.Lock()
@@ -87,9 +76,9 @@ func (publisher *ThisPublisherState) GetNode(address string) *nodes.Node {
 // GetInput returns a discovered input by its discovery address
 // Returns nil if address has no known input
 // address with node type and instance. The command will be ignored.
-func (publisher *ThisPublisherState) GetInput(address string) *nodes.InOutput {
+func (publisher *ThisPublisherState) GetInput(address string) *standard.InOutput {
 	segments := strings.Split(address, "/")
-	segments[3] = "$input"
+	segments[3] = standard.InputDiscoveryCommand
 	inputAddr := strings.Join(segments, "/")
 
 	publisher.updateMutex.Lock()
@@ -101,9 +90,9 @@ func (publisher *ThisPublisherState) GetInput(address string) *nodes.InOutput {
 // GetOutput returns a discovered output by its discovery address
 // Returns nil if address has no known output
 // address with node type and instance. The command will be ignored.
-func (publisher *ThisPublisherState) GetOutput(address string) *nodes.InOutput {
+func (publisher *ThisPublisherState) GetOutput(address string) *standard.InOutput {
 	segments := strings.Split(address, "/")
-	segments[3] = "$output"
+	segments[3] = standard.OutputDiscoveryCommand
 	outputAddr := strings.Join(segments, "/")
 	publisher.updateMutex.Lock()
 	var output = publisher.outputs[outputAddr]
@@ -117,8 +106,8 @@ func (publisher *ThisPublisherState) GetOutput(address string) *nodes.InOutput {
 // onInput handles commands to update inputs, nil if there are no inputs to control
 func (publisher *ThisPublisherState) Start(
 	synchroneous bool,
-	onConfig func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap,
-	onSetMessage func(input *nodes.InOutput, message *SetMessage)) {
+	onConfig func(node *standard.Node, config standard.AttrMap) standard.AttrMap,
+	onSetMessage func(input *standard.InOutput, message *standard.SetMessage)) {
 
 	publisher.synchroneous = synchroneous
 	publisher.onConfig = onConfig
@@ -135,9 +124,9 @@ func (publisher *ThisPublisherState) Start(
 		// TODO: support LWT
 		publisher.messenger.Connect("", "")
 		// handle configuration and set messages
-		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, ConfigureCommand)
-		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfig)
-		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.zoneID, publisher.publisherID, SetCommand)
+		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, standard.ConfigureCommand)
+		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
+		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.zoneID, publisher.publisherID, standard.SetCommand)
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 		publisher.Logger.Warningf("Publisher %s started", publisher.publisherID)
 	}
@@ -164,9 +153,9 @@ func (publisher *ThisPublisherState) Stop() {
 // address of the node, only the zone, publisher and nodeID are used. Any command suffix is ignored
 // This method is not thread safe and should only be used in a locked section
 // Returns nil if address has no known node
-func (publisher *ThisPublisherState) getNode(address string) *nodes.Node {
+func (publisher *ThisPublisherState) getNode(address string) *standard.Node {
 	segments := strings.Split(address, "/")
-	segments[3] = "$node"
+	segments[3] = standard.NodeDiscoveryCommand
 	nodeAddr := strings.Join(segments[:4], "/")
 
 	var node = publisher.nodes[nodeAddr]
@@ -175,8 +164,8 @@ func (publisher *ThisPublisherState) getNode(address string) *nodes.Node {
 
 // getNodeOutputs returns a list of outputs for the given node
 // This method is not thread safe and should only be used in a locked section
-func (publisher *ThisPublisherState) getNodeOutputs(node *nodes.Node) []*nodes.InOutput {
-	outputs := []*nodes.InOutput{}
+func (publisher *ThisPublisherState) getNodeOutputs(node *standard.Node) []*standard.InOutput {
+	outputs := []*standard.InOutput{}
 	for _, output := range publisher.outputs {
 		if output.NodeID == node.ID {
 			outputs = append(outputs, output)
@@ -199,7 +188,8 @@ func (publisher *ThisPublisherState) heartbeatLoop() {
 			// FIXME: the publishUpdates duration adds to the heartbeat. This can also take a
 			//  while unless the messenger unloads using channels (which it should)
 			//  we want to be sure it has completed when the heartbeat ends
-			publisher.publishUpdates()
+			publisher.publishDiscovery()
+			publisher.publishOutputValues()
 			publisher.updateMutex.Unlock()
 		}
 
@@ -240,17 +230,17 @@ func NewPublisher(
 	messenger messenger.IMessenger,
 ) *ThisPublisherState {
 
-	var pubNode = nodes.NewNode(zoneID, publisherID, PublisherNodeID)
+	var pubNode = standard.NewNode(zoneID, publisherID, standard.PublisherNodeID)
 
 	// IotZone core running state of the publisher
 	var publisher = &ThisPublisherState{
 		discoveryInterval: DefaultDiscoveryInterval,
 		exitChannel:       make(chan bool),
-		inputs:            make(map[string]*nodes.InOutput, 0),
+		inputs:            make(map[string]*standard.InOutput, 0),
 		Logger:            log.New(),
 		messenger:         messenger,
-		nodes:             make(map[string]*nodes.Node),
-		outputs:           make(map[string]*nodes.InOutput),
+		nodes:             make(map[string]*standard.Node),
+		outputs:           make(map[string]*standard.InOutput),
 		pollInterval:      DefaultPollInterval,
 		publisherID:       publisherID,
 		publisherNode:     pubNode,

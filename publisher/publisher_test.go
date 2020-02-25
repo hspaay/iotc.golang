@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"iotzone/messenger"
-	"iotzone/nodes"
+	"iotzone/standard"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +20,7 @@ const zone1ID = "$local"
 var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
-var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
+var node1 = standard.NewNode(zone1ID, publisher1ID, node1ID)
 var node1ConfigureAddr = node1Base + "/$configure"
 var node1InputAddr = node1Base + "/$input/switch/0"
 var node1InputSetAddr = node1Base + "/$set/switch/0"
@@ -30,9 +30,9 @@ var node1valueAddr = node1Base + "/$value/switch/0"
 var node1latestAddr = node1Base + "/$latest/switch/0"
 var node1historyAddr = node1Base + "/$history/switch/0"
 
-var node1Input1 = nodes.NewInput(node1, "switch", "0")
-var node1Output1 = nodes.NewOutput(node1, "switch", "0")
-var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, PublisherNodeID)
+var node1Input1 = standard.NewInput(node1, "switch", "0")
+var node1Output1 = standard.NewOutput(node1, "switch", "0")
+var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, standard.PublisherNodeID)
 
 // const node2 = new node.Node{}
 
@@ -98,7 +98,7 @@ func TestNodePublication(t *testing.T) {
 	p0 := testMessenger.FindLastPublication(node1Addr)
 	assert.NotNilf(t, p0, "Publication for publisher %s not found", pubAddr)
 	assert.NotEmpty(t, p0.Signature, "Missing signature in publication")
-	var p0Node nodes.Node
+	var p0Node standard.Node
 	err := json.Unmarshal([]byte(p0.Message), &p0Node)
 	assert.NoError(t, err, "Failed parsing node message publication")
 	assert.Equal(t, node1Addr, p0Node.Address, "published node doesn't match address")
@@ -123,7 +123,7 @@ func TestAlias(t *testing.T) {
 	publisher.DiscoverNode(node1)
 
 	config := map[string]string{"alias": node1AliasID}
-	publisher.UpdateNodeConfig(node1Addr, config)
+	publisher.UpdateNodeConfigValue(node1Addr, config)
 
 	publisher.DiscoverOutput(node1Output1) // expect a publication with the alias
 	publisher.Stop()
@@ -131,13 +131,13 @@ func TestAlias(t *testing.T) {
 	p3 := testMessenger.FindLastPublication(node1AliasOutput1Addr) // the output discovery publication
 	assert.NotNil(t, p3, "output discovery should use alias with address %s but no publication was found", node1AliasOutput1Addr)
 
-	var out nodes.InOutput
+	var out standard.InOutput
 	err := json.Unmarshal([]byte(p3.Message), &out)
 	if !assert.NoError(t, err, "Failed to unmarshal published message") {
 		return
 	}
 	assert.Equal(t, node1Output1Addr, out.Address, "published output has unexpected address")
-	assert.Equal(t, nodes.IOTypeOnOffSwitch, out.IOType, "published output has unexpected iotype")
+	assert.Equal(t, standard.IOTypeOnOffSwitch, out.IOType, "published output has unexpected iotype")
 }
 
 // TestConfigure tests if the node configuration is handled
@@ -148,10 +148,10 @@ func TestConfigure(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	publisher.Start(true, nil, nil) // start to subscribe
 	publisher.DiscoverNode(node1)
-	publisher.DiscoverNodeConfig(node1, "name", &nodes.ConfigAttr{Description: "Friendly Name"})
+	publisher.DiscoverNodeConfig(node1, "name", &standard.ConfigAttr{Description: "Friendly Name"})
 
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "config": {"name":"NewName"} }`,
-		node1ConfigureAddr, pubAddr, time.Now().Format(nodes.TimeFormat))
+		node1ConfigureAddr, pubAddr, time.Now().Format(standard.TimeFormat))
 	// message = `{ "a": "Hello world" }`
 	payload := fmt.Sprintf(`{"signature": "123", "message": %s }`, message)
 	testMessenger.OnReceive(node1ConfigureAddr, []byte(payload))
@@ -186,7 +186,7 @@ func TestOutputValue(t *testing.T) {
 
 	// test $latest publication
 	p2 := testMessenger.FindLastPublication(node1latestAddr)
-	var latest LatestMessage
+	var latest standard.LatestMessage
 	if !assert.NotNil(t, p2.Message) {
 		return
 	}
@@ -195,7 +195,7 @@ func TestOutputValue(t *testing.T) {
 
 	// test $history publication
 	p3 := testMessenger.FindLastPublication(node1historyAddr)
-	var history HistoryMessage
+	var history standard.HistoryMessage
 	json.Unmarshal([]byte(p3.Message), &history)
 	assert.Len(t, history.History, 1, "History length differs")
 }
@@ -206,26 +206,26 @@ func TestReceiveInput(t *testing.T) {
 	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	publisher.Start(false, nil, func(input *nodes.InOutput, message *SetMessage) {
+	publisher.Start(false, nil, func(input *standard.InOutput, message *standard.SetMessage) {
 		publisher.Logger.Infof("Received message: %s", message.Value)
 		// find the corresponding output address
 		output := publisher.GetOutput(input.Address)
 		if !assert.NotNilf(t, output, "No corresponding output for address %s", input.Address) {
 			return
 		}
-		nodes.UpdateValue(output, message.Value)
+		standard.UpdateValue(output, message.Value)
 	})
 	publisher.DiscoverNode(node1) // p1
 	publisher.DiscoverInput(node1Input1)
 	publisher.DiscoverOutput(node1Output1)
 
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
-		node1InputSetAddr, pubAddr, time.Now().Format(nodes.TimeFormat))
+		node1InputSetAddr, pubAddr, time.Now().Format(standard.TimeFormat))
 	// message = `{ "a": "Hello world" }`
 	payload := fmt.Sprintf(`{"signature": "123", "message": %s }`, message)
 	testMessenger.OnReceive(node1InputSetAddr, []byte(payload))
 
-	val := nodes.GetOutputValue(node1Output1)
+	val := standard.GetOutputValue(node1Output1)
 	assert.Equal(t, "true", val, "Input value didn't update the output")
 
 	publisher.Stop()

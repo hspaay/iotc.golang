@@ -1,11 +1,29 @@
-// Package nodes constants for attributes, node types, I/O types and units
-package nodes
+// Package standard with constants of the iotconnect standard
+package standard
 
 import (
 	"fmt"
 )
 
+// TimeFormat for publishing messages
 const TimeFormat = "2006-01-02T15:04:05.000-0700"
+
+// address reserved keywords
+const (
+	// LocalZone ID for local-only zones (eg, no sharing outside this zone)
+	LocalZoneID = "$local"
+	// PublisherNodeID to use when none is provided
+	ConfigureCommand       = "$configure" // node configuration
+	EventCommand           = "$event"     // node outputs event
+	HistoryCommand         = "$history"   // output history
+	InputDiscoveryCommand  = "$input"
+	LatestCommand          = "$latest" // latest output value
+	NodeDiscoveryCommand   = "$node"   // node discovery command
+	OutputDiscoveryCommand = "$output"
+	PublisherNodeID        = "$publisher" // reserved node ID for publishers
+	SetCommand             = "$set"       // control input command
+	ValueCommand           = "$value"     // raw output value
+)
 
 // Standard attribute names for device and sensor attributes and config
 const (
