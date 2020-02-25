@@ -47,7 +47,7 @@ type ThisPublisherState struct {
 	Logger            *log.Logger                                                //
 	messenger         messenger.IMessenger                                       // Message bus messenger to use
 	onConfig          func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap // handle before applying configuration
-	onInput           func(input *nodes.InOutput, message string)                // handle to update device/service input
+	onSetMessage      func(input *nodes.InOutput, message *SetMessage)           // handle to update device/service input
 	pollHandler       func(publisher *ThisPublisherState)                        // function that performs value polling
 	pollCountdown     int                                                        // countdown each heartbeat
 	pollInterval      int                                                        // value polling interval
@@ -86,18 +86,27 @@ func (publisher *ThisPublisherState) GetNode(address string) *nodes.Node {
 
 // GetInput returns a discovered input by its discovery address
 // Returns nil if address has no known input
+// address with node type and instance. The command will be ignored.
 func (publisher *ThisPublisherState) GetInput(address string) *nodes.InOutput {
+	segments := strings.Split(address, "/")
+	segments[3] = "$input"
+	inputAddr := strings.Join(segments, "/")
+
 	publisher.updateMutex.Lock()
-	var input = publisher.inputs[address]
+	var input = publisher.inputs[inputAddr]
 	publisher.updateMutex.Unlock()
 	return input
 }
 
 // GetOutput returns a discovered output by its discovery address
 // Returns nil if address has no known output
+// address with node type and instance. The command will be ignored.
 func (publisher *ThisPublisherState) GetOutput(address string) *nodes.InOutput {
+	segments := strings.Split(address, "/")
+	segments[3] = "$output"
+	outputAddr := strings.Join(segments, "/")
 	publisher.updateMutex.Lock()
-	var output = publisher.outputs[address]
+	var output = publisher.outputs[outputAddr]
 	publisher.updateMutex.Unlock()
 	return output
 }
@@ -109,11 +118,11 @@ func (publisher *ThisPublisherState) GetOutput(address string) *nodes.InOutput {
 func (publisher *ThisPublisherState) Start(
 	synchroneous bool,
 	onConfig func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap,
-	onInput func(input *nodes.InOutput, message string)) {
+	onSetMessage func(input *nodes.InOutput, message *SetMessage)) {
 
 	publisher.synchroneous = synchroneous
 	publisher.onConfig = onConfig
-	publisher.onInput = onInput
+	publisher.onSetMessage = onSetMessage
 	if !publisher.isRunning {
 		publisher.Logger.Warningf("Starting publisher %s", publisher.publisherID)
 		publisher.updateMutex.Lock()
@@ -128,6 +137,8 @@ func (publisher *ThisPublisherState) Start(
 		// handle configuration and set messages
 		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, ConfigureCommand)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfig)
+		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.zoneID, publisher.publisherID, SetCommand)
+		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 		publisher.Logger.Warningf("Publisher %s started", publisher.publisherID)
 	}
 }

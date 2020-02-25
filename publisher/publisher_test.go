@@ -23,6 +23,7 @@ var node1Addr = node1Base + "/$node"
 var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
 var node1ConfigureAddr = node1Base + "/$configure"
 var node1InputAddr = node1Base + "/$input/switch/0"
+var node1InputSetAddr = node1Base + "/$set/switch/0"
 var node1Output1Addr = node1Base + "/$output/switch/0"
 var node1AliasOutput1Addr = node1Alias + "/$output/switch/0"
 var node1valueAddr = node1Base + "/$value/switch/0"
@@ -94,7 +95,7 @@ func TestNodePublication(t *testing.T) {
 	if !assert.Len(t, testMessenger.Publications, 4, "Missing publication") {
 		return
 	}
-	p0 := testMessenger.FindLastPublication(pubAddr)
+	p0 := testMessenger.FindLastPublication(node1Addr)
 	assert.NotNilf(t, p0, "Publication for publisher %s not found", pubAddr)
 	assert.NotEmpty(t, p0.Signature, "Missing signature in publication")
 	var p0Node nodes.Node
@@ -205,8 +206,27 @@ func TestReceiveInput(t *testing.T) {
 	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	publisher.Start(false, nil, nil)
+	publisher.Start(false, nil, func(input *nodes.InOutput, message *SetMessage) {
+		publisher.Logger.Infof("Received message: %s", message.Value)
+		// find the corresponding output address
+		output := publisher.GetOutput(input.Address)
+		if !assert.NotNilf(t, output, "No corresponding output for address %s", input.Address) {
+			return
+		}
+		nodes.UpdateValue(output, message.Value)
+	})
 	publisher.DiscoverNode(node1) // p1
 	publisher.DiscoverInput(node1Input1)
+	publisher.DiscoverOutput(node1Output1)
+
+	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
+		node1InputSetAddr, pubAddr, time.Now().Format(nodes.TimeFormat))
+	// message = `{ "a": "Hello world" }`
+	payload := fmt.Sprintf(`{"signature": "123", "message": %s }`, message)
+	testMessenger.OnReceive(node1InputSetAddr, []byte(payload))
+
+	val := nodes.GetOutputValue(node1Output1)
+	assert.Equal(t, "true", val, "Input value didn't update the output")
+
 	publisher.Stop()
 }

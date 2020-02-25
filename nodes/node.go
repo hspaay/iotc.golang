@@ -87,6 +87,11 @@ func GetHistory(inout *InOutput) []HistoryValue {
 	return inout.history
 }
 
+// GetOutputValue returns the current output value
+func GetOutputValue(output *InOutput) string {
+	return output.history[0].Value
+}
+
 // UpdateValue inserts a new value at the front of the output history
 // If the value hasn't change it is ignored unless the the previous value is older than the repeatDelay
 // This function is not thread-safe and should only be used from within a locked section

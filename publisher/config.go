@@ -58,11 +58,8 @@ func (publisher *ThisPublisherState) UpdateNodeConfig(address string, param map[
 // handle an incoming a configuration command for one of our nodes. This:
 // - check if the signature is valid
 // - check if the node is valid
-// - pass the configuration update to the adapter's callback
+// - pass the configuration update to the adapter's callback set in Start()
 //
-// The message has already be unmarshalled and the signature verified by the messenger.
-// address of the node to be configured
-// message object with the configuration
 func (publisher *ThisPublisherState) handleNodeConfig(address string, publication *messenger.Publication) {
 	// TODO: authorization check
 	node := publisher.GetNode(address)
