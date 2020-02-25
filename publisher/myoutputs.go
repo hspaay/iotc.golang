@@ -1,4 +1,4 @@
-// Package publisher with output message publication functions
+// Package publisher with publication of my node outputs
 package publisher
 
 import (
@@ -118,8 +118,10 @@ func (publisher *ThisPublisherState) publishHistoryCommand(aliasAddress string, 
 }
 
 // publishMessage encapsulates the message object in a payload, signs, and sends it
-func (publisher *ThisPublisherState) publishMessage(address string, message interface{}) {
-	buffer, err := json.MarshalIndent(message, " ", " ")
+// address of the publication
+// object to publish. This will be marshalled to JSON and signed by this publisher
+func (publisher *ThisPublisherState) publishMessage(address string, object interface{}) {
+	buffer, err := json.MarshalIndent(object, " ", " ")
 	if err != nil {
 		publisher.Logger.Errorf("Error marshalling message for address %s: %s", address, err)
 		return
@@ -127,7 +129,7 @@ func (publisher *ThisPublisherState) publishMessage(address string, message inte
 	signature := publisher.ecdsaSign(buffer)
 
 	publication := &messenger.Publication{
-		Message:   string(buffer),
+		Message:   buffer,
 		Signature: signature,
 	}
 	publisher.messenger.Publish(address, publication)
@@ -149,7 +151,7 @@ func (publisher *ThisPublisherState) publishValueCommand(aliasAddress string, ou
 	}
 	publisher.Logger.Infof("publish output value '%s' on %s", s, aliasAddress)
 
-	publisher.messenger.PublishRaw(alias, latest.Value) // raw
+	publisher.messenger.PublishRaw(alias, []byte(latest.Value)) // raw
 }
 
 // publishOutputValues publishes pending updates to output values

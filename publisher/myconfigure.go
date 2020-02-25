@@ -1,4 +1,4 @@
-// Package publisher handling node configuration
+// Package publisher handling configuration of my nodes
 // - Update node configuration as it is discovered by the publisher, or one of its nodes
 // - Handle incoming node configuration command
 // Not thread-safe.
@@ -58,10 +58,11 @@ func (publisher *ThisPublisherState) UpdateNodeConfigValue(address string, param
 // - check if the signature is valid
 // - check if the node is valid
 // - pass the configuration update to the adapter's callback set in Start()
+// TODO: track which nodes are allowed to control configuration
 func (publisher *ThisPublisherState) handleNodeConfigCommand(address string, publication *messenger.Publication) {
 	// TODO: authorization check
 	node := publisher.GetNode(address)
-	if node == nil || publication.Message == "" {
+	if node == nil || publication.Message == nil {
 		publisher.Logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
 		return
 	}

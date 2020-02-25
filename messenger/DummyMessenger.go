@@ -4,6 +4,7 @@ package messenger
 import (
 	"encoding/json"
 	"strings"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -12,14 +13,14 @@ import (
 type DummyMessenger struct {
 	Logger        *log.Logger
 	Publications  map[string]*Publication
-	subscriptions map[string]func(address string, publication *Publication)
+	subscriptions []Subscription
+	publishMutex  *sync.Mutex // mutex for concurrent publishing of messages
 }
 
-// Payload for parsing raw message without parsing Message.
-// At this stage we don't know the type yet
-type Payload struct {
-	Signature string          `json:"signature"`
-	Message   json.RawMessage `json:"message"`
+// Subscription to messages
+type Subscription struct {
+	address string
+	handler func(address string, publication *Publication)
 }
 
 // Connect the messenger
@@ -32,14 +33,16 @@ func (messenger *DummyMessenger) Disconnect() {
 
 // FindLastPublication with the given address
 func (messenger *DummyMessenger) FindLastPublication(addr string) *Publication {
+	messenger.publishMutex.Lock()
 	pub := messenger.Publications[addr]
+	messenger.publishMutex.Unlock()
 	return pub
 }
 
 // OnReceive function to simulate a received message
 func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 	messageParts := strings.Split(address, "/")
-	var payload Payload
+	var payload Publication
 	var publication Publication
 	var rawStr = string(rawPayload)
 	_ = rawStr
@@ -50,11 +53,11 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 		return
 	}
 	publication.Signature = payload.Signature
-	publication.Message = string(payload.Message)
+	publication.Message = payload.Message
 
-	for subscription, handler := range messenger.subscriptions {
-		subscriptionSegments := strings.Split(subscription, "/")
-		// Match the subscription. Rather crude but only intended for testing.
+	for _, subscription := range messenger.subscriptions {
+		subscriptionSegments := strings.Split(subscription.address, "/")
+		// Match the address accepting wildcards. Rather crude but only intended for testing.
 		match := true
 		for index, addrSegment := range messageParts {
 			if index >= len(subscriptionSegments) {
@@ -75,29 +78,40 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 			}
 		}
 		if match {
-			handler(address, &publication)
+			subscription.handler(address, &publication)
 		}
 	}
 }
 
 // Publish a JSON encoded message
 func (messenger *DummyMessenger) Publish(address string, publication *Publication) {
+	messenger.publishMutex.Lock()
 	messenger.Publications[address] = publication
+	messenger.publishMutex.Unlock()
+	//
+	payload, err := json.Marshal(publication)
+	if err != nil {
+		messenger.Logger.Errorf("Failed marshalling publication for address %s", address)
+		return
+	}
+	go messenger.OnReceive(address, payload)
 }
 
 // PublishRaw message
-func (messenger *DummyMessenger) PublishRaw(address string, message string) {
+func (messenger *DummyMessenger) PublishRaw(address string, message json.RawMessage) {
 	payload := Publication{
 		Message: message,
 	}
+	messenger.publishMutex.Lock()
 	messenger.Publications[address] = &payload
+	messenger.publishMutex.Unlock()
 }
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
 	address string, onMessage func(address string, publication *Publication)) {
-
-	messenger.subscriptions[address] = onMessage
+	subscription := Subscription{address: address, handler: onMessage}
+	messenger.subscriptions = append(messenger.subscriptions, subscription)
 }
 
 // NewDummyMessenger provides a messenger for messages that go no.where...
@@ -109,7 +123,8 @@ func NewDummyMessenger() *DummyMessenger {
 	var messenger = &DummyMessenger{
 		Logger:        logger,
 		Publications:  make(map[string]*Publication, 0),
-		subscriptions: make(map[string]func(addr string, publication *Publication)),
+		subscriptions: make([]Subscription, 0),
+		publishMutex:  &sync.Mutex{},
 	}
 	return messenger
 }

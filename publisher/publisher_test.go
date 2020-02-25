@@ -15,6 +15,7 @@ import (
 const node1ID = "node1"
 const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
+const publisher2ID = "publisher2"
 const zone1ID = "$local"
 
 var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
@@ -33,6 +34,9 @@ var node1historyAddr = node1Base + "/$history/switch/0"
 var node1Input1 = standard.NewInput(node1, "switch", "0")
 var node1Output1 = standard.NewOutput(node1, "switch", "0")
 var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, standard.PublisherNodeID)
+
+var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, standard.PublisherNodeID)
+var pub2Node = standard.NewNode(zone1ID, publisher2ID, standard.PublisherNodeID)
 
 // const node2 = new node.Node{}
 
@@ -229,4 +233,24 @@ func TestReceiveInput(t *testing.T) {
 	assert.Equal(t, "true", val, "Input value didn't update the output")
 
 	publisher.Stop()
+}
+
+// TestDiscoveryPublishers tests receiving other publishers
+func TestDiscoveryPublishers(t *testing.T) {
+	var testMessenger = messenger.NewDummyMessenger()
+	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
+
+	// update the node alias and see if its output is published with alias' as node id
+	publisher.Start(false, nil, nil)
+
+	publisher2 := NewPublisher(zone1ID, publisher2ID, testMessenger)
+	publisher2.Start(false, nil, nil)
+	// wait for incoming messages to be processed
+	time.Sleep(time.Second * 2)
+	publisher2.Stop()
+	publisher.Stop()
+
+	// publisher 1 and 2 should have been discovered
+	assert.Len(t, publisher.zonePublishers, 2, "Should have discovered 2 publishers")
+
 }

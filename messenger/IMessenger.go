@@ -1,11 +1,13 @@
 // Package messenger - Interface of messengers for publishers and subscribers
 package messenger
 
+import "encoding/json"
+
 // Publication struct to  encapsulate messages with a signature
 type Publication struct {
 	// Message json.RawMessage `json:"message"`
-	Message   string `json:"message"`
-	Signature string `json:"signature"`
+	Message   json.RawMessage `json:"message"`
+	Signature string          `json:"signature"`
 }
 
 // IMessenger interface for messenger implementations
@@ -34,7 +36,7 @@ type IMessenger interface {
 	// Publis raw data
 	// address to subscribe top as per IotConnect standard
 	// raw data, published as-is
-	PublishRaw(address string, raw string)
+	PublishRaw(address string, raw json.RawMessage)
 
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent

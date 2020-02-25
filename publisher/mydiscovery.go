@@ -1,4 +1,5 @@
-// Package publisher with discovery methods
+// Package publisher with discovery publication of my nodes, inputs and outputs
+// (not to discovery of other nodes on the bus)
 package publisher
 
 import "iotzone/standard"
@@ -100,7 +101,7 @@ func (publisher *ThisPublisherState) UpdateOutputValue(outputAddress string, new
 	}
 }
 
-// publishDiscovery publishes pending node and in/output discovery messages
+// publishDiscovery publishes updated nodes and in/outputs
 func (publisher *ThisPublisherState) publishDiscovery() {
 	if publisher.messenger == nil {
 		return // can't do anything here, just go home

@@ -10,6 +10,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"iotzone/messenger"
 	"iotzone/standard"
@@ -42,6 +45,7 @@ type ThisPublisherState struct {
 	pollInterval      int                                                                 // value polling interval
 	publisherID       string                                                              // for easy access to the pub ID
 	publisherNode     *standard.Node                                                      // This publisher's node
+	zonePublishers    map[string]*standard.Node                                           // publishers on the network
 	signPrivateKey    *ecdsa.PrivateKey                                                   // key for singing published messages
 	synchroneous      bool                                                                // publish synchroneous with updates for testing
 	zoneID            string                                                              // Easy access to zone ID
@@ -123,11 +127,18 @@ func (publisher *ThisPublisherState) Start(
 
 		// TODO: support LWT
 		publisher.messenger.Connect("", "")
-		// handle configuration and set messages
+
+		// Subscribe to receive configuration and set messages
 		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, standard.ConfigureCommand)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
+
 		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.zoneID, publisher.publisherID, standard.SetCommand)
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
+
+		// subscribe to publisher nodes to verify signature for input commands
+		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.zoneID, standard.PublisherNodeID, standard.NodeDiscoveryCommand)
+		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
+
 		publisher.Logger.Warningf("Publisher %s started", publisher.publisherID)
 	}
 }
@@ -218,6 +229,48 @@ func (publisher *ThisPublisherState) heartbeatLoop() {
 	publisher.Logger.Warningf("Ending loop of publisher %s", publisher.publisherID)
 }
 
+// encodeKeys see https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
+func encodeKeys(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
+	x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
+	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
+
+	x509EncodedPub, _ := x509.MarshalPKIXPublicKey(publicKey)
+	pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
+
+	return string(pemEncoded), string(pemEncodedPub)
+}
+
+// decodeKeys
+func decodeKeys(pemEncoded string, pemEncodedPub string) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
+	block, _ := pem.Decode([]byte(pemEncoded))
+	x509Encoded := block.Bytes
+	privateKey, _ := x509.ParseECPrivateKey(x509Encoded)
+
+	blockPub, _ := pem.Decode([]byte(pemEncodedPub))
+	x509EncodedPub := blockPub.Bytes
+	genericPublicKey, _ := x509.ParsePKIXPublicKey(x509EncodedPub)
+	publicKey := genericPublicKey.(*ecdsa.PublicKey)
+
+	return privateKey, publicKey
+}
+
+// handlePublisherDiscovery stores discovered (remote) publishers in the zone for their public key
+// Used to verify signatures of incoming configuration and input messages
+// address contains the publisher's discovery address: zone/publisher/$publisher/$node
+// publication contains a message with the publisher node info
+func (publisher *ThisPublisherState) handlePublisherDiscovery(address string, publication *messenger.Publication) {
+	var pubNode standard.Node
+	err := json.Unmarshal(publication.Message, &pubNode)
+	if err != nil {
+		publisher.Logger.Warningf("Unable to unmarshal Publisher Node in %s: %s", address, err)
+		return
+	}
+	publisher.updateMutex.Lock()
+	publisher.zonePublishers[address] = &pubNode
+	publisher.updateMutex.Unlock()
+	publisher.Logger.Infof("Discovered publisher %s", address)
+}
+
 // NewPublisher creates a publisher instance and node for use in publications
 // zoneID for the zone this publisher lives in
 // publisherID of this publisher, unique within the zone
@@ -246,10 +299,12 @@ func NewPublisher(
 		publisherNode:     pubNode,
 		updateMutex:       &sync.Mutex{},
 		zoneID:            zoneID,
+		zonePublishers:    make(map[string]*standard.Node),
 	}
 	publisher.Logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	// generate private/public key for signing
+	// generate private/public key for signing and store the public key in the publisher identity
+	// TODO: store keys
 	rng := rand.Reader
 	curve := elliptic.P256()
 	privKey, err := ecdsa.GenerateKey(curve, rng)
@@ -257,7 +312,17 @@ func NewPublisher(
 	if err != nil {
 		publisher.Logger.Errorf("Failed to create keys for signing: %s", err)
 	}
+	privStr, pubStr := encodeKeys(privKey, &privKey.PublicKey)
+	_ = privStr
 
+	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
+	pubNode.Identity = &standard.Identity{
+		Address:          pubNode.Address,
+		PublicKeySigning: pubStr,
+		Publisher:        publisherID,
+		Timestamp:        timeStampStr,
+		Zone:             zoneID,
+	}
 	publisher.DiscoverNode(pubNode)
 	return publisher
 }
