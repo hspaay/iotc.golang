@@ -1,6 +1,15 @@
 // Package publisher handling configuration of my nodes
 // - Update node configuration as it is discovered by the publisher, or one of its nodes
 // - Handle incoming node configuration command
+//
+// FIXME: Differentiate between node and service (adapter?) configuration
+//        node configuration are applied to a device and service and do not apply until
+//         the device accepted the configuration. Examples are calibration, report type
+//         reported unit, reporting inteval, min/max limits for alerting.
+//        service configuration relate to the usage of the node and include attrs like
+//         name, alias, keys, poll interval, enable/disable
+//
+// TODO: support for authorization per node
 // Not thread-safe.
 package publisher
 
@@ -10,8 +19,8 @@ import (
 	"iotzone/standard"
 )
 
-// DiscoverNodeConfig is called by the adapter to add a configuration to a node
-// node whose config has been discovered
+// DiscoverNodeConfig is called by the adapter to add or update a configuration attribute
+// that was reported by the node.
 // name of config, unique for the node
 // config struct with configuration description and value
 func (publisher *ThisPublisherState) DiscoverNodeConfig(
@@ -32,11 +41,10 @@ func (publisher *ThisPublisherState) DiscoverNodeConfig(
 	publisher.updateMutex.Unlock()
 }
 
-// UpdateNodeConfigValue updates a node's existing configuration
-// Called when receiving a configuration update, after it has been processed by the adapter handler.
-// Configuration updates that are send directly to the node should not be included as they only take
-// effect after the node confirms that its configuration has changed, eg zwave callback.
-// This will re-publish the node discovery.
+// UpdateNodeConfigValue applies an update to a node's existing configuration
+// Intended for use by the handler that receives a $configure command. The handler
+// must only apply configuration updates that are not handled by the node, like for example
+// the name.
 func (publisher *ThisPublisherState) UpdateNodeConfigValue(address string, param map[string]string) {
 	node := publisher.GetNode(address)
 
@@ -58,7 +66,7 @@ func (publisher *ThisPublisherState) UpdateNodeConfigValue(address string, param
 // - check if the signature is valid
 // - check if the node is valid
 // - pass the configuration update to the adapter's callback set in Start()
-// TODO: track which nodes are allowed to control configuration
+// TODO: support for authorization per node
 func (publisher *ThisPublisherState) handleNodeConfigCommand(address string, publication *messenger.Publication) {
 	// TODO: authorization check
 	node := publisher.GetNode(address)
@@ -70,6 +78,12 @@ func (publisher *ThisPublisherState) handleNodeConfigCommand(address string, pub
 	err := json.Unmarshal([]byte(publication.Message), &configureMessage)
 	if err != nil {
 		publisher.Logger.Infof("Unable to unmarshal ConfigureMessage in %s", address)
+		return
+	}
+	// Verify that the message comes from the sender using the sender's public key
+	isValid := publisher.VerifyMessageSignature(configureMessage.Sender, publication.Message, publication.Signature)
+	if !isValid {
+		publisher.Logger.Warningf("Incoming configuration verification failed for sender: %s", configureMessage.Sender)
 		return
 	}
 	params := configureMessage.Config

@@ -126,14 +126,25 @@ func TestAlias(t *testing.T) {
 	publisher.Start(true, nil, nil)
 	publisher.DiscoverNode(node1)
 
-	config := map[string]string{"alias": node1AliasID}
-	publisher.UpdateNodeConfigValue(node1Addr, config)
+	// var cm = &standard.ConfigureMessage{
+	// 	Address: node1Addr,
+	// 	Config:  map[string]string{"alias": node1AliasID},
+	// 	Sender:  publisher.publisherNode.Address,
+	// }
+	// mcm, _ := json.Marshal(cm)
+	// publication := &messenger.Publication{
+	// 	Message: mcm,
+	// }
+	// publisher.handleNodeConfigCommand(node1Addr, publication)
+	publisher.UpdateNodeConfigValue(node1Addr, map[string]string{"alias": node1AliasID})
 
 	publisher.DiscoverOutput(node1Output1) // expect a publication with the alias
 	publisher.Stop()
 
 	p3 := testMessenger.FindLastPublication(node1AliasOutput1Addr) // the output discovery publication
-	assert.NotNil(t, p3, "output discovery should use alias with address %s but no publication was found", node1AliasOutput1Addr)
+	if !assert.NotNil(t, p3, "output discovery should use alias with address %s but no publication was found", node1AliasOutput1Addr) {
+		return
+	}
 
 	var out standard.InOutput
 	err := json.Unmarshal([]byte(p3.Message), &out)
@@ -157,7 +168,8 @@ func TestConfigure(t *testing.T) {
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "config": {"name":"NewName"} }`,
 		node1ConfigureAddr, pubAddr, time.Now().Format(standard.TimeFormat))
 	// message = `{ "a": "Hello world" }`
-	payload := fmt.Sprintf(`{"signature": "123", "message": %s }`, message)
+	signatureBase64 := standard.CreateEcdsaSignature([]byte(message), publisher.signPrivateKey)
+	payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	testMessenger.OnReceive(node1ConfigureAddr, []byte(payload))
 
 	// config := map[string]string{"alias": "myalias"}
@@ -210,8 +222,8 @@ func TestReceiveInput(t *testing.T) {
 	publisher := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	publisher.Start(false, nil, func(input *standard.InOutput, message *standard.SetMessage) {
-		publisher.Logger.Infof("Received message: %s", message.Value)
+	publisher.Start(true, nil, func(input *standard.InOutput, message *standard.SetMessage) {
+		publisher.Logger.Infof("Received message: '%s'", message.Value)
 		// find the corresponding output address
 		output := publisher.GetOutput(input.Address)
 		if !assert.NotNilf(t, output, "No corresponding output for address %s", input.Address) {
@@ -222,11 +234,17 @@ func TestReceiveInput(t *testing.T) {
 	publisher.DiscoverNode(node1) // p1
 	publisher.DiscoverInput(node1Input1)
 	publisher.DiscoverOutput(node1Output1)
+	// process background messages
+	time.Sleep(time.Second * 1)
 
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
 		node1InputSetAddr, pubAddr, time.Now().Format(standard.TimeFormat))
-	// message = `{ "a": "Hello world" }`
-	payload := fmt.Sprintf(`{"signature": "123", "message": %s }`, message)
+	signatureBase64 := standard.CreateEcdsaSignature([]byte(message), publisher.signPrivateKey)
+	// publicKey := &publisher.signPrivateKey.PublicKey
+	// test := publisher.ecdsaVerify([]byte(message), signatureBase64, publicKey)
+	// _ = test
+
+	payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	testMessenger.OnReceive(node1InputSetAddr, []byte(payload))
 
 	val := standard.GetOutputValue(node1Output1)

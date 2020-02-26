@@ -2,38 +2,12 @@
 package publisher
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/asn1"
-	"encoding/base64"
 	"encoding/json"
 	"iotzone/messenger"
 	"iotzone/standard"
-	"math/big"
 	"strings"
 	"time"
 )
-
-// ECDSASignature ...
-type ECDSASignature struct {
-	R, S *big.Int
-}
-
-// ecdsaSign the message and return the base64 encoded signature
-// This requires the signing private key to be set
-func (publisher *ThisPublisherState) ecdsaSign(message []byte) string {
-	if publisher.signPrivateKey == nil {
-		return ""
-	}
-	hashed := sha256.Sum256(message)
-	r, s, err := ecdsa.Sign(rand.Reader, publisher.signPrivateKey, hashed[:])
-	if err != nil {
-		return ""
-	}
-	sig, err := asn1.Marshal(ECDSASignature{r, s})
-	return base64.StdEncoding.EncodeToString(sig)
-}
 
 // Replace the address with the node's alias instead the node ID, if available
 // return the address if the node doesn't have an alias
@@ -126,7 +100,7 @@ func (publisher *ThisPublisherState) publishMessage(address string, object inter
 		publisher.Logger.Errorf("Error marshalling message for address %s: %s", address, err)
 		return
 	}
-	signature := publisher.ecdsaSign(buffer)
+	signature := standard.CreateEcdsaSignature(buffer, publisher.signPrivateKey)
 
 	publication := &messenger.Publication{
 		Message:   buffer,

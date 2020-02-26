@@ -10,9 +10,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"iotzone/messenger"
 	"iotzone/standard"
@@ -229,31 +227,6 @@ func (publisher *ThisPublisherState) heartbeatLoop() {
 	publisher.Logger.Warningf("Ending loop of publisher %s", publisher.publisherID)
 }
 
-// encodeKeys see https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
-func encodeKeys(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
-	x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
-	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
-
-	x509EncodedPub, _ := x509.MarshalPKIXPublicKey(publicKey)
-	pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
-
-	return string(pemEncoded), string(pemEncodedPub)
-}
-
-// decodeKeys
-func decodeKeys(pemEncoded string, pemEncodedPub string) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
-	block, _ := pem.Decode([]byte(pemEncoded))
-	x509Encoded := block.Bytes
-	privateKey, _ := x509.ParseECPrivateKey(x509Encoded)
-
-	blockPub, _ := pem.Decode([]byte(pemEncodedPub))
-	x509EncodedPub := blockPub.Bytes
-	genericPublicKey, _ := x509.ParsePKIXPublicKey(x509EncodedPub)
-	publicKey := genericPublicKey.(*ecdsa.PublicKey)
-
-	return privateKey, publicKey
-}
-
 // handlePublisherDiscovery stores discovered (remote) publishers in the zone for their public key
 // Used to verify signatures of incoming configuration and input messages
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
@@ -312,7 +285,7 @@ func NewPublisher(
 	if err != nil {
 		publisher.Logger.Errorf("Failed to create keys for signing: %s", err)
 	}
-	privStr, pubStr := encodeKeys(privKey, &privKey.PublicKey)
+	privStr, pubStr := standard.EncodeKeys(privKey, &privKey.PublicKey)
 	_ = privStr
 
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
