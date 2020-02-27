@@ -1,32 +1,257 @@
 // Package messenger - Publish and Subscribe to message using the MQTT message bus
 package messenger
 
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	pahomqtt "github.com/eclipse/paho.mqtt.golang"
+	log "github.com/sirupsen/logrus"
+)
+
+// ConnectionTimeoutSec constant with connection and reconnection timeouts
+const ConnectionTimeoutSec = 20
+
 // MqttMessenger that implements IMessenger
 type MqttMessenger struct {
+	pahoClient    pahomqtt.Client // Paho MQTT Client
+	hostName      string          // MQTT broker hostname or ip address to connect to
+	port          int             // MQTT port nr to connect to
+	login         string
+	password      string
+	subscriptions []TopicSubscription // list of TopicSubscription for re-subscribing after reconnect
+	Logger        *log.Logger         // Logger provided by user
+	//config          myzone.MyZoneConfig            // configuration for the mqtt connection
+	clientID string
+	//messageChannel  chan *IncomingMessage
+	isRunning bool // listen for messages while running
+	pubqos    byte // publish QOS 0, 1, or 2
+	subqos    byte // subscribe QOS 0, 1, or 2
 }
 
-// NewMqttMessenger provides a messager for the MQTT message bus
-// url with host and port of the server, eg "mqtt://mqtt.iotzone.network:5883/"
-// login name: zone/id
-// cred with password
-// zone namespace for multi-tenant message busses
-func NewMqttMessenger(url string, login string, cred string, zone string) *MqttMessenger {
-	mqttMessenger := &MqttMessenger{}
-	return mqttMessenger
+// TopicSubscription holds subscriptions to restore after disconnect
+type TopicSubscription struct {
+	address string
+	handler func(address string, publication *Publication)
+	token   pahomqtt.Token // for debugging
+	client  *MqttMessenger //
+	log     *log.Logger
 }
 
-// Connect the messenger
-func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue string) {
+// Connect to the MQTT broker and set the LWT
+// If a previous connection exists then it is disconnected first.
+// This publishes the LWT on the address baseTopic/deviceID/$state.
+// @param lastWillTopic optional last will and testament address for publishing device state on accidental disconnect.
+//                       Use "" to ignore LWT feature.
+// @param lastWillValue to use as the last will
+func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue string) error {
+	// close existing connection
+	if messenger.pahoClient != nil && messenger.pahoClient.IsConnected() {
+		messenger.pahoClient.Disconnect(10 * ConnectionTimeoutSec)
+	}
+
+	// set config defaults
+	if messenger.clientID == "" {
+		messenger.Logger.Panic("Connect - Missing Client ID. Required for MQTT connection. Bye.")
+		log.Exit(1)
+	}
+
+	// Support multiple MQTT client IDs
+	brokerURL := fmt.Sprintf("tcp://%s:%d/", messenger.hostName, messenger.port) // tcp://host:1883 ws://host:1883 tls://host:8883, tcps://awshost:8883/mqtt
+	opts := pahomqtt.NewClientOptions()
+	opts.AddBroker(brokerURL)
+	opts.SetClientID(messenger.clientID)
+	opts.SetAutoReconnect(true)
+	opts.SetConnectTimeout(10 * time.Second)
+	opts.SetMaxReconnectInterval(60 * time.Second) // max wait 1 minute for a reconnect
+	// Do not use MQTT persistence as not all brokers support it, and it causes problems on the broker if the client ID is
+	// randomly generated. CleanSession disables persistence.
+	opts.SetCleanSession(true)
+	opts.SetKeepAlive(ConnectionTimeoutSec * time.Second) // pings to detect a disconnect. Use same as reconnect interval
+	//opts.SetKeepAlive(60) // keepalive causes deadlock in v1.1.0. See github issue #126
+
+	opts.SetOnConnectHandler(func(client pahomqtt.Client) {
+		messenger.Logger.Warningf("mqtt:onConnect: Connected to broker at %s. Connected=%v. ClientId=%s",
+			brokerURL, client.IsConnected(), messenger.clientID)
+		// Subscribe to addresss already registered by the app on connect or reconnect
+		messenger.resubscribe()
+	})
+	opts.SetConnectionLostHandler(func(client pahomqtt.Client, err error) {
+		log.Warningf("mqtt:onConnectionLost: Disconnected from broker %s. Error %s, ClientId=%s",
+			brokerURL, err, messenger.clientID)
+	})
+	if lastWillAddress != "" {
+		//lastWillTopic := fmt.Sprintf("%s/%s/$state", messenger.config.Base, deviceId)
+		opts.SetWill(lastWillAddress, lastWillValue, 1, false)
+	}
+	messenger.Logger.Infof("mqtt:Connect: Connecting to MQTT broker: %s with clientID %s"+
+		" AutoReconnect and CleanSession are set.",
+		brokerURL, messenger.clientID)
+
+	// FIXME: PahoMqtt disconnects when sending a lot of messages, like on startup of some adapters.
+	messenger.pahoClient = pahomqtt.NewClient(opts)
+
+	// start listening for messages
+	messenger.isRunning = true
+	//go messenger.messageChanLoop()
+
+	// Auto reconnect doesn't work for initial attempt: https://github.com/eclipse/paho.mqtt.golang/issues/77
+	retryDelaySec := 1
+	for {
+		token := messenger.pahoClient.Connect()
+		token.Wait()
+		// Wait to give connection time to settle. Sending a lot of messages causes the connection to fail. Bug?
+		time.Sleep(1000 * time.Millisecond)
+		err := token.Error()
+		if err == nil {
+			break
+		}
+
+		messenger.Logger.Errorf("Connect: Connecting to broker on %s failed: %s. retrying in %d seconds.",
+			brokerURL, token.Error(), retryDelaySec)
+		time.Sleep(time.Duration(retryDelaySec) * time.Second)
+		// slowly increment wait time
+		if retryDelaySec < 120 {
+			retryDelaySec++
+		}
+	}
+	return nil
 }
 
-// Disconnect gracefully disconnects the messenger
+// Disconnect from the MQTT broker and unsubscribe from all addresss and set
+// device state to disconnected
 func (messenger *MqttMessenger) Disconnect() {
+	messenger.isRunning = false
+	if messenger.pahoClient != nil {
+		messenger.Logger.Warningf("Disconnect: Set state to disconnected and close connection")
+		//messenger.publish("$state", "disconnected")
+		time.Sleep(time.Second / 10) // Disconnect doesn't seem to wait for all messages. A small delay ahead helps
+		messenger.pahoClient.Disconnect(10 * ConnectionTimeoutSec * 1000)
+		messenger.pahoClient = nil
+
+		messenger.subscriptions = nil
+		//close(messenger.messageChannel)     // end the message handler loop
+	}
 }
 
-// Publish a message
-func (messenger *MqttMessenger) Publish(address string, payload struct{}) {
+// Wrapper for message handling.
+// Use a channel to handle the message in a gorouting.
+// This fixes a problem with losing context in callbacks. Not sure what is going on though.
+func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt.Message) {
+	// NOTE: Scope in this callback is not always retained. Pipe notifications through a channel and handle in goroutine
+	address := msg.Topic()
+	rawPayload := msg.Payload()
+	var publication Publication
+	err := json.Unmarshal(rawPayload, &publication)
+	if err != nil {
+		subscription.log.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
+		return
+	}
+	subscription.log.Infof("MqttMessenger.onMessage. address=%s, subscription=%s, retained=%v",
+		address, subscription.address, msg.Retained())
+	subscription.handler(address, &publication)
+	//message := &IncomingMessage{msgTopic, payload, subscription}
+	//subscription.client.messageChannel <- message
 }
 
-// Subscribe to a message by address
-func (messenger *MqttMessenger) Subscribe(address string, onMessage func(address string, payload interface{})) {
+// Publish value using the device address as base
+// address to publish on.
+// retained to have the broker retain the address value
+// payload is converted to string if it isn't a byte array, as Paho doesn't handle int and bool
+func (messenger *MqttMessenger) Publish(address string, retained bool, publication *Publication) error {
+	var err error
+
+	//fullTopic := fmt.Sprintf("%s/%s/%s", messenger.config.Base, messenger.deviceId, addressLevels)
+	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
+		messenger.Logger.Warnf("publish: Unable to publish. No connection with broker.")
+		return errors.New("no connection with broker")
+	}
+	payload, err := json.Marshal(publication)
+	if err != nil {
+		messenger.Logger.Errorf("Publish:  Error marshalling publication: %s", err)
+		return err
+	}
+	messenger.Logger.Debugf("publish []byte: address=%s, qos=%d, retained=%v",
+		address, messenger.pubqos, retained)
+	token := messenger.pahoClient.Publish(address, messenger.pubqos, retained, payload)
+
+	err = token.Error()
+	if err != nil {
+		// TODO: confirm that with qos=1 the message is sent after reconnect
+		messenger.Logger.Warnf("publish: Error during publish on address %s: %v", address, err)
+		//return err
+	}
+	return err
+}
+
+// subscribe to addresss after establishing connection
+// The application can already subscribe to addresss before the connection is established. If connection is lost then
+// this will re-subscribe to those addresss as PahoMqtt drops the subscriptions after disconnect.
+//
+func (messenger *MqttMessenger) resubscribe() {
+	//
+	messenger.Logger.Infof("mqtt.resubscribe to %d addresss", len(messenger.subscriptions))
+	for _, subscription := range messenger.subscriptions {
+		// clear existing subscription
+		messenger.pahoClient.Unsubscribe(subscription.address)
+
+		messenger.Logger.Infof("mqtt.resubscribe: address %s", subscription.address)
+		// create a new variable to hold the subscription in the closure
+		newSubscr := subscription
+		token := messenger.pahoClient.Subscribe(newSubscr.address, messenger.subqos, newSubscr.onMessage)
+		//token := messenger.pahoClient.Subscribe(newSubscr.address, newSubscr.qos, func (c pahomqtt.Client, msg pahomqtt.Message) {
+		//messenger.Logger.Infof("mqtt.resubscribe.onMessage: address %s, subscription %s", msg.Topic(), newSubscr.address)
+		//newSubscr.onMessage(c, msg)
+		//})
+		newSubscr.token = token
+	}
+	messenger.Logger.Infof("mqtt.resubscribe complete")
+}
+
+// Subscribe to a address
+// Subscribers are automatically resubscribed after the connection is restored
+// address: address to subscribe to. This can contain wildcards.
+// qos: Quality of service for subscription: 0, 1, 2
+// handler: callback handler.
+// returns error if no connection exists
+func (messenger *MqttMessenger) Subscribe(
+	address string, onMessage func(address string, publication *Publication)) error {
+	if messenger.pahoClient == nil {
+		err := errors.New("mqtt.Subscribe: Unable to subscribe. Missing the MQTT client")
+		messenger.Logger.Error(err)
+		//return errors.New("missing mqtt client")
+		return err
+	}
+	subscription := TopicSubscription{
+		address: address,
+		handler: onMessage,
+		token:   nil,
+		client:  messenger,
+		log:     messenger.Logger,
+	}
+	messenger.subscriptions = append(messenger.subscriptions, subscription)
+
+	messenger.Logger.Infof("mqtt.Subscribe: address %s, qos %d", address, messenger.subqos)
+	//messenger.pahoClient.Subscribe(address, qos, addressSubscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
+	messenger.pahoClient.Subscribe(address, messenger.subqos, subscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
+	return nil
+}
+
+// NewMqttMessenger creates a new MQTT messenger instance
+func NewMqttMessenger(hostName string, port int, login string, password string, clientID string, logger *log.Logger) *MqttMessenger {
+	messenger := &MqttMessenger{
+		pahoClient: nil,
+		Logger:     logger,
+		hostName:   hostName,
+		port:       port,
+		clientID:   clientID,
+		login:      login,
+		password:   password,
+		pubqos:     1,
+		subqos:     1,
+		//messageChannel: make(chan *IncomingMessage),
+	}
+	return messenger
 }

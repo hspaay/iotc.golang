@@ -32,7 +32,7 @@ func (publisher *ThisPublisherState) getAliasAddress(address string) string {
 // TODO: decide when to invoke this
 func (publisher *ThisPublisherState) publishEventCommand(aliasAddress string, node *standard.Node) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = standard.EventCommand
+	aliasSegments[3] = standard.CommandEvent
 	addr := strings.Join(aliasSegments[:4], "/")
 	publisher.Logger.Infof("publish node event: %s", addr)
 
@@ -56,7 +56,7 @@ func (publisher *ThisPublisherState) publishEventCommand(aliasAddress string, no
 // publish the $latest output value
 func (publisher *ThisPublisherState) publishLatestCommand(aliasAddress string, output *standard.InOutput) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = standard.LatestCommand
+	aliasSegments[3] = standard.CommandLatest
 	addr := strings.Join(aliasSegments, "/")
 
 	// zone/publisher/node/$latest/iotype/instance
@@ -76,7 +76,7 @@ func (publisher *ThisPublisherState) publishLatestCommand(aliasAddress string, o
 // publish the $history output values
 func (publisher *ThisPublisherState) publishHistoryCommand(aliasAddress string, output *standard.InOutput) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = standard.HistoryCommand
+	aliasSegments[3] = standard.CommandHistory
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
@@ -117,7 +117,7 @@ func (publisher *ThisPublisherState) publishValueCommand(aliasAddress string, ou
 	// zone/publisher/node/$value/iotype/instance
 	history := standard.GetHistory(output)
 	latest := history[0]
-	aliasSegments[3] = standard.ValueCommand
+	aliasSegments[3] = standard.CommandValue
 	alias := strings.Join(aliasSegments, "/")
 	s := latest.Value
 	if len(s) > 30 {

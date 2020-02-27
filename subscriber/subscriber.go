@@ -41,7 +41,7 @@ func (subscriber *ThisSubscriberState) Start() {
 		subscriber.messenger.Connect("", "")
 
 		// subscribe to receive any publisher node
-		pubAddr := fmt.Sprintf("+/+/%s/%s", standard.PublisherNodeID, standard.NodeDiscoveryCommand)
+		pubAddr := fmt.Sprintf("+/+/%s/%s", standard.PublisherNodeID, standard.CommandNodeDiscovery)
 		subscriber.messenger.Subscribe(pubAddr, subscriber.handlePublisherDiscovery)
 
 		subscriber.Logger.Warningf("Subscriber started")

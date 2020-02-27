@@ -66,7 +66,7 @@ type ThisPublisherState struct {
 // Returns nil if address has no known node
 func (publisher *ThisPublisherState) GetNode(address string) *standard.Node {
 	segments := strings.Split(address, "/")
-	segments[3] = standard.NodeDiscoveryCommand
+	segments[3] = standard.CommandNodeDiscovery
 	nodeAddr := strings.Join(segments[:4], "/")
 
 	publisher.updateMutex.Lock()
@@ -80,7 +80,7 @@ func (publisher *ThisPublisherState) GetNode(address string) *standard.Node {
 // address with node type and instance. The command will be ignored.
 func (publisher *ThisPublisherState) GetInput(address string) *standard.InOutput {
 	segments := strings.Split(address, "/")
-	segments[3] = standard.InputDiscoveryCommand
+	segments[3] = standard.CommandInputDiscovery
 	inputAddr := strings.Join(segments, "/")
 
 	publisher.updateMutex.Lock()
@@ -94,7 +94,7 @@ func (publisher *ThisPublisherState) GetInput(address string) *standard.InOutput
 // address with node type and instance. The command will be ignored.
 func (publisher *ThisPublisherState) GetOutput(address string) *standard.InOutput {
 	segments := strings.Split(address, "/")
-	segments[3] = standard.OutputDiscoveryCommand
+	segments[3] = standard.CommandOutputDiscovery
 	outputAddr := strings.Join(segments, "/")
 	publisher.updateMutex.Lock()
 	var output = publisher.outputs[outputAddr]
@@ -127,14 +127,14 @@ func (publisher *ThisPublisherState) Start(
 		publisher.messenger.Connect("", "")
 
 		// Subscribe to receive configuration and set messages
-		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, standard.ConfigureCommand)
+		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.zoneID, publisher.publisherID, standard.CommandConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
-		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.zoneID, publisher.publisherID, standard.SetCommand)
+		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.zoneID, publisher.publisherID, standard.CommandSet)
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.zoneID, standard.PublisherNodeID, standard.NodeDiscoveryCommand)
+		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.zoneID, standard.PublisherNodeID, standard.CommandNodeDiscovery)
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		publisher.Logger.Warningf("Publisher %s started", publisher.publisherID)
@@ -164,7 +164,7 @@ func (publisher *ThisPublisherState) Stop() {
 // Returns nil if address has no known node
 func (publisher *ThisPublisherState) getNode(address string) *standard.Node {
 	segments := strings.Split(address, "/")
-	segments[3] = standard.NodeDiscoveryCommand
+	segments[3] = standard.CommandNodeDiscovery
 	nodeAddr := strings.Join(segments[:4], "/")
 
 	var node = publisher.nodes[nodeAddr]

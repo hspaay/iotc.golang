@@ -8,21 +8,22 @@ import (
 // TimeFormat for publishing messages
 const TimeFormat = "2006-01-02T15:04:05.000-0700"
 
-// address reserved keywords
+// publication address reserved keywords
 const (
+	CommandConfigure       = "$configure" // node configuration, payload is ConfigureMessage
+	CommandEvent           = "$event"     // node outputs event, payload is EventMessage
+	CommandHistory         = "$history"   // output history, payload is HistoryMessage
+	CommandInputDiscovery  = "$input"     // input discovery, payload is InOutput object
+	CommandLatest          = "$latest"    // latest output, payload is latest message
+	CommandNodeDiscovery   = "$node"      // node discovery, payload is Node object
+	CommandOutputDiscovery = "$output"    // output discovery, payload output definition
+	CommandSet             = "$set"       // control input command, payload is input value
+	CommandUpgrade         = "$upgrade"   // perform firmware upgrade, payload is UpgradeMessage
+	CommandValue           = "$value"     // raw output value
 	// LocalZone ID for local-only zones (eg, no sharing outside this zone)
 	LocalZoneID = "$local"
 	// PublisherNodeID to use when none is provided
-	ConfigureCommand       = "$configure" // node configuration
-	EventCommand           = "$event"     // node outputs event
-	HistoryCommand         = "$history"   // output history
-	InputDiscoveryCommand  = "$input"
-	LatestCommand          = "$latest" // latest output value
-	NodeDiscoveryCommand   = "$node"   // node discovery command
-	OutputDiscoveryCommand = "$output"
-	PublisherNodeID        = "$publisher" // reserved node ID for publishers
-	SetCommand             = "$set"       // control input command
-	ValueCommand           = "$value"     // raw output value
+	PublisherNodeID = "$publisher" // reserved node ID for publishers
 )
 
 // Standard attribute names for device and sensor attributes and config

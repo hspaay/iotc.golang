@@ -91,7 +91,17 @@ type EventMessage struct {
 	Timestamp string            `json:"timestamp"`
 }
 
-// HistoryMessage struct to send/receive the '$latest' command
+// UpgradeMessage with node firmware
+type UpgradeMessage struct {
+	Address   string `json:"address"`
+	MD5       string `json:"md5"`
+	Firmware  []byte `json:"firmware"`
+	FWVersion string `json:"fwversion"`
+	Sender    string `json:"sender"`
+	Timestamp string `json:"timestamp"`
+}
+
+// HistoryMessage with the '$latest' output value and metadata
 type HistoryMessage struct {
 	Address   string         `json:"address"`
 	Duration  int            `json:"duration,omitempty"`
@@ -161,7 +171,7 @@ func UpdateValue(inout *InOutput, newValue string) {
 // NewInput instance
 func NewInput(node *Node, ioType string, instance string) *InOutput {
 	segments := strings.Split(node.Address, "/")
-	address := fmt.Sprintf("%s/%s/%s/"+InputDiscoveryCommand+"/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
+	address := fmt.Sprintf("%s/%s/%s/"+CommandInputDiscovery+"/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
 	io := &InOutput{
 		Address:  address,
 		Config:   ConfigAttrMap{},
@@ -175,7 +185,7 @@ func NewInput(node *Node, ioType string, instance string) *InOutput {
 // NewOutput instance
 func NewOutput(node *Node, ioType string, instance string) *InOutput {
 	segments := strings.Split(node.Address, "/")
-	address := fmt.Sprintf("%s/%s/%s/"+OutputDiscoveryCommand+"/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
+	address := fmt.Sprintf("%s/%s/%s/"+CommandOutputDiscovery+"/%s/%s", segments[0], segments[1], segments[2], ioType, instance)
 	io := &InOutput{
 		Address:  address,
 		Config:   ConfigAttrMap{},
@@ -188,7 +198,7 @@ func NewOutput(node *Node, ioType string, instance string) *InOutput {
 
 // NewNode instance
 func NewNode(zoneID string, publisherID string, nodeID string) *Node {
-	address := fmt.Sprintf("%s/%s/%s/"+NodeDiscoveryCommand, zoneID, publisherID, nodeID)
+	address := fmt.Sprintf("%s/%s/%s/"+CommandNodeDiscovery, zoneID, publisherID, nodeID)
 	return &Node{
 		Address:   address,
 		Attr:      AttrMap{},
