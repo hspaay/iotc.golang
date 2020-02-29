@@ -1,5 +1,5 @@
 // Package myzone exported functions for managing and publishing nodes and their in/outputs
-package myzone
+package iotzone
 
 import (
 	"github.com/sirupsen/logrus"
