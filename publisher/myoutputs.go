@@ -3,8 +3,8 @@ package publisher
 
 import (
 	"encoding/json"
-	"iotzone/messenger"
-	"iotzone/standard"
+	"iotconnect/messenger"
+	"iotconnect/standard"
 	"strings"
 	"time"
 )

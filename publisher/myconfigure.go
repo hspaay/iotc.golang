@@ -15,8 +15,8 @@ package publisher
 
 import (
 	"encoding/json"
-	"iotzone/messenger"
-	"iotzone/standard"
+	"iotconnect/messenger"
+	"iotconnect/standard"
 )
 
 // DiscoverNodeConfig is called by the adapter to add or update a configuration attribute

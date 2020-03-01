@@ -1,4 +1,4 @@
-module iotzone
+module iotconnect
 
 go 1.13
 

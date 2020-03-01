@@ -4,8 +4,8 @@ package subscriber
 import (
 	"encoding/json"
 	"fmt"
-	"iotzone/messenger"
-	"iotzone/standard"
+	"iotconnect/messenger"
+	"iotconnect/standard"
 	"sync"
 
 	log "github.com/sirupsen/logrus"

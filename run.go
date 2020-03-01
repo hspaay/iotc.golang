@@ -1,4 +1,4 @@
-package myzone
+package iotconnect
 
 // import (
 // 	"flag"

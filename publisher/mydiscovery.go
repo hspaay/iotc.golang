@@ -2,7 +2,7 @@
 // (not to discovery of other nodes on the bus)
 package publisher
 
-import "iotzone/standard"
+import "iotconnect/standard"
 
 // DiscoverNode is invoked when a node is (re)discovered by this publisher
 // The given node replaces the existing node if one exists

@@ -5,8 +5,8 @@ package publisher
 import (
 	"crypto/ecdsa"
 	"encoding/json"
-	"iotzone/messenger"
-	"iotzone/standard"
+	"iotconnect/messenger"
+	"iotconnect/standard"
 )
 
 // VerifyMessageSignature Verify the message is signed by the sender

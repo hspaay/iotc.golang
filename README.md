@@ -1,6 +1,6 @@
-# iotzone.golang
+# iotconnect.golang
 
-iotzone is an implementation of the IotConnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation. The standard can be found at: https://github.com/hspaay/iotconnect.standard
+iotconnect.golang is an implementation of the IotConnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation. The standard can be found at: https://github.com/hspaay/iotconnect.standard
 
 ## Status
 
@@ -10,7 +10,7 @@ The current focus is on improving this library by adding adapters that use it.
 
 TODO:
 * TLS connection to MQTT brokers
-* 
+* ...
 
 ## Audience
 
@@ -22,7 +22,7 @@ A similar library for the Python and Javascript/Typescript languages is planned 
 * systemd launcher of adapters for Linux 
 * Messenger for MQTT brokers
 * Management of nodes, inputs and outputs (see IotConnect standard for further explanation)
-* Publish discovery when nodes and configuration are updated 
+* Publish discovery when nodes are updated 
 * Publish updates to output values 
 * Signing of published messages
 * Hook to handle node input control messages
@@ -32,11 +32,12 @@ A similar library for the Python and Javascript/Typescript languages is planned 
 ## Prerequisites
 
 1. Golang
+   
    This guide assumes that you are familiar with programming in golang, and have golang 1.13 or newer installed. If you are new to golang, check out their website https://golang.org/doc/install for more information. 
 
 2. MQTT broker
   
-   A working [MQTT broker](https://en.wikipedia.org/wiki/MQTT) (message bus) is needed to test and run a publisher. Mosquitto is a lightweight MQTT broker that runs nicely on Linux (including Raspberry-pi), Mac, and Windows. More info can be found here: https://mosquitto.org/. Only a single broker is needed for all you publishers. For a home automation application you will do fine with running Mosquitto on a Raspberry-pi 2, 3 or 4 connected to a small UPS and park it somewhere out of sight.
+   A working [MQTT broker](https://en.wikipedia.org/wiki/MQTT) (message bus) is needed to test and run a publisher. [Mosquitto](https://mosquitto.org/) is a lightweight MQTT broker that runs nicely on Linux (including Raspberry-pi), Mac, and Windows. Only a single broker is needed for all your publishers. For a home automation application you will do fine with running Mosquitto on a Raspberry-pi 2, 3 or 4 connected to a small UPS and park it somewhere out of sight.
 
    For industrial or government applications that require GDPR or SOC2 compliance, look at enterprise message brokers such as [HiveMQT](www.hivemq.com), [RabbitMQT](https://www.rabbitmq.com/), [Apache ActiveMQ](https://activemq.apache.org/). For hosted cloud versions look at [CloudMQTT](www.cloudmqtt.com) (uses managed Mosquitto instances under the hood). Amazon AWS and Google also support IoT message buses and are worth a look.
 
@@ -52,11 +53,9 @@ The first part describes the project setup to start building. The second part sh
 
 This example uses Go modules as this lets you control versioning and choose your own project folder location.
 
-## Installing
+## Installing Publishers
 
-No installation is neccesary to use this library. Import it in your code by importing https://github.com/hspaay/iotzone.golang
-
-Recommended installation of your publisher on a linux platform:
+Recommended installation of your publisher on a linux platform. The iotzone namespace is used for publisher applications:
 
 The folder structure for deployment as a normal user:
 * ~/bin/iotzone/bin      location of the publisher binaries
@@ -64,8 +63,8 @@ The folder structure for deployment as a normal user:
 * ~/bin/iotzone/logs     logging output
 
 When deploying as an system application, create these folders and update /etc/iotzone.conf
-* /opt/iotzone/             location of the publisher binaries
 * /etc/iotzone/conf         location of iotzone.conf main configuration file
+* /opt/iotzone/             location of the publisher binaries
 * /var/lib/iotzone/         location of the persistence files
 * /var/log/iotzone/         location of iotzone log files
 
@@ -96,6 +95,7 @@ Common questions will be captured in the [Q&A](docs/FAQ.md).
 
 This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/iotzone/myweather*
 The publisher is called myweather, and each node is a city. More cities can be added with more nodes. 
+This example assumes you have a MQTT broker running locally. 
 
 ## Step 1: Create A New Project
 
@@ -135,9 +135,9 @@ A basic publisher is implemented through only a few functions as shown below.
 Change myweather.go to look like this:
 
 ~~~golang
-package "myweather"
+package myweather
 
-import "github.com/hspaay/iotzone.golang"
+import "github.com/hspaay/iotconnect"
 
 const ZoneID = standard.LocalZoneID
 const MqttServerAddress = "localhost"
@@ -187,10 +187,37 @@ function Poll(publisher *Publisher) {
     publisher.UpdateOutputError(node, OutputType, OutputTypeHumidity, "Forecast not available")
   }
 }
-~~~golang
+~~~
 
 There are plenty of ways to enhance this with additional outputs and forecasts. You can even add an input to the publisher itself for adding and removing cities remotely. Please obtain a valid API key from openweathermap.
 Enjoy!
 
+
+## Step 3. Install Mosquitto
+
+[Mosquitto](https://mosquitto.org/) is a lightweight MQTT server. Installation for the different platforms[is described here](https://mosquitto.org/download/).
+
+Mosquitto needs little configuration as [described on their documentation](https://mosquitto.org/man/mosquitto-conf-5.html).
+On Linux the configuration takes place in the /etc/mosquitto/mosquitto.conf file.
+
+### Basic Configuration
+
+No configuration neccesary as the defaults are good to go. 
+
+### Advanced Configuration
+
+Unless you run locally on a trusted LAN, you're going to want to:
+1. Use SSL/TLS for secure connections
+2. Add authentication for your publishers 
+
+
+
+### Automatically Start Mosquitto
+On Linux:
+$ sudo systemctl enable mosquitto
+$ sudo systemctl start mosquitto
+
+
+## Last, Run!
 
 ... work in progress ...
