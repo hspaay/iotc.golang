@@ -4,10 +4,10 @@ package subscriber
 import (
 	"encoding/json"
 	"fmt"
-	"iotconnect/messenger"
-	"iotconnect/standard"
 	"sync"
 
+	"github.com/hspaay/iotconnect.golang/messenger"
+	"github.com/hspaay/iotconnect.golang/standard"
 	log "github.com/sirupsen/logrus"
 )
 

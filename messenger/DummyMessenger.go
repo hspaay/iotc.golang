@@ -24,7 +24,8 @@ type Subscription struct {
 }
 
 // Connect the messenger
-func (messenger *DummyMessenger) Connect(lastWillAddress string, lastWillValue string) {
+func (messenger *DummyMessenger) Connect(lastWillAddress string, lastWillValue string) error {
+	return nil
 }
 
 // Disconnect gracefully disconnects the messenger
@@ -84,7 +85,7 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 }
 
 // Publish a JSON encoded message
-func (messenger *DummyMessenger) Publish(address string, publication *Publication) {
+func (messenger *DummyMessenger) Publish(address string, retained bool, publication *Publication) error {
 	messenger.publishMutex.Lock()
 	messenger.Publications[address] = publication
 	messenger.publishMutex.Unlock()
@@ -92,24 +93,27 @@ func (messenger *DummyMessenger) Publish(address string, publication *Publicatio
 	payload, err := json.Marshal(publication)
 	if err != nil {
 		messenger.Logger.Errorf("Failed marshalling publication for address %s", address)
-		return
+		return err
 	}
 	go messenger.OnReceive(address, payload)
+	return nil
 }
 
 // PublishRaw message
-func (messenger *DummyMessenger) PublishRaw(address string, message json.RawMessage) {
+func (messenger *DummyMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
 	payload := Publication{
 		Message: message,
 	}
 	messenger.publishMutex.Lock()
 	messenger.Publications[address] = &payload
 	messenger.publishMutex.Unlock()
+	return nil
 }
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
 	address string, onMessage func(address string, publication *Publication)) {
+
 	subscription := Subscription{address: address, handler: onMessage}
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
 }

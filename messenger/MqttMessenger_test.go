@@ -19,11 +19,11 @@ const clientID = "test1"
 const pub1Addr = "zone1/pub1/test"
 
 type PubMessage struct {
-	name string
+	Name string
 }
 
-var pub1Message = PubMessage{name: "bob"}
-var pub1Buffer, _ = json.Marshal(&pub1Message)
+var pub1Message = &PubMessage{Name: "bob"}
+var pub1Buffer, _ = json.Marshal(pub1Message)
 var pub1 = Publication{Message: pub1Buffer}
 
 // TestConnect to mqtt broker
@@ -61,17 +61,17 @@ func TestPublishSubscribe(t *testing.T) {
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 
-	err = messenger.Subscribe(pub1Addr, func(addr string, pub *Publication) {
+	messenger.Subscribe(pub1Addr, func(addr string, pub *Publication) {
 		err := json.Unmarshal(pub.Message, &receivedMessage)
 		assert.NoError(t, err, "Received message can't be parsed")
 
-		logger.Infof("Received message yeaah")
+		logger.Infof("Received message. Length=%d: %s", len(pub.Message), pub.Message)
 	})
 
 	err = messenger.Publish(pub1Addr, false, &pub1)
 	assert.NoError(t, err, "Publish failed")
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 2)
 	messenger.Disconnect()
 
-	assert.Equal(t, "bob", receivedMessage.name, "Did not receive published message")
+	assert.Equal(t, "bob", receivedMessage.Name, "Did not receive published message")
 }

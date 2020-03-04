@@ -6,7 +6,7 @@
 //        node configuration are applied to a device and service and do not apply until
 //         the device accepted the configuration. Examples are calibration, report type
 //         reported unit, reporting inteval, min/max limits for alerting.
-//        service configuration relate to the usage of the node and include attrs like
+//        service configuration relate to the managing the node and include attrs like
 //         name, alias, keys, poll interval, enable/disable
 //
 // TODO: support for authorization per node
@@ -15,21 +15,21 @@ package publisher
 
 import (
 	"encoding/json"
-	"iotconnect/messenger"
-	"iotconnect/standard"
+
+	"github.com/hspaay/iotconnect.golang/messenger"
+	"github.com/hspaay/iotconnect.golang/standard"
 )
 
 // DiscoverNodeConfig is called by the adapter to add or update a configuration attribute
 // that was reported by the node.
-// name of config, unique for the node
 // config struct with configuration description and value
-func (publisher *ThisPublisherState) DiscoverNodeConfig(
-	node *standard.Node, name string, config *standard.ConfigAttr) {
+func (publisher *PublisherState) DiscoverNodeConfig(
+	node *standard.Node, config *standard.ConfigAttr) {
 
 	publisher.Logger.Info("DiscoverNodeConfig node: ", node.Address)
 
 	publisher.updateMutex.Lock()
-	node.Config[name] = config
+	node.Config[config.ID] = config
 	if publisher.updatedNodes == nil {
 		publisher.updatedNodes = make(map[string]*standard.Node)
 	}
@@ -45,8 +45,8 @@ func (publisher *ThisPublisherState) DiscoverNodeConfig(
 // Intended for use by the handler that receives a $configure command. The handler
 // must only apply configuration updates that are not handled by the node, like for example
 // the name.
-func (publisher *ThisPublisherState) UpdateNodeConfigValue(address string, param map[string]string) {
-	node := publisher.GetNode(address)
+func (publisher *PublisherState) UpdateNodeConfigValue(address string, param map[string]string) {
+	node := publisher.GetNodeByAddress(address)
 
 	var appliedParams map[string]string = param
 	for key, value := range appliedParams {
@@ -67,9 +67,9 @@ func (publisher *ThisPublisherState) UpdateNodeConfigValue(address string, param
 // - check if the node is valid
 // - pass the configuration update to the adapter's callback set in Start()
 // TODO: support for authorization per node
-func (publisher *ThisPublisherState) handleNodeConfigCommand(address string, publication *messenger.Publication) {
+func (publisher *PublisherState) handleNodeConfigCommand(address string, publication *messenger.Publication) {
 	// TODO: authorization check
-	node := publisher.GetNode(address)
+	node := publisher.GetNodeByAddress(address)
 	if node == nil || publication.Message == nil {
 		publisher.Logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
 		return

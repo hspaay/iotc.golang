@@ -21,7 +21,7 @@ type IMessenger interface {
 	// lastWillAddress optional last will & testament address for publishing device state
 	//                 on accidental disconnect. Subscribers use "" to ignore.
 	// lastWillValue payload to use with the last will publication
-	Connect(lastWillAddress string, lastWillValue string)
+	Connect(lastWillAddress string, lastWillValue string) error
 
 	// Gracefully disconnect the messenger and unsubscribe to all subscribed messages.
 	// This will prevent the LWT publication so publishers must publish a graceful disconnect
@@ -31,12 +31,12 @@ type IMessenger interface {
 	// Sign and Publish a message
 	// address to subscribe to as per IotConnect standard
 	// publication object to transmit, this is an object that will be converted into a JSON
-	Publish(address string, publication *Publication)
+	Publish(address string, retained bool, publication *Publication) error
 
 	// Publis raw data
 	// address to subscribe top as per IotConnect standard
 	// raw data, published as-is
-	PublishRaw(address string, raw json.RawMessage)
+	PublishRaw(address string, retained bool, raw json.RawMessage) error
 
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent

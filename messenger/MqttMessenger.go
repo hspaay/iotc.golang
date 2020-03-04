@@ -186,6 +186,26 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 	return err
 }
 
+// PublishRaw message
+func (messenger *MqttMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
+	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
+		messenger.Logger.Warnf("publish: Unable to publish. No connection with broker.")
+		return errors.New("no connection with broker")
+	}
+	payload := Publication{
+		Message: message,
+	}
+	token := messenger.pahoClient.Publish(address, messenger.pubqos, retained, payload)
+
+	err := token.Error()
+	if err != nil {
+		// TODO: confirm that with qos=1 the message is sent after reconnect
+		messenger.Logger.Warnf("publish: Error during publish on address %s: %v", address, err)
+		//return err
+	}
+	return err
+}
+
 // subscribe to addresss after establishing connection
 // The application can already subscribe to addresss before the connection is established. If connection is lost then
 // this will re-subscribe to those addresss as PahoMqtt drops the subscriptions after disconnect.
@@ -215,14 +235,13 @@ func (messenger *MqttMessenger) resubscribe() {
 // address: address to subscribe to. This can contain wildcards.
 // qos: Quality of service for subscription: 0, 1, 2
 // handler: callback handler.
-// returns error if no connection exists
 func (messenger *MqttMessenger) Subscribe(
-	address string, onMessage func(address string, publication *Publication)) error {
+	address string, onMessage func(address string, publication *Publication)) {
 	if messenger.pahoClient == nil {
 		err := errors.New("mqtt.Subscribe: Unable to subscribe. Missing the MQTT client")
 		messenger.Logger.Error(err)
 		//return errors.New("missing mqtt client")
-		return err
+		// return err
 	}
 	subscription := TopicSubscription{
 		address: address,
@@ -236,7 +255,7 @@ func (messenger *MqttMessenger) Subscribe(
 	messenger.Logger.Infof("mqtt.Subscribe: address %s, qos %d", address, messenger.subqos)
 	//messenger.pahoClient.Subscribe(address, qos, addressSubscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
 	messenger.pahoClient.Subscribe(address, messenger.subqos, subscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
-	return nil
+	// return nil
 }
 
 // NewMqttMessenger creates a new MQTT messenger instance

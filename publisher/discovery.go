@@ -1,12 +1,12 @@
-// Package publisher with discovery publication of my nodes, inputs and outputs
+// Package publisher with handling and publishing of discovered nodes, inputs and outputs
 // (not to discovery of other nodes on the bus)
 package publisher
 
-import "iotconnect/standard"
+import "github.com/hspaay/iotconnect.golang/standard"
 
 // DiscoverNode is invoked when a node is (re)discovered by this publisher
 // The given node replaces the existing node if one exists
-func (publisher *ThisPublisherState) DiscoverNode(node *standard.Node) {
+func (publisher *PublisherState) DiscoverNode(node *standard.Node) {
 	publisher.Logger.Info("Discovered node: ", node.Address)
 
 	publisher.updateMutex.Lock()
@@ -22,10 +22,11 @@ func (publisher *ThisPublisherState) DiscoverNode(node *standard.Node) {
 	publisher.updateMutex.Unlock()
 }
 
-// DiscoverInput is invoked when a node input is (re)discovered by this publisher
+// DiscoverInput is invoked when a publisher (re)discovered the input of one of its nodes
 // The given input replaces the existing input if one exists
 // If a node alias is set then the input and outputs are published under the alias instead of the node id
-func (publisher *ThisPublisherState) DiscoverInput(input *standard.InOutput) {
+// Returns the actual input instance to use
+func (publisher *PublisherState) DiscoverInput(input *standard.InOutput) *standard.InOutput {
 	publisher.Logger.Info("Discovered input: ", input.Address)
 
 	publisher.updateMutex.Lock()
@@ -39,14 +40,17 @@ func (publisher *ThisPublisherState) DiscoverInput(input *standard.InOutput) {
 		publisher.publishDiscovery()
 	}
 	publisher.updateMutex.Unlock()
+	return input
 }
 
-// DiscoverOutput is invoked when a node output is (re)discovered by this publisher
+// DiscoverOutput is invoked when a publishers (re)discovered an output of one of its nodes
 // The given output replaces the existing output if one exists
-func (publisher *ThisPublisherState) DiscoverOutput(output *standard.InOutput) {
+// Returns the actual input instance to use
+func (publisher *PublisherState) DiscoverOutput(output *standard.InOutput) *standard.InOutput {
 	publisher.Logger.Info("Discovered output: ", output.Address)
 
 	publisher.updateMutex.Lock()
+
 	publisher.outputs[output.Address] = output
 	if publisher.updatedInOutputs == nil {
 		publisher.updatedInOutputs = make(map[string]*standard.InOutput)
@@ -57,6 +61,7 @@ func (publisher *ThisPublisherState) DiscoverOutput(output *standard.InOutput) {
 		publisher.publishDiscovery()
 	}
 	publisher.updateMutex.Unlock()
+	return output
 }
 
 // SetDiscoveryInterval is a convenience function for periodic update of discovered
@@ -64,7 +69,7 @@ func (publisher *ThisPublisherState) DiscoverOutput(output *standard.InOutput) {
 //
 // interval in seconds to perform another discovery. Default is DefaultDiscoveryInterval
 // handler is the callback with the publisher for publishing discovery
-func (publisher *ThisPublisherState) SetDiscoveryInterval(interval int, handler func(publisher *ThisPublisherState)) {
+func (publisher *PublisherState) SetDiscoveryInterval(interval int, handler func(publisher *PublisherState)) {
 	publisher.Logger.Infof("discovery interval = %d seconds", interval)
 	publisher.discoveryInterval = interval
 	publisher.discoveryHandler = handler
@@ -73,36 +78,14 @@ func (publisher *ThisPublisherState) SetDiscoveryInterval(interval int, handler 
 // SetPollingInterval is a convenience function for periodic update of output values
 // interval in seconds to perform another poll. Default is DefaultPollInterval
 // intended for publishers that need to poll for values
-func (publisher *ThisPublisherState) SetPollingInterval(interval int, handler func(publisher *ThisPublisherState)) {
+func (publisher *PublisherState) SetPollingInterval(interval int, handler func(publisher *PublisherState)) {
 	publisher.Logger.Infof("polling interval = %d seconds", interval)
 	publisher.pollInterval = interval
 	publisher.pollHandler = handler
 }
 
-// UpdateOutputValue is invoked when an output value is updated
-// Ignores the value if such output has not yet been discovered
-func (publisher *ThisPublisherState) UpdateOutputValue(outputAddress string, newValue string) {
-	var output = publisher.GetOutput(outputAddress)
-	if output != nil {
-		publisher.updateMutex.Lock()
-
-		standard.UpdateValue(output, newValue)
-		if publisher.updatedOutputValues == nil {
-			publisher.updatedOutputValues = make(map[string]*standard.InOutput)
-		}
-		publisher.updatedOutputValues[output.Address] = output
-
-		if publisher.synchroneous {
-			publisher.publishDiscovery()
-		}
-		publisher.updateMutex.Unlock()
-	} else {
-		publisher.Logger.Warningf("Output to update not found. Address %s", outputAddress)
-	}
-}
-
 // publishDiscovery publishes updated nodes and in/outputs
-func (publisher *ThisPublisherState) publishDiscovery() {
+func (publisher *PublisherState) publishDiscovery() {
 	if publisher.messenger == nil {
 		return // can't do anything here, just go home
 	}
@@ -110,7 +93,7 @@ func (publisher *ThisPublisherState) publishDiscovery() {
 	if publisher.updatedNodes != nil {
 		for addr, node := range publisher.updatedNodes {
 			publisher.Logger.Infof("publish node discovery: %s", addr)
-			publisher.publishMessage(addr, node)
+			publisher.publishMessage(addr, true, node)
 		}
 		publisher.updatedNodes = nil
 	}
@@ -118,9 +101,9 @@ func (publisher *ThisPublisherState) publishDiscovery() {
 	// publish updated input or output discovery
 	if publisher.updatedInOutputs != nil {
 		for addr, inoutput := range publisher.updatedInOutputs {
-			aliasAddress := publisher.getAliasAddress(addr)
+			aliasAddress := publisher.getOutputAliasAddress(addr)
 			publisher.Logger.Infof("publish in/output discovery: %s", aliasAddress)
-			publisher.publishMessage(aliasAddress, inoutput)
+			publisher.publishMessage(aliasAddress, true, inoutput)
 		}
 		publisher.updatedInOutputs = nil
 	}
