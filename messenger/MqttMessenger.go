@@ -14,11 +14,14 @@ import (
 // ConnectionTimeoutSec constant with connection and reconnection timeouts
 const ConnectionTimeoutSec = 20
 
+// TLSPort is the default secure port to connect to mqtt
+const TLSPort = 8883
+
 // MqttMessenger that implements IMessenger
 type MqttMessenger struct {
 	pahoClient    pahomqtt.Client // Paho MQTT Client
 	hostName      string          // MQTT broker hostname or ip address to connect to
-	port          int             // MQTT port nr to connect to
+	port          int             // MQTT port nr to connect to, 0 for default 8883 (TLS)
 	login         string
 	password      string
 	subscriptions []TopicSubscription // list of TopicSubscription for re-subscribing after reconnect
@@ -58,8 +61,9 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 		log.Exit(1)
 	}
 
-	// Support multiple MQTT client IDs
-	brokerURL := fmt.Sprintf("tcp://%s:%d/", messenger.hostName, messenger.port) // tcp://host:1883 ws://host:1883 tls://host:8883, tcps://awshost:8883/mqtt
+	// Connect using  TLS
+	brokerURL := fmt.Sprintf("tls://%s:%d/", messenger.hostName, messenger.port) // tcp://host:1883 ws://host:1883 tls://host:8883, tcps://awshost:8883/mqtt
+	// brokerURL := fmt.Sprintf("tls://mqtt.eclipse.org:8883/")
 	opts := pahomqtt.NewClientOptions()
 	opts.AddBroker(brokerURL)
 	opts.SetClientID(messenger.clientID)
@@ -73,20 +77,20 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 	//opts.SetKeepAlive(60) // keepalive causes deadlock in v1.1.0. See github issue #126
 
 	opts.SetOnConnectHandler(func(client pahomqtt.Client) {
-		messenger.Logger.Warningf("mqtt:onConnect: Connected to broker at %s. Connected=%v. ClientId=%s",
+		messenger.Logger.Warningf("mqtt:onConnect: Connected to server at %s. Connected=%v. ClientId=%s",
 			brokerURL, client.IsConnected(), messenger.clientID)
 		// Subscribe to addresss already registered by the app on connect or reconnect
 		messenger.resubscribe()
 	})
 	opts.SetConnectionLostHandler(func(client pahomqtt.Client, err error) {
-		log.Warningf("mqtt:onConnectionLost: Disconnected from broker %s. Error %s, ClientId=%s",
+		log.Warningf("mqtt:onConnectionLost: Disconnected from server %s. Error %s, ClientId=%s",
 			brokerURL, err, messenger.clientID)
 	})
 	if lastWillAddress != "" {
 		//lastWillTopic := fmt.Sprintf("%s/%s/$state", messenger.config.Base, deviceId)
 		opts.SetWill(lastWillAddress, lastWillValue, 1, false)
 	}
-	messenger.Logger.Infof("mqtt:Connect: Connecting to MQTT broker: %s with clientID %s"+
+	messenger.Logger.Infof("mqtt:Connect: Connecting to MQTT server: %s with clientID %s"+
 		" AutoReconnect and CleanSession are set.",
 		brokerURL, messenger.clientID)
 
@@ -165,8 +169,8 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 
 	//fullTopic := fmt.Sprintf("%s/%s/%s", messenger.config.Base, messenger.deviceId, addressLevels)
 	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
-		messenger.Logger.Warnf("publish: Unable to publish. No connection with broker.")
-		return errors.New("no connection with broker")
+		messenger.Logger.Warnf("publish: Unable to publish. No connection with server.")
+		return errors.New("no connection with server")
 	}
 	payload, err := json.Marshal(publication)
 	if err != nil {
@@ -189,8 +193,8 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 // PublishRaw message
 func (messenger *MqttMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
 	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
-		messenger.Logger.Warnf("publish: Unable to publish. No connection with broker.")
-		return errors.New("no connection with broker")
+		messenger.Logger.Warnf("publish: Unable to publish. No connection with server.")
+		return errors.New("no connection with server")
 	}
 	payload := Publication{
 		Message: message,
@@ -260,6 +264,9 @@ func (messenger *MqttMessenger) Subscribe(
 
 // NewMqttMessenger creates a new MQTT messenger instance
 func NewMqttMessenger(hostName string, port int, login string, password string, clientID string, logger *log.Logger) *MqttMessenger {
+	if port == 0 {
+		port = TLSPort
+	}
 	messenger := &MqttMessenger{
 		pahoClient: nil,
 		Logger:     logger,

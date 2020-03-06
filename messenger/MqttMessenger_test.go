@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const hostName = "pi3" // set this to your broker
-const port = 1883
+const hostName = "localhost" // set this to your broker
+const port = 8883
 const login = ""
 const password = ""
 const clientID = "test1"

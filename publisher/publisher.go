@@ -12,7 +12,10 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/hspaay/iotconnect.golang/messenger"
@@ -142,6 +145,21 @@ func (publisher *PublisherState) Stop() {
 		publisher.updateMutex.Unlock()
 	}
 	publisher.Logger.Info("... bye bye")
+}
+
+// WaitForSignal waits until a TERM or INT signal is received
+func (publisher *PublisherState) WaitForSignal() {
+
+	// catch all signals since not explicitly listing
+	exitChannel := make(chan os.Signal, 1)
+
+	//signal.Notify(exitChannel, syscall.SIGTERM|syscall.SIGHUP|syscall.SIGINT)
+	signal.Notify(exitChannel, syscall.SIGINT, syscall.SIGTERM)
+
+	sig := <-exitChannel
+	log.Warningf("RECEIVED SIGNAL: %s", sig)
+	fmt.Println()
+	fmt.Println(sig)
 }
 
 // Main heartbeat loop to publish, discove and poll value updates
