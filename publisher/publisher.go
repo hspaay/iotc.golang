@@ -237,7 +237,7 @@ func NewPublisher(
 
 	var pubNode = standard.NewNode(zoneID, publisherID, standard.PublisherNodeID)
 
-	// IotZone core running state of the publisher
+	// IotConnect core running state of the publisher
 	var publisher = &PublisherState{
 		discoveryInterval: DefaultDiscoveryInterval,
 		exitChannel:       make(chan bool),

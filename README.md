@@ -55,32 +55,32 @@ This example uses Go modules as this lets you control versioning and choose your
 
 ## Installing Publishers
 
-Recommended installation of your publisher on a linux platform. The iotzone namespace is used for publisher applications:
+Recommended installation of your publisher on a linux platform. The iotconnect namespace is used for publisher applications:
 
 The folder structure for deployment as a normal user:
-* ~/bin/iotzone/bin      location of the publisher binaries
-* ~/bin/iotzone/config   location of the configuration files, including iotzone.conf
-* ~/bin/iotzone/logs     logging output
+* ~/bin/iotconnect/bin      location of the publisher binaries
+* ~/bin/iotconnect/config   location of the configuration files, including iotconnect.conf
+* ~/bin/iotconnect/logs     logging output
 
-When deploying as an system application, create these folders and update /etc/iotzone.conf
-* /etc/iotzone/conf         location of iotzone.conf main configuration file
-* /opt/iotzone/             location of the publisher binaries
-* /var/lib/iotzone/         location of the persistence files
-* /var/log/iotzone/         location of iotzone log files
+When deploying as an system application, create these folders and update /etc/iotconnect.conf
+* /etc/iotconnect/conf         location of iotconnect.conf main configuration file
+* /opt/iotconnect/             location of the publisher binaries
+* /var/lib/iotconnect/         location of the persistence files
+* /var/log/iotconnect/         location of iotconnect log files
 
 Starting a publisher using systemd 
-1. Edit the paths in iotzone.service to make sure the folder and user IDs are correct
-2. Copy the iotzone@.service and iotzone.target files to /etc/systemd/system/
+1. Edit the paths in iotconnect.service to make sure the folder and user IDs are correct
+2. Copy the iotconnect@.service and iotconnect.target files to /etc/systemd/system/
 3. Start manually using systemd using myweather as an example:
-   $ sudo service iotzone@myweather start
+   $ sudo service iotconnect@myweather start
 4. To enable autostart:
-   $ sudo systemctl enable iotzone@myweather
+   $ sudo systemctl enable iotconnect@myweather
 5. To disable autostart:
-   $ sudo systemctl disable iotzone@myweather
+   $ sudo systemctl disable iotconnect@myweather
 
 ## Contributing
 
-Contribution to the iotzone project is welcome. There are many areas where help is needed, especially with building publishers for IoT and other devices.
+Contribution to the iotconnect project is welcome. There are many areas where help is needed, especially with building publishers for IoT and other devices.
 See [CONTRIBUTING](docs/CONTRIBUTING.md) for guidelines.
 
 ## Questions
@@ -93,7 +93,7 @@ Common questions will be captured in the [Q&A](docs/FAQ.md).
 
 ... under construction ...
 
-This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/iotzone/myweather*
+This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/iotconnect/myweather*
 The publisher is called myweather, and each node is a city. More cities can be added with more nodes. 
 This example assumes you have a MQTT broker running locally. 
 
@@ -102,15 +102,15 @@ This example assumes you have a MQTT broker running locally.
 This uses golang modules so you can use the folder of your choice. More info here: https://blog.golang.org/using-go-modules
 
 ~~~bash
-$ mkdir -p ~/Projects/iotzone/myweather
-$ cd ~/Projects/iotzone/myweather
+$ mkdir -p ~/Projects/iotconnect/myweather
+$ cd ~/Projects/iotconnect/myweather
 $ go mod init myweather
    > go: creating new go.mod: module myweather
 ~~~
 Create a file named 'myweather.go' that looks like:
 ~~~golang
 package main
-import "github.com/hspaay/iotzone.golang"
+import "github.com/hspaay/iotconnect.golang"
 import "fmt"
 func main() {
   fmt.Printf("hello, myweather\n")
@@ -156,7 +156,7 @@ func main() {
   publisher = publisher.NewPublisher(ZoneID, PublisherID, messenger)
 
   // Update the forecast once an hour
-  iotzone.SetDefaultOutputInterval(3600, this.PollOutputs)
+  iotconnect.SetDefaultOutputInterval(3600, this.PollOutputs)
 
   // See below for Discover and Poll functions
   publisher.Start(nil, nil, Discover, Poll)
@@ -171,7 +171,7 @@ function Discover(publisher *Publisher) {
 }
 
 // Poll obtains the forcast and updates the output value.
-// The iotzone library will automatically publish the output discovery and values.
+// The iotconnect library will automatically publish the output discovery and values.
 function Poll(publisher *Publisher) {
   node = publisher.GetNode(NodeId)
   configValues = publisher.GetNodeConfigValues(node)

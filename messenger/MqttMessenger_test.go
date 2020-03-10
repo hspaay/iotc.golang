@@ -11,6 +11,7 @@ import (
 )
 
 const hostName = "localhost" // set this to your broker
+// const hostName = "mqtt.eclipse.org" // set this to your broker
 const port = 8883
 const login = ""
 const password = ""

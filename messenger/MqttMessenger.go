@@ -2,9 +2,12 @@
 package messenger
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
@@ -32,6 +35,9 @@ type MqttMessenger struct {
 	isRunning bool // listen for messages while running
 	pubqos    byte // publish QOS 0, 1, or 2
 	subqos    byte // subscribe QOS 0, 1, or 2
+	//
+	tlsVerifyServerCert bool   // verify the server certificate, this requires a Root CA signed cert
+	tlsCACertFile       string // path to CA certificate
 }
 
 // TopicSubscription holds subscriptions to restore after disconnect
@@ -90,6 +96,23 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 		//lastWillTopic := fmt.Sprintf("%s/%s/$state", messenger.config.Base, deviceId)
 		opts.SetWill(lastWillAddress, lastWillValue, 1, false)
 	}
+	// Use TLS if a CA certificate is given
+	var rootCA *x509.CertPool
+	if messenger.tlsCACertFile != "" {
+		rootCA = x509.NewCertPool()
+		caFile, err := ioutil.ReadFile(messenger.tlsCACertFile)
+		if err != nil {
+			messenger.Logger.Errorf("Unable to read CA certificate chain: %s", err)
+		}
+		rootCA.AppendCertsFromPEM([]byte(caFile))
+	}
+	opts.SetTLSConfig(&tls.Config{
+		InsecureSkipVerify: !messenger.tlsVerifyServerCert,
+		RootCAs:            rootCA, // include the zcas cert in the host root ca set
+		// https://opium.io/blog/mqtt-in-go/
+		ServerName: "", // hostname on the server certificate. How to get this?
+	})
+
 	messenger.Logger.Infof("mqtt:Connect: Connecting to MQTT server: %s with clientID %s"+
 		" AutoReconnect and CleanSession are set.",
 		brokerURL, messenger.clientID)
@@ -278,6 +301,8 @@ func NewMqttMessenger(hostName string, port int, login string, password string, 
 		pubqos:     1,
 		subqos:     1,
 		//messageChannel: make(chan *IncomingMessage),
+		tlsCACertFile:       "/etc/mosquitto/certs/zcas_ca.crt",
+		tlsVerifyServerCert: true,
 	}
 	return messenger
 }
