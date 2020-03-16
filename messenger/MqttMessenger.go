@@ -22,19 +22,13 @@ const TLSPort = 8883
 
 // MqttMessenger that implements IMessenger
 type MqttMessenger struct {
-	pahoClient    pahomqtt.Client // Paho MQTT Client
-	hostName      string          // MQTT broker hostname or ip address to connect to
-	port          int             // MQTT port nr to connect to, 0 for default 8883 (TLS)
-	login         string
-	password      string
+	config        *MessengerConfig    // connect information
+	pahoClient    pahomqtt.Client     // Paho MQTT Client
 	subscriptions []TopicSubscription // list of TopicSubscription for re-subscribing after reconnect
 	Logger        *log.Logger         // Logger provided by user
 	//config          myzone.MyZoneConfig            // configuration for the mqtt connection
-	clientID string
 	//messageChannel  chan *IncomingMessage
 	isRunning bool // listen for messages while running
-	pubqos    byte // publish QOS 0, 1, or 2
-	subqos    byte // subscribe QOS 0, 1, or 2
 	//
 	tlsVerifyServerCert bool   // verify the server certificate, this requires a Root CA signed cert
 	tlsCACertFile       string // path to CA certificate
@@ -56,23 +50,30 @@ type TopicSubscription struct {
 //                       Use "" to ignore LWT feature.
 // @param lastWillValue to use as the last will
 func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue string) error {
+	config := messenger.config
+
 	// close existing connection
 	if messenger.pahoClient != nil && messenger.pahoClient.IsConnected() {
 		messenger.pahoClient.Disconnect(10 * ConnectionTimeoutSec)
 	}
 
 	// set config defaults
-	if messenger.clientID == "" {
+	if config.ClientID == "" {
 		messenger.Logger.Panic("Connect - Missing Client ID. Required for MQTT connection. Bye.")
 		log.Exit(1)
 	}
 
 	// Connect using  TLS
-	brokerURL := fmt.Sprintf("tls://%s:%d/", messenger.hostName, messenger.port) // tcp://host:1883 ws://host:1883 tls://host:8883, tcps://awshost:8883/mqtt
+	port := config.Port
+	if port == 0 {
+		port = TLSPort
+	}
+
+	brokerURL := fmt.Sprintf("tls://%s:%d/", config.Server, port) // tcp://host:1883 ws://host:1883 tls://host:8883, tcps://awshost:8883/mqtt
 	// brokerURL := fmt.Sprintf("tls://mqtt.eclipse.org:8883/")
 	opts := pahomqtt.NewClientOptions()
 	opts.AddBroker(brokerURL)
-	opts.SetClientID(messenger.clientID)
+	opts.SetClientID(config.ClientID)
 	opts.SetAutoReconnect(true)
 	opts.SetConnectTimeout(10 * time.Second)
 	opts.SetMaxReconnectInterval(60 * time.Second) // max wait 1 minute for a reconnect
@@ -84,13 +85,13 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 
 	opts.SetOnConnectHandler(func(client pahomqtt.Client) {
 		messenger.Logger.Warningf("mqtt:onConnect: Connected to server at %s. Connected=%v. ClientId=%s",
-			brokerURL, client.IsConnected(), messenger.clientID)
+			brokerURL, client.IsConnected(), config.ClientID)
 		// Subscribe to addresss already registered by the app on connect or reconnect
 		messenger.resubscribe()
 	})
 	opts.SetConnectionLostHandler(func(client pahomqtt.Client, err error) {
 		log.Warningf("mqtt:onConnectionLost: Disconnected from server %s. Error %s, ClientId=%s",
-			brokerURL, err, messenger.clientID)
+			brokerURL, err, config.ClientID)
 	})
 	if lastWillAddress != "" {
 		//lastWillTopic := fmt.Sprintf("%s/%s/$state", messenger.config.Base, deviceId)
@@ -115,7 +116,7 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 
 	messenger.Logger.Infof("mqtt:Connect: Connecting to MQTT server: %s with clientID %s"+
 		" AutoReconnect and CleanSession are set.",
-		brokerURL, messenger.clientID)
+		brokerURL, config.ClientID)
 
 	// FIXME: PahoMqtt disconnects when sending a lot of messages, like on startup of some adapters.
 	messenger.pahoClient = pahomqtt.NewClient(opts)
@@ -201,8 +202,8 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 		return err
 	}
 	messenger.Logger.Debugf("publish []byte: address=%s, qos=%d, retained=%v",
-		address, messenger.pubqos, retained)
-	token := messenger.pahoClient.Publish(address, messenger.pubqos, retained, payload)
+		address, messenger.config.PubQos, retained)
+	token := messenger.pahoClient.Publish(address, messenger.config.PubQos, retained, payload)
 
 	err = token.Error()
 	if err != nil {
@@ -222,7 +223,7 @@ func (messenger *MqttMessenger) PublishRaw(address string, retained bool, messag
 	payload := Publication{
 		Message: message,
 	}
-	token := messenger.pahoClient.Publish(address, messenger.pubqos, retained, payload)
+	token := messenger.pahoClient.Publish(address, messenger.config.PubQos, retained, payload)
 
 	err := token.Error()
 	if err != nil {
@@ -247,7 +248,7 @@ func (messenger *MqttMessenger) resubscribe() {
 		messenger.Logger.Infof("mqtt.resubscribe: address %s", subscription.address)
 		// create a new variable to hold the subscription in the closure
 		newSubscr := subscription
-		token := messenger.pahoClient.Subscribe(newSubscr.address, messenger.subqos, newSubscr.onMessage)
+		token := messenger.pahoClient.Subscribe(newSubscr.address, messenger.config.PubQos, newSubscr.onMessage)
 		//token := messenger.pahoClient.Subscribe(newSubscr.address, newSubscr.qos, func (c pahomqtt.Client, msg pahomqtt.Message) {
 		//messenger.Logger.Infof("mqtt.resubscribe.onMessage: address %s, subscription %s", msg.Topic(), newSubscr.address)
 		//newSubscr.onMessage(c, msg)
@@ -279,27 +280,18 @@ func (messenger *MqttMessenger) Subscribe(
 	}
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
 
-	messenger.Logger.Infof("mqtt.Subscribe: address %s, qos %d", address, messenger.subqos)
+	messenger.Logger.Infof("mqtt.Subscribe: address %s, qos %d", address, messenger.config.SubQos)
 	//messenger.pahoClient.Subscribe(address, qos, addressSubscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
-	messenger.pahoClient.Subscribe(address, messenger.subqos, subscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
+	messenger.pahoClient.Subscribe(address, messenger.config.SubQos, subscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
 	// return nil
 }
 
 // NewMqttMessenger creates a new MQTT messenger instance
-func NewMqttMessenger(hostName string, port int, login string, password string, clientID string, logger *log.Logger) *MqttMessenger {
-	if port == 0 {
-		port = TLSPort
-	}
+func NewMqttMessenger(config *MessengerConfig, logger *log.Logger) *MqttMessenger {
 	messenger := &MqttMessenger{
 		pahoClient: nil,
 		Logger:     logger,
-		hostName:   hostName,
-		port:       port,
-		clientID:   clientID,
-		login:      login,
-		password:   password,
-		pubqos:     1,
-		subqos:     1,
+		config:     config,
 		//messageChannel: make(chan *IncomingMessage),
 		tlsCACertFile:       "/etc/mosquitto/certs/zcas_ca.crt",
 		tlsVerifyServerCert: true,

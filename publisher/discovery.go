@@ -6,7 +6,7 @@ import "github.com/hspaay/iotconnect.golang/standard"
 
 // DiscoverNode is invoked when a node is (re)discovered by this publisher
 // The given node replaces the existing node if one exists
-func (publisher *PublisherState) DiscoverNode(node *standard.Node) {
+func (publisher *PublisherState) DiscoverNode(node *standard.Node) *standard.Node {
 	publisher.Logger.Info("Discovered node: ", node.Address)
 
 	publisher.updateMutex.Lock()
@@ -20,6 +20,7 @@ func (publisher *PublisherState) DiscoverNode(node *standard.Node) {
 		publisher.publishDiscovery()
 	}
 	publisher.updateMutex.Unlock()
+	return node
 }
 
 // DiscoverInput is invoked when a publisher (re)discovered the input of one of its nodes
@@ -70,6 +71,7 @@ func (publisher *PublisherState) DiscoverOutput(output *standard.InOutput) *stan
 // interval in seconds to perform another discovery. Default is DefaultDiscoveryInterval
 // handler is the callback with the publisher for publishing discovery
 func (publisher *PublisherState) SetDiscoveryInterval(interval int, handler func(publisher *PublisherState)) {
+
 	publisher.Logger.Infof("discovery interval = %d seconds", interval)
 	publisher.discoveryInterval = interval
 	publisher.discoveryHandler = handler

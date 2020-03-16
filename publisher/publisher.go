@@ -86,7 +86,8 @@ func (publisher *PublisherState) SetErrorStatus(node *standard.Node, errorText s
 }
 
 // SetPollInterval determines the interval between polling
-func (publisher *PublisherState) SetPollInterval(seconds int, handler func(publisher *PublisherState)) {
+func (publisher *PublisherState) SetPollInterval(seconds int,
+	handler func(publisher *PublisherState)) {
 	publisher.pollInterval = seconds
 	publisher.pollHandler = handler
 }

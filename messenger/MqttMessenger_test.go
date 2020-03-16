@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const hostName = "localhost" // set this to your broker
-// const hostName = "mqtt.eclipse.org" // set this to your broker
-const port = 8883
-const login = ""
-const password = ""
-const clientID = "test1"
+var messengerConfig = MessengerConfig{
+	Server: "localhost", // set this to your broker
+	// const hostName = "mqtt.eclipse.org" // set this to your broker
+	Port:     8883,
+	ClientID: "test1",
+}
 
 const pub1Addr = "zone1/pub1/test"
 
@@ -32,7 +32,7 @@ func TestConnect(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	messenger := NewMqttMessenger(hostName, port, login, password, clientID, logger)
+	messenger := NewMqttMessenger(&messengerConfig, logger)
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 	messenger.Disconnect()
@@ -43,7 +43,7 @@ func TestPublish(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	messenger := NewMqttMessenger(hostName, port, login, password, clientID, logger)
+	messenger := NewMqttMessenger(&messengerConfig, logger)
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 
@@ -58,7 +58,7 @@ func TestPublishSubscribe(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	messenger := NewMqttMessenger(hostName, port, login, password, clientID, logger)
+	messenger := NewMqttMessenger(&messengerConfig, logger)
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 

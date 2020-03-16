@@ -10,6 +10,18 @@ type Publication struct {
 	Signature string          `json:"signature"`
 }
 
+// MessengerConfig with configuration of a messenger
+type MessengerConfig struct {
+	Server   string `yaml:"server"`             // Messenger hostname or ip address
+	Port     uint16 `yaml:"port,omitempty"`     // optional port, default is 8883 for TLS
+	Login    string `yaml:"login"`              // messenger login name
+	Password string `yaml:"credentials"`        // messenger login credentials
+	ClientID string `yaml:"clientid,omitempty"` // optional connect ID, must be unique. Default is generated.
+	PubQos   byte   `yaml:"pubqos"`             // publish messages with QOS=1
+	SubQos   byte   `yaml:"subqos"`             // subscribe to messages with QOS=1
+	Zone     string `yaml:"zone"`               // Zone in which this messenger publishes
+}
+
 // IMessenger interface for messenger implementations
 type IMessenger interface {
 

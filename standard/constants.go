@@ -11,6 +11,8 @@ const TimeFormat = "2006-01-02T15:04:05.000-0700"
 // publication address reserved keywords
 const (
 	CommandConfigure       = "$configure" // node configuration, payload is ConfigureMessage
+	CommandCreate          = "$create"    // create node command
+	CommandDelete          = "$delete"    // delete node command
 	CommandEvent           = "$event"     // node outputs event, payload is EventMessage
 	CommandHistory         = "$history"   // output history, payload is HistoryMessage
 	CommandInputDiscovery  = "$input"     // input discovery, payload is InOutput object
