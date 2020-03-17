@@ -73,7 +73,9 @@ func (publisher *PublisherState) DiscoverOutput(output *standard.InOutput) *stan
 func (publisher *PublisherState) SetDiscoveryInterval(interval int, handler func(publisher *PublisherState)) {
 
 	publisher.Logger.Infof("discovery interval = %d seconds", interval)
-	publisher.discoveryInterval = interval
+	if interval > 0 {
+		publisher.discoveryInterval = interval
+	}
 	publisher.discoveryHandler = handler
 }
 
@@ -82,7 +84,9 @@ func (publisher *PublisherState) SetDiscoveryInterval(interval int, handler func
 // intended for publishers that need to poll for values
 func (publisher *PublisherState) SetPollingInterval(interval int, handler func(publisher *PublisherState)) {
 	publisher.Logger.Infof("polling interval = %d seconds", interval)
-	publisher.pollInterval = interval
+	if interval > 0 {
+		publisher.pollInterval = interval
+	}
 	publisher.pollHandler = handler
 }
 

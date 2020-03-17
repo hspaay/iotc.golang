@@ -23,7 +23,7 @@ const (
 	CommandUpgrade         = "$upgrade"   // perform firmware upgrade, payload is UpgradeMessage
 	CommandValue           = "$value"     // raw output value
 	// LocalZone ID for local-only zones (eg, no sharing outside this zone)
-	LocalZoneID = "$local"
+	LocalZoneID = "local"
 	// PublisherNodeID to use when none is provided
 	PublisherNodeID = "$publisher" // reserved node ID for publishers
 )

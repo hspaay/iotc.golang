@@ -184,17 +184,25 @@ func (publisher *PublisherState) heartbeatLoop() {
 
 		// discover new nodes
 		if (publisher.discoverCountdown <= 0) && (publisher.discoveryHandler != nil) {
-			go publisher.discoveryHandler(publisher)
+			if publisher.synchroneous {
+				publisher.discoveryHandler(publisher)
+			} else {
+				go publisher.discoveryHandler(publisher)
+			}
 			publisher.discoverCountdown = publisher.discoveryInterval
 		}
 		publisher.discoverCountdown--
 
 		// poll for values
 		if (publisher.pollCountdown <= 0) && (publisher.pollHandler != nil) {
-			go publisher.pollHandler(publisher)
+			if publisher.synchroneous {
+				publisher.pollHandler(publisher)
+			} else {
+				go publisher.pollHandler(publisher)
+			}
 			publisher.pollCountdown = publisher.pollInterval
 		}
-		publisher.discoverCountdown--
+		publisher.pollCountdown--
 
 		publisher.updateMutex.Lock()
 		isRunning := publisher.isRunning
@@ -248,6 +256,7 @@ func NewPublisher(
 		nodes:             make(map[string]*standard.Node),
 		outputs:           make(map[string]*standard.InOutput),
 		outputHistory:     make(map[string]standard.HistoryList),
+		pollCountdown:     1, // run discovery before poll
 		pollInterval:      DefaultPollInterval,
 		publisherID:       publisherID,
 		publisherNode:     pubNode,

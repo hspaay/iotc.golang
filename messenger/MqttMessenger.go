@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
@@ -58,12 +59,13 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 	}
 
 	// set config defaults
+	// ClientID defaults to hostname-secondsSinceEpoc
+	hostName, _ := os.Hostname()
 	if config.ClientID == "" {
-		messenger.Logger.Panic("Connect - Missing Client ID. Required for MQTT connection. Bye.")
-		log.Exit(1)
+		config.ClientID = fmt.Sprintf("%s-%d", hostName, time.Now().Unix())
 	}
 
-	// Connect using  TLS
+	// Connect using TLS
 	port := config.Port
 	if port == 0 {
 		port = TLSPort
@@ -196,7 +198,7 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 		messenger.Logger.Warnf("publish: Unable to publish. No connection with server.")
 		return errors.New("no connection with server")
 	}
-	payload, err := json.Marshal(publication)
+	payload, err := json.MarshalIndent(publication, " ", " ")
 	if err != nil {
 		messenger.Logger.Errorf("Publish:  Error marshalling publication: %s", err)
 		return err
@@ -208,7 +210,7 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 	err = token.Error()
 	if err != nil {
 		// TODO: confirm that with qos=1 the message is sent after reconnect
-		messenger.Logger.Warnf("publish: Error during publish on address %s: %v", address, err)
+		messenger.Logger.Warnf("Publish: Error during publish on address %s: %v", address, err)
 		//return err
 	}
 	return err
@@ -217,18 +219,17 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 // PublishRaw message
 func (messenger *MqttMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
 	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
-		messenger.Logger.Warnf("publish: Unable to publish. No connection with server.")
+		messenger.Logger.Warnf("PublishRaw: Unable to publish. No connection with server.")
 		return errors.New("no connection with server")
 	}
-	payload := Publication{
-		Message: message,
-	}
-	token := messenger.pahoClient.Publish(address, messenger.config.PubQos, retained, payload)
+	// publication := Publication{Message: message}
+	// payload, err := json.Marshal(publication)
+	token := messenger.pahoClient.Publish(address, messenger.config.PubQos, retained, []byte(message))
 
 	err := token.Error()
 	if err != nil {
 		// TODO: confirm that with qos=1 the message is sent after reconnect
-		messenger.Logger.Warnf("publish: Error during publish on address %s: %v", address, err)
+		messenger.Logger.Warnf("PublishRaw: Error during publish on address %s: %v", address, err)
 		//return err
 	}
 	return err

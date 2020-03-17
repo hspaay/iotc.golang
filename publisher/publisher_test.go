@@ -15,7 +15,7 @@ const node1ID = "node1"
 const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
 const publisher2ID = "publisher2"
-const zone1ID = "$local"
+const zone1ID = standard.LocalZoneID
 
 var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
