@@ -108,9 +108,9 @@ type HistoryList []*HistoryValue
 
 // HistoryValue of node output
 type HistoryValue struct {
-	Time      time.Time
-	TimeStamp string `json:"timestamp"`
-	Value     string `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
+	// Timestamp string `json:"timestamp"`
+	Value string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
 }
 
 // LatestMessage struct to send/receive the '$latest' command
@@ -119,7 +119,7 @@ type LatestMessage struct {
 	Sender    string `json:"sender"`
 	Timestamp string `json:"timestamp"` // timestamp of value
 	Unit      Unit   `json:"unit,omitempty"`
-	Value     string `json:"value"`
+	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
 }
 
 // SetMessage to set node input
@@ -127,7 +127,7 @@ type SetMessage struct {
 	Address   string `json:"address"` // zone/publisher/node/$set/type/instance
 	Sender    string `json:"sender"`
 	Timestamp string `json:"timestamp"`
-	Value     string `json:"value"`
+	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
 }
 
 // NewInput instance

@@ -11,10 +11,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// ThisSubscriberState carries the operating state of the subscriber
+// SubscriberState carries the operating state of the subscriber
 // Start() will subscribe to discover all publishers.
 // To discover nodes, subscribe to the publisher
-type ThisSubscriberState struct {
+type SubscriberState struct {
 	Logger        *log.Logger               //
 	messenger     messenger.IMessenger      // Message bus messenger to use
 	zoneID        string                    // The zone in which we live
@@ -30,7 +30,7 @@ type ThisSubscriberState struct {
 }
 
 // Start listen for publisher nodes
-func (subscriber *ThisSubscriberState) Start() {
+func (subscriber *SubscriberState) Start() {
 	if !subscriber.isRunning {
 		subscriber.Logger.Warningf("Starting subscriber")
 		subscriber.updateMutex.Lock()
@@ -49,7 +49,7 @@ func (subscriber *ThisSubscriberState) Start() {
 }
 
 // Stop listen for messages
-func (subscriber *ThisSubscriberState) Stop() {
+func (subscriber *SubscriberState) Stop() {
 	if subscriber.isRunning {
 		subscriber.Logger.Warningf("Stopping subscriber")
 		subscriber.updateMutex.Lock()
@@ -63,7 +63,7 @@ func (subscriber *ThisSubscriberState) Stop() {
 // Used to verify signatures of incoming configuration and input messages
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
 // publication contains a message with the publisher node info
-func (subscriber *ThisSubscriberState) handlePublisherDiscovery(address string, publication *messenger.Publication) {
+func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publication *messenger.Publication) {
 	var pubNode standard.Node
 	err := json.Unmarshal([]byte(publication.Message), &pubNode)
 	if err != nil {
@@ -78,9 +78,9 @@ func (subscriber *ThisSubscriberState) handlePublisherDiscovery(address string, 
 // outputs and receive output values
 // zoneID for the zone this subscriber lives in
 // messenger for subscribing to the message bus
-func NewSubscriber(zoneID string, messenger messenger.IMessenger) *ThisSubscriberState {
+func NewSubscriber(zoneID string, messenger messenger.IMessenger) *SubscriberState {
 
-	var subscriber = &ThisSubscriberState{
+	var subscriber = &SubscriberState{
 		inputs:      make(map[string]*standard.InOutput, 0),
 		Logger:      log.New(),
 		messenger:   messenger,

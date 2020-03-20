@@ -82,6 +82,7 @@ const (
 	DataTypeDate   DataType = "date"    // ISO8601 date YYYY-MM-DDTHH:MM:SS.mmmZ
 	DataTypeEnum   DataType = "enum"    // value is one of a predefined set of string values, published in the 'enum info field'
 	DataTypeInt    DataType = "int"     // value is an integer number
+	DataTypeList   DataType = "list"    // value is a list of ...
 	DataTypeNumber DataType = "number"  // value is a float number
 	DataTypeSecret DataType = "secret"  // a secret string that is not published
 	DataTypeString DataType = "string"  // value is a string
@@ -247,10 +248,12 @@ const (
 	IOTypeOnOffSwitch            string = "switch"
 	IOTypePlay                   string = "avplay"
 	IOTypePushButton             string = "pushbutton" // with nr of pushes
+	IOTypeRain                   string = "rain"
 	IOTypeSaturation             string = "saturation"
 	IOTypeScale                  string = "scale"
 	IOTypeSignalStrength         string = "signalstrength"
 	IOTypeSmokeDetector          string = "smokedetector"
+	IOTypeSnow                   string = "snow"
 	IOTypeSoundDetector          string = "sounddetector"
 	IOTypeTemperature            string = "temperature"
 	IOTypeUltraviolet            string = "ultraviolet"
@@ -259,6 +262,7 @@ const (
 	IOTypeVoltage                string = "voltage"
 	IOTypeVolume                 string = "volume"
 	IOTypeWaterLevel             string = "waterlevel"
+	IOTypeWeather                string = "weather" // description of weather, eg sunny
 	IOTypeWindHeading            string = "windheading"
 	IOTypeWindSpeed              string = "windspeed"
 )
@@ -308,8 +312,10 @@ var IOTypeMap = map[string]struct {
 	IOTypeOnOffSwitch:            {DataType: DataTypeBool},
 	IOTypePlay:                   {DataType: DataTypeBool},
 	IOTypePushButton:             {DataType: DataTypeNumber},
+	IOTypeRain:                   {DataType: DataTypeNumber, DefaultUnit: UnitMeter, UnitValues: "m"},
 	IOTypeSaturation:             {DataType: DataTypeString},
 	IOTypeScale:                  {DataType: DataTypeNumber, DefaultUnit: UnitKG, UnitValues: UnitValuesWeight},
+	IOTypeSnow:                   {DataType: DataTypeNumber, DefaultUnit: UnitMeter, UnitValues: "m"},
 	IOTypeSignalStrength:         {DataType: DataTypeNumber, DefaultUnit: "dBm"},
 	IOTypeSmokeDetector:          {DataType: DataTypeBool},
 	IOTypeSoundDetector:          {DataType: DataTypeBool},
@@ -320,6 +326,6 @@ var IOTypeMap = map[string]struct {
 	IOTypeVoltage:                {DataType: DataTypeNumber, DefaultUnit: UnitVolt},
 	IOTypeVolume:                 {DataType: DataTypeNumber, DefaultUnit: UnitPercent},
 	IOTypeWaterLevel:             {DataType: DataTypeNumber, DefaultUnit: UnitMeter, UnitValues: UnitValuesLength},
-	IOTypeWindHeading:            {DataType: DataTypeNumber, DefaultUnit: UnitPercent},
+	IOTypeWindHeading:            {DataType: DataTypeNumber, DefaultUnit: UnitDegree},
 	IOTypeWindSpeed:              {DataType: DataTypeNumber, DefaultUnit: UnitSpeed, UnitValues: UnitValuesSpeed},
 }

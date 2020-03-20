@@ -45,7 +45,25 @@ func (publisher *PublisherState) GetOutputValue(node *standard.Node, outputType 
 	return latest.Value
 }
 
-// UpdateOutputValue adds the new output value to the front of the history
+// UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
+func (publisher *PublisherState) UpdateOutputStringList(node *standard.Node, outputType string, outputInstance string, values []string) {
+	valuesAsString, _ := json.Marshal(values)
+	publisher.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+}
+
+// UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
+func (publisher *PublisherState) UpdateOutputFloatList(node *standard.Node, outputType string, outputInstance string, values []float32) {
+	valuesAsString, _ := json.Marshal(values)
+	publisher.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+}
+
+// UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
+func (publisher *PublisherState) UpdateOutputIntList(node *standard.Node, outputType string, outputInstance string, values []int) {
+	valuesAsString, _ := json.Marshal(values)
+	publisher.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+}
+
+// UpdateOutputValue adds the new node output value to the front of the history
 // If the output has a repeatDelay configured, then the value is only added if
 //  it has changed or the previous update was older than the repeatDelay.
 // The history retains a max of 24 hours
@@ -67,7 +85,7 @@ func (publisher *PublisherState) UpdateOutputValue(node *standard.Node, outputTy
 	}
 	if len(history) > 0 {
 		previous = history[0]
-		age := time.Now().Sub(previous.Time)
+		age := time.Now().Sub(previous.Timestamp)
 		ageSeconds = int(age.Seconds())
 	}
 
@@ -159,9 +177,10 @@ func (publisher *PublisherState) publishLatestCommand(aliasAddress string, outpu
 	latestMessage := &standard.LatestMessage{
 		Address:   addr,
 		Sender:    publisher.publisherNode.Address,
-		Timestamp: latest.TimeStamp,
-		Unit:      output.Unit,
-		Value:     latest.Value,
+		Timestamp: latest.Timestamp.Format("2006-01-02T15:04:05.000-0700"),
+		// Timestamp: latest.TimeStamp,
+		Unit:  output.Unit,
+		Value: latest.Value,
 	}
 	publisher.publishMessage(addr, true, latestMessage)
 }
@@ -217,14 +236,14 @@ func (publisher *PublisherState) publishValueCommand(aliasAddress string, output
 		return
 	}
 	aliasSegments[3] = standard.CommandValue
-	alias := strings.Join(aliasSegments, "/")
+	addr := strings.Join(aliasSegments, "/")
 	s := latest.Value
 	if len(s) > 30 {
 		s = s[:30]
 	}
-	publisher.Logger.Infof("publish output value '%s' on %s", s, aliasAddress)
+	publisher.Logger.Infof("publish output value '%s' on %s", s, addr)
 
-	publisher.messenger.PublishRaw(alias, true, []byte(latest.Value)) // raw
+	publisher.messenger.PublishRaw(addr, true, []byte(latest.Value)) // raw
 }
 
 // publishOutputValues publishes pending updates to output values
@@ -246,21 +265,24 @@ func (publisher *PublisherState) publishOutputValues() {
 // The resulting list contains a max of historySize entries limited to 24 hours
 // This function is not thread-safe and should only be used from within a locked section
 // history is optional and used to insert the value in the front. If nil then a new history is returned
+// newValue contains the value to include in the history along with the current timestamp
 // maxHistorySize is optional and limits the size in addition to the 24 hour limit
 // returns the history list with the new value at the front of the list
 func updateHistory(history standard.HistoryList, newValue string, maxHistorySize int) standard.HistoryList {
 
 	timeStamp := time.Now()
-	timeStampStr := timeStamp.Format("2006-01-02T15:04:05.000-0700")
+	// timeStampStr := timeStamp.Format("2006-01-02T15:04:05.000-0700")
 
 	latest := standard.HistoryValue{
-		Time:      timeStamp,
-		TimeStamp: timeStampStr,
-		Value:     newValue,
+		Timestamp: timeStamp,
+		// TimeStamp: timeStampStr,
+		Value: newValue,
 	}
 	if history == nil {
 		history = make(standard.HistoryList, 1)
 	} else {
+		// make room at the front of the slice
+		history = append(history, &latest)
 		copy(history[1:], history[0:])
 	}
 	history[0] = &latest
@@ -272,7 +294,7 @@ func updateHistory(history standard.HistoryList, newValue string, maxHistorySize
 	// cap at 24 hours
 	for ; maxHistorySize > 1; maxHistorySize-- {
 		entry := history[maxHistorySize-1]
-		if timeStamp.Sub(entry.Time) <= time.Hour*24 {
+		if timeStamp.Sub(entry.Timestamp) <= time.Hour*24 {
 			break
 		}
 	}

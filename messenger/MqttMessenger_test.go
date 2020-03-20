@@ -1,4 +1,5 @@
 // Package messenger - Publish and Subscribe to message using the MQTT message bus
+// This requires a running MQTT server on localhost
 package messenger
 
 import (
@@ -12,9 +13,8 @@ import (
 
 var messengerConfig = MessengerConfig{
 	Server: "localhost", // set this to your broker
-	// const hostName = "mqtt.eclipse.org" // set this to your broker
-	Port:     8883,
-	ClientID: "test1",
+	Port:   8883,
+	// ClientID: "test1",
 }
 
 const pub1Addr = "zone1/pub1/test"

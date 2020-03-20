@@ -230,6 +230,14 @@ func TestOutputValue(t *testing.T) {
 	var history standard.HistoryMessage
 	json.Unmarshal([]byte(p3.Message), &history)
 	assert.Len(t, history.History, 1, "History length differs")
+
+	// test int, float, string list publication
+	intList := []int{1, 2, 3}
+	pub1.UpdateOutputIntList(node1, node1Output1Type, node1Output1Instance, intList)
+	floatList := []float32{1.3, 2.5, 3.09}
+	pub1.UpdateOutputFloatList(node1, node1Output1Type, node1Output1Instance, floatList)
+	stringList := []string{"hello", "world"}
+	pub1.UpdateOutputStringList(node1, node1Output1Type, node1Output1Instance, stringList)
 }
 
 // TestReceiveInput tests receiving input control commands
