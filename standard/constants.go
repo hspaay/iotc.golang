@@ -14,6 +14,7 @@ const (
 	CommandCreate          = "$create"    // create node command
 	CommandDelete          = "$delete"    // delete node command
 	CommandEvent           = "$event"     // node outputs event, payload is EventMessage
+	CommandForecast        = "$forecast"  // output forecast, payload is HistoryMessage
 	CommandHistory         = "$history"   // output history, payload is HistoryMessage
 	CommandInputDiscovery  = "$input"     // input discovery, payload is InOutput object
 	CommandLatest          = "$latest"    // latest output, payload is latest message
@@ -82,7 +83,6 @@ const (
 	DataTypeDate   DataType = "date"    // ISO8601 date YYYY-MM-DDTHH:MM:SS.mmmZ
 	DataTypeEnum   DataType = "enum"    // value is one of a predefined set of string values, published in the 'enum info field'
 	DataTypeInt    DataType = "int"     // value is an integer number
-	DataTypeList   DataType = "list"    // value is a list of ...
 	DataTypeNumber DataType = "number"  // value is a float number
 	DataTypeSecret DataType = "secret"  // a secret string that is not published
 	DataTypeString DataType = "string"  // value is a string

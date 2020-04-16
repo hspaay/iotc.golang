@@ -50,7 +50,7 @@ func TestNewPublisher(t *testing.T) {
 	if !assert.NotNil(t, pub1, "Failed creating publisher") {
 		return
 	}
-	tmpNode := pub1.GetNodeByAddress(pubAddr)
+	tmpNode := pub1.Nodes.GetNodeByAddress(pubAddr)
 	if !(assert.NotNil(t, tmpNode, "Failed getting publisher node") &&
 		assert.Equal(t, pubAddr, tmpNode.Address, "Retrieved publisher node not equal to expected node")) {
 		return
@@ -61,23 +61,23 @@ func TestNewPublisher(t *testing.T) {
 func TestDiscover(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger()
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
-	pub1.DiscoverNode(node1)
-	tmpNode := pub1.GetNodeByAddress(node1Addr)
+	pub1.Nodes.UpdateNode(node1)
+	tmpNode := pub1.Nodes.GetNodeByAddress(node1Addr)
 	if !(assert.NotNil(t, tmpNode, "Failed getting discovered node") &&
 		assert.Equal(t, node1Addr, tmpNode.Address, "Retrieved node not equal to expected node")) {
 		return
 	}
 
-	pub1.DiscoverInput(node1Input1)
-	tmpIn := pub1.GetInput(node1, "switch", "0")
+	pub1.Inputs.UpdateInput(node1Input1)
+	tmpIn := pub1.Inputs.GetInput(node1, "switch", "0")
 	if !(assert.NotNil(t, tmpIn, "Failed getting discovered input") &&
 		assert.Equal(t, node1Input1.Address, tmpIn.Address, "Retrieved input 1 not equal to discovered input 1") &&
 		assert.Equal(t, node1InputAddr, tmpIn.Address, "Input address incorrect")) {
 		return
 	}
 
-	pub1.DiscoverOutput(node1Output1)
-	tmpOut := pub1.GetOutput(node1, "switch", "0")
+	pub1.Outputs.UpdateOutput(node1Output1)
+	tmpOut := pub1.Outputs.GetOutput(node1, "switch", "0")
 	if !(assert.NotNil(t, tmpOut, "Failed getting discovered output") &&
 		assert.Equal(t, node1Output1.Address, tmpOut.Address, "Retrieved output 1 not equal to discovered output 1")) {
 		return
@@ -93,13 +93,14 @@ func TestNodePublication(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// Start synchroneous publications to verify publications in order
-	pub1.Start(false, nil, nil)       // publisher is first publication [0]
-	pub1.DiscoverNode(node1)          // 2nd [1]
-	pub1.DiscoverInput(node1Input1)   // 3rd [2]
-	pub1.DiscoverOutput(node1Output1) // 4th [3]
+	pub1.Start()                            // publisher is first publication [0]
+	pub1.Nodes.UpdateNode(node1)            // 2nd [1]
+	pub1.Inputs.UpdateInput(node1Input1)    // 3rd [2]
+	pub1.Outputs.UpdateOutput(node1Output1) // 4th [3]
 	pub1.Stop()
 
-	if !assert.Len(t, testMessenger.Publications, 4, "Missing publication") {
+	nrPublications := len(testMessenger.Publications)
+	if !assert.Equal(t, 4, nrPublications, "Missing publication") {
 		return
 	}
 	p0 := testMessenger.FindLastPublication(node1Addr)
@@ -126,23 +127,21 @@ func TestAlias(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.Start(false, nil, nil)
-	pub1.DiscoverNode(node1)
-	time.Sleep(time.Second * 2) // process publisher discovery
+	pub1.Start()
+	pub1.Nodes.UpdateNode(node1)
+	pub1.PublishUpdates()
+	// time.Sleep(1)
 
-	// var cm = &standard.ConfigureMessage{
-	// 	Address: node1Addr,
-	// 	Config:  map[string]string{"alias": node1AliasID},
-	// 	Sender:  publisher.publisherNode.Address,
-	// }
-	// mcm, _ := json.Marshal(cm)
-	// publication := &messenger.Publication{
-	// 	Message: mcm,
-	// }
-	// publisher.handleNodeConfigCommand(node1Addr, publication)
-	pub1.UpdateNodeConfigValue(node1Addr, map[string]string{"alias": node1AliasID})
+	// Stress concurrency, run test with -race
+	for i := 1; i < 30; i++ {
+		go pub1.Nodes.UpdateNodeConfigValues(node1Addr, map[string]string{"alias": node1AliasID})
+		time.Sleep(130 * time.Millisecond)
+		node := pub1.Nodes.GetNodeByAddress(node1Addr)
+		json.Marshal(node)
+	}
 
-	pub1.DiscoverOutput(node1Output1) // expect a publication with the alias
+	// pub1.Nodes.UpdateNodeConfigValues(node1Addr, map[string]string{"alias": node1AliasID})
+	pub1.Outputs.UpdateOutput(node1Output1) // expect an output discovery publication with the alias
 	pub1.Stop()
 
 	p3 := testMessenger.FindLastPublication(node1AliasOutput1Addr) // the output discovery publication
@@ -165,12 +164,14 @@ func TestConfigure(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.Start(false, nil, nil) // start to subscribe
-	pub1.DiscoverNode(node1)
+	pub1.Start() // call start to subscribe to node updates
+	pub1.Nodes.UpdateNode(node1)
 	config := standard.NewConfig("name", standard.DataTypeString, "Friendly Name", "")
-	pub1.DiscoverNodeConfig(node1, config)
+	pub1.Nodes.UpdateNodeConfig(node1Addr, config)
 
-	time.Sleep(time.Second * 2) // process publisher discovery
+	// time.Sleep(time.Second * 1) // receive publications
+
+	// publish a configuration update for the name -> NewName
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "config": {"name":"NewName"} }`,
 		node1ConfigureAddr, pubAddr, time.Now().Format(standard.TimeFormat))
 	// message = `{ "a": "Hello world" }`
@@ -182,9 +183,9 @@ func TestConfigure(t *testing.T) {
 
 	// config := map[string]string{"alias": "myalias"}
 	// publisher.UpdateNodeConfig(node1Addr, config) // p2
-	// publisher.DiscoverOutput(node1Output1)        // p3
+	// publisher.Outputs.UpdateOutput(node1Output1)        // p3
 	pub1.Stop()
-	node1 := pub1.GetNodeByAddress(node1Addr)
+	node1 := pub1.Nodes.GetNodeByAddress(node1Addr)
 	c := node1.Config["name"]
 	if !assert.NotNil(t, c, "Can't find configuration for name") {
 		return
@@ -201,11 +202,13 @@ func TestOutputValue(t *testing.T) {
 	node1 = standard.NewNode(zone1ID, publisher1ID, node1ID)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.Start(false, nil, nil)
-	pub1.DiscoverNode(node1)
-	pub1.DiscoverOutput(node1Output1)
-	pub1.UpdateOutputValue(node1, node1Output1Type, node1Output1Instance, "true")
-	time.Sleep(time.Second * 2)
+	pub1.Start()
+	pub1.Nodes.UpdateNode(node1)
+	pub1.Outputs.UpdateOutput(node1Output1)
+	pub1.OutputHistory.UpdateOutputValue(node1, node1Output1Type, node1Output1Instance, "true")
+
+	pub1.PublishUpdates()
+	// time.Sleep(time.Second * 1) // receive publications
 	pub1.Stop()
 
 	// test raw $value publication
@@ -246,15 +249,17 @@ func TestReceiveInput(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.Start(false, nil, func(input *standard.InOutput, message *standard.SetMessage) {
+	pub1.SetNodeInputHandler(func(input *standard.InOutput, message *standard.SetMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
-		pub1.UpdateOutputValue(node1, input.IOType, input.Instance, message.Value)
+		pub1.OutputHistory.UpdateOutputValue(node1, input.IOType, input.Instance, message.Value)
 	})
-	pub1.DiscoverNode(node1) // p1
-	pub1.DiscoverInput(node1Input1)
-	pub1.DiscoverOutput(node1Output1)
+	pub1.Start()
+	pub1.Nodes.UpdateNode(node1) // p1
+	pub1.Inputs.UpdateInput(node1Input1)
+	pub1.Outputs.UpdateOutput(node1Output1)
+	pub1.PublishUpdates()
 	// process background messages
-	time.Sleep(time.Second * 2)
+	// time.Sleep(time.Second * 1) // receive publications
 
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
 		node1InputSetAddr, pubAddr, time.Now().Format(standard.TimeFormat))
@@ -266,8 +271,11 @@ func TestReceiveInput(t *testing.T) {
 	payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	testMessenger.OnReceive(node1InputSetAddr, []byte(payload))
 
-	val := pub1.GetOutputValue(node1, node1Output1Type, node1Output1Instance)
-	assert.Equal(t, "true", val, "Input value didn't update the output")
+	val := pub1.OutputHistory.GetOutputValueByType(node1, node1Output1Type, node1Output1Instance)
+	if !assert.NotNilf(t, val, "Unable to find output value for output %s/%s/%s", node1.Address, node1Output1Type, node1Output1Instance) {
+		return
+	}
+	assert.Equal(t, "true", val.Value, "Input value didn't update the output")
 
 	pub1.Stop()
 }
@@ -278,12 +286,14 @@ func TestDiscoveryPublishers(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.Start(false, nil, nil)
+	pub1.Start()
 
 	publisher2 := NewPublisher(zone1ID, publisher2ID, testMessenger)
-	publisher2.Start(false, nil, nil)
+	publisher2.Start()
 	// wait for incoming messages to be processed
-	time.Sleep(time.Second * 2)
+
+	time.Sleep(time.Second * 1) // receive publications
+
 	publisher2.Stop()
 	pub1.Stop()
 

@@ -56,7 +56,11 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 	publication.Signature = payload.Signature
 	publication.Message = payload.Message
 
-	for _, subscription := range messenger.subscriptions {
+	messenger.publishMutex.Lock()
+	subs := messenger.subscriptions
+	messenger.publishMutex.Unlock()
+
+	for _, subscription := range subs {
 		subscriptionSegments := strings.Split(subscription.address, "/")
 		// Match the address accepting wildcards. Rather crude but only intended for testing.
 		match := true
@@ -95,7 +99,8 @@ func (messenger *DummyMessenger) Publish(address string, retained bool, publicat
 		messenger.Logger.Errorf("Failed marshalling publication for address %s", address)
 		return err
 	}
-	go messenger.OnReceive(address, payload)
+	// go messenger.OnReceive(address, payload)
+	messenger.OnReceive(address, payload)
 	return nil
 }
 
@@ -115,7 +120,9 @@ func (messenger *DummyMessenger) Subscribe(
 	address string, onMessage func(address string, publication *Publication)) {
 
 	subscription := Subscription{address: address, handler: onMessage}
+	messenger.publishMutex.Lock()
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
+	messenger.publishMutex.Unlock()
 }
 
 // NewDummyMessenger provides a messenger for messages that go no.where...

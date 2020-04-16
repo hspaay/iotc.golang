@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Node definition
+// Node definition.
 type Node struct {
 	ID                string        `json:"id"`
 	Address           string        `json:"address"`                     // Node discovery address
@@ -52,7 +52,7 @@ type InOutput struct {
 type AttrMap map[string]string
 
 // ConfigAttrMap for use in node and in/output configuration
-type ConfigAttrMap map[string]*ConfigAttr
+type ConfigAttrMap map[string]ConfigAttr
 
 // ConfigAttr describing the configuration of the device/service or sensor
 type ConfigAttr struct {
@@ -83,17 +83,17 @@ type EventMessage struct {
 	Timestamp string            `json:"timestamp"`
 }
 
-// UpgradeMessage with node firmware
-type UpgradeMessage struct {
-	Address   string `json:"address"`   // message address
-	MD5       string `json:"md5"`       // firmware MD5
-	Firmware  []byte `json:"firmware"`  // firmware code
-	FWVersion string `json:"fwversion"` // firmware version
-	Sender    string `json:"sender"`
-	Timestamp string `json:"timestamp"`
+// ForecastMessage with the '$forecast' output value and metadata
+type ForecastMessage struct {
+	Address   string      `json:"address"`
+	Duration  int         `json:"duration,omitempty"`
+	Forecast  HistoryList `json:"forecast"`
+	Sender    string      `json:"sender"`
+	Timestamp string      `json:"timestamp"`
+	Unit      Unit        `json:"unit,omitempty"`
 }
 
-// HistoryMessage with the '$latest' output value and metadata
+// HistoryMessage with the '$history' output value and metadata
 type HistoryMessage struct {
 	Address   string      `json:"address"`
 	Duration  int         `json:"duration,omitempty"`
@@ -128,6 +128,16 @@ type SetMessage struct {
 	Sender    string `json:"sender"`
 	Timestamp string `json:"timestamp"`
 	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
+}
+
+// UpgradeMessage with node firmware
+type UpgradeMessage struct {
+	Address   string `json:"address"`   // message address
+	MD5       string `json:"md5"`       // firmware MD5
+	Firmware  []byte `json:"firmware"`  // firmware code
+	FWVersion string `json:"fwversion"` // firmware version
+	Sender    string `json:"sender"`
+	Timestamp string `json:"timestamp"`
 }
 
 // NewInput instance

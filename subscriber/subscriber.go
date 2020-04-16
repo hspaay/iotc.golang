@@ -74,7 +74,7 @@ func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publ
 	subscriber.Logger.Infof("Discovered publisher %s", address)
 }
 
-// NewSubscriber creates a subscriber instance for discoverying nodes, inputs and
+// NewSubscriber creates a subscriber instance for discoverying publishers, nodes, inputs and
 // outputs and receive output values
 // zoneID for the zone this subscriber lives in
 // messenger for subscribing to the message bus

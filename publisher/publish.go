@@ -3,7 +3,6 @@ package publisher
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -11,121 +10,87 @@ import (
 	"github.com/hspaay/iotconnect.golang/standard"
 )
 
-// GetHistory returns the history list
-// Returns nil if the type or instance is unknown
-func (publisher *PublisherState) GetHistory(inOutput *standard.InOutput) standard.HistoryList {
+// GetForecast returns the output's forecast list
+// Returns nil if the type or instance is unknown or no forecast is available
+func (publisher *PublisherState) GetForecast(inOutput *standard.InOutput) standard.HistoryList {
 	publisher.updateMutex.Lock()
-	var historyList = publisher.outputHistory[inOutput.Address]
+	var forecastList = publisher.outputForecast[inOutput.Address]
 	publisher.updateMutex.Unlock()
-	return historyList
+	return forecastList
 }
 
-// GetOutput returns the output of one of this publisher's nodes
-// Returns nil if the type or instance is unknown
-func (publisher *PublisherState) GetOutput(
-	node *standard.Node, outputType string, instance string) *standard.InOutput {
-
-	outputAddr := fmt.Sprintf("%s/%s/%s/%s/%s/%s", node.Zone, node.PublisherID, node.ID,
-		standard.CommandOutputDiscovery, outputType, instance)
-	publisher.updateMutex.Lock()
-	var output = publisher.outputs[outputAddr]
-	publisher.updateMutex.Unlock()
-	return output
-}
-
-// GetOutputValue returns the current output value
-func (publisher *PublisherState) GetOutputValue(node *standard.Node, outputType string, instance string) string {
-	output := publisher.GetOutput(node, outputType, instance)
-	publisher.updateMutex.Lock()
-	latest := publisher.getLatestOutput(output)
-	publisher.updateMutex.Unlock()
-	if latest == nil {
-		return ""
+// PublishUpdates publishes updated nodes, inputs and outputs
+func (publisher *PublisherState) PublishUpdates() {
+	if publisher.messenger == nil {
+		publisher.Logger.Error("PublishUpdates: No messenger")
+		return // can't do anything here, just go home
 	}
-	return latest.Value
+	publisher.updateMutex.Lock()
+	nodeList := publisher.Nodes.GetUpdatedNodes(true)
+	inputList := publisher.Inputs.GetUpdatedInputs(true)
+	outputList := publisher.Outputs.GetUpdatedOutputs(true)
+	publisher.updateMutex.Unlock()
+
+	// publish updated nodes
+	for _, node := range nodeList {
+		publisher.Logger.Infof("publish node discovery: %s", node.Address)
+		publisher.publishMessage(node.Address, true, node)
+	}
+	// publish updated input or output discovery
+	for _, input := range inputList {
+		aliasAddress := publisher.getOutputAliasAddress(input.Address)
+		publisher.Logger.Infof("publish input discovery: %s", aliasAddress)
+		publisher.publishMessage(aliasAddress, true, input)
+	}
+	for _, output := range outputList {
+		aliasAddress := publisher.getOutputAliasAddress(output.Address)
+		publisher.Logger.Infof("publish output discovery: %s", aliasAddress)
+		publisher.publishMessage(aliasAddress, true, output)
+	}
+}
+
+// UpdateForecast publishes the output forecast list of values"
+func (publisher *PublisherState) UpdateForecast(node *standard.Node, outputType string, outputInstance string, forecast standard.HistoryList) {
+	addr := standard.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, outputInstance)
+
+	publisher.updateMutex.Lock()
+	publisher.outputForecast[addr] = forecast
+	output := publisher.Outputs.GetOutputByAddress(addr)
+	aliasAddress := publisher.getOutputAliasAddress(addr)
+	publisher.publishForecastCommand(aliasAddress, output)
+	publisher.updateMutex.Unlock()
 }
 
 // UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
 func (publisher *PublisherState) UpdateOutputStringList(node *standard.Node, outputType string, outputInstance string, values []string) {
 	valuesAsString, _ := json.Marshal(values)
-	publisher.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+	publisher.OutputHistory.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
 func (publisher *PublisherState) UpdateOutputFloatList(node *standard.Node, outputType string, outputInstance string, values []float32) {
 	valuesAsString, _ := json.Marshal(values)
-	publisher.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+	publisher.OutputHistory.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
 func (publisher *PublisherState) UpdateOutputIntList(node *standard.Node, outputType string, outputInstance string, values []int) {
 	valuesAsString, _ := json.Marshal(values)
-	publisher.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
-}
-
-// UpdateOutputValue adds the new node output value to the front of the history
-// If the output has a repeatDelay configured, then the value is only added if
-//  it has changed or the previous update was older than the repeatDelay.
-// The history retains a max of 24 hours
-func (publisher *PublisherState) UpdateOutputValue(node *standard.Node, outputType string, outputInstance string, newValue string) {
-	var previous *standard.HistoryValue
-	var repeatDelay = 3600 // default repeat delay
-	var ageSeconds = -1
-
-	addr := standard.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, outputInstance)
-
-	publisher.updateMutex.Lock()
-	// auto create the output if it hasn't been discovered yet
-	output := publisher.outputs[addr]
-	history := publisher.outputHistory[addr]
-
-	// only update output if value changes or delay has passed
-	if node.RepeatDelay != 0 {
-		repeatDelay = node.RepeatDelay
+	if publisher.OutputHistory.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString)) {
+		publisher.publishOutputValues()
 	}
-	if len(history) > 0 {
-		previous = history[0]
-		age := time.Now().Sub(previous.Timestamp)
-		ageSeconds = int(age.Seconds())
-	}
-
-	doUpdate := ageSeconds < 0 || ageSeconds > repeatDelay || newValue != previous.Value
-	if doUpdate {
-		newHistory := updateHistory(history, newValue, node.HistorySize)
-
-		publisher.outputHistory[addr] = newHistory
-		if publisher.updatedOutputValues == nil {
-			publisher.updatedOutputValues = make(map[string]*standard.InOutput)
-		}
-		publisher.updatedOutputValues[output.Address] = output
-
-		if publisher.synchroneous {
-			publisher.publishOutputValues()
-		}
-	}
-	publisher.updateMutex.Unlock()
-}
-
-// Get the latest output historyvalue
-// This is not thread-safe. Use within a locked area
-func (publisher *PublisherState) getLatestOutput(inoutput *standard.InOutput) *standard.HistoryValue {
-	history := publisher.outputHistory[inoutput.Address]
-	if history == nil || len(history) == 0 {
-		return nil
-	}
-	return history[0]
 }
 
 // Replace the address with the node's alias instead the node ID, if available
 // return the address if the node doesn't have an alias
 // This method is not thread safe and should only be used in a locked section
 func (publisher *PublisherState) getOutputAliasAddress(address string) string {
-	node := publisher.getNode(address)
+	node := publisher.Nodes.GetNodeByAddress(address)
 	if node == nil {
 		return address
 	}
-	aliasConfig := node.Config[standard.AttrNameAlias]
-	if (aliasConfig == nil) || (aliasConfig.Value == "") {
+	aliasConfig, configExists := node.Config[standard.AttrNameAlias]
+	if !configExists || (aliasConfig.Value == "") {
 		return address
 	}
 	parts := strings.Split(address, "/")
@@ -143,18 +108,18 @@ func (publisher *PublisherState) publishEventCommand(aliasAddress string, node *
 	addr := strings.Join(aliasSegments[:4], "/")
 	publisher.Logger.Infof("publish node event: %s", addr)
 
-	outputs := publisher.getNodeOutputs(node)
+	outputs := publisher.Outputs.GetNodeOutputs(node)
 	event := make(map[string]string)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	for _, output := range outputs {
-		history := publisher.outputHistory[output.Address]
+		latest := publisher.OutputHistory.GetOutputValueByAddress(output.Address)
 		attrID := output.IOType + "/" + output.Instance
-		event[attrID] = history[0].Value
+		event[attrID] = latest.Value
 	}
 	eventMessage := &standard.EventMessage{
 		Address:   addr,
 		Event:     event,
-		Sender:    publisher.publisherNode.Address,
+		Sender:    publisher.PublisherNode.Address,
 		Timestamp: timeStampStr,
 	}
 	publisher.publishMessage(addr, true, eventMessage)
@@ -168,7 +133,7 @@ func (publisher *PublisherState) publishLatestCommand(aliasAddress string, outpu
 	addr := strings.Join(aliasSegments, "/")
 
 	// zone/publisher/node/$latest/iotype/instance
-	latest := publisher.getLatestOutput(output)
+	latest := publisher.OutputHistory.GetOutputValueByAddress(output.Address)
 	if latest == nil {
 		publisher.Logger.Warningf("publishLatest, no latest value. This is unexpected")
 		return
@@ -176,13 +141,32 @@ func (publisher *PublisherState) publishLatestCommand(aliasAddress string, outpu
 	publisher.Logger.Infof("publish output latest: %s", addr)
 	latestMessage := &standard.LatestMessage{
 		Address:   addr,
-		Sender:    publisher.publisherNode.Address,
+		Sender:    publisher.PublisherNode.Address,
 		Timestamp: latest.Timestamp.Format("2006-01-02T15:04:05.000-0700"),
 		// Timestamp: latest.TimeStamp,
 		Unit:  output.Unit,
 		Value: latest.Value,
 	}
 	publisher.publishMessage(addr, true, latestMessage)
+}
+
+// publish the $forecast output values retained=true
+// not thread-safe, using within a locked section
+func (publisher *PublisherState) publishForecastCommand(aliasAddress string, output *standard.InOutput) {
+	aliasSegments := strings.Split(aliasAddress, "/")
+	aliasSegments[3] = standard.CommandForecast
+	addr := strings.Join(aliasSegments, "/")
+	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
+
+	forecastMessage := &standard.ForecastMessage{
+		Address:   addr,
+		Duration:  0, // tbd
+		Sender:    publisher.PublisherNode.Address,
+		Timestamp: timeStampStr,
+		Unit:      output.Unit,
+		Forecast:  publisher.outputForecast[output.Address],
+	}
+	publisher.publishMessage(addr, true, forecastMessage)
 }
 
 // publish the $history output values retained=true
@@ -196,10 +180,10 @@ func (publisher *PublisherState) publishHistoryCommand(aliasAddress string, outp
 	historyMessage := &standard.HistoryMessage{
 		Address:   addr,
 		Duration:  0, // tbd
-		Sender:    publisher.publisherNode.Address,
+		Sender:    publisher.PublisherNode.Address,
 		Timestamp: timeStampStr,
 		Unit:      output.Unit,
-		History:   publisher.outputHistory[output.Address],
+		History:   publisher.OutputHistory.GetHistory(output.Address),
 	}
 	publisher.publishMessage(addr, true, historyMessage)
 }
@@ -230,7 +214,7 @@ func (publisher *PublisherState) publishValueCommand(aliasAddress string, output
 
 	// publish raw value with the $value command
 	// zone/publisher/node/$value/iotype/instance
-	latest := publisher.getLatestOutput(output)
+	latest := publisher.OutputHistory.GetOutputValueByAddress(output.Address)
 	if latest == nil {
 		publisher.Logger.Warningf("publishValue, no latest value. This is unexpected")
 		return
@@ -250,54 +234,12 @@ func (publisher *PublisherState) publishValueCommand(aliasAddress string, output
 // not thread-safe, using within a locked section
 func (publisher *PublisherState) publishOutputValues() {
 	// publish updated output values using alias address if configured
-	if publisher.updatedOutputValues != nil {
-		for addr, output := range publisher.updatedOutputValues {
-			aliasAddress := publisher.getOutputAliasAddress(addr)
-			publisher.publishValueCommand(aliasAddress, output)
-			publisher.publishLatestCommand(aliasAddress, output)
-			publisher.publishHistoryCommand(aliasAddress, output)
-		}
-		publisher.updatedOutputValues = nil
+	addressesOfUpdatedOutputs := publisher.OutputHistory.GetUpdatedOutputs(true)
+	for _, addr := range addressesOfUpdatedOutputs {
+		aliasAddress := publisher.getOutputAliasAddress(addr)
+		output := publisher.Outputs.GetOutputByAddress(addr)
+		publisher.publishValueCommand(aliasAddress, output)
+		publisher.publishLatestCommand(aliasAddress, output)
+		publisher.publishHistoryCommand(aliasAddress, output)
 	}
-}
-
-// updateHistory inserts a new value at the front of the history
-// The resulting list contains a max of historySize entries limited to 24 hours
-// This function is not thread-safe and should only be used from within a locked section
-// history is optional and used to insert the value in the front. If nil then a new history is returned
-// newValue contains the value to include in the history along with the current timestamp
-// maxHistorySize is optional and limits the size in addition to the 24 hour limit
-// returns the history list with the new value at the front of the list
-func updateHistory(history standard.HistoryList, newValue string, maxHistorySize int) standard.HistoryList {
-
-	timeStamp := time.Now()
-	// timeStampStr := timeStamp.Format("2006-01-02T15:04:05.000-0700")
-
-	latest := standard.HistoryValue{
-		Timestamp: timeStamp,
-		// TimeStamp: timeStampStr,
-		Value: newValue,
-	}
-	if history == nil {
-		history = make(standard.HistoryList, 1)
-	} else {
-		// make room at the front of the slice
-		history = append(history, &latest)
-		copy(history[1:], history[0:])
-	}
-	history[0] = &latest
-
-	// remove old entries, determine the max
-	if maxHistorySize == 0 || len(history) < maxHistorySize {
-		maxHistorySize = len(history)
-	}
-	// cap at 24 hours
-	for ; maxHistorySize > 1; maxHistorySize-- {
-		entry := history[maxHistorySize-1]
-		if timeStamp.Sub(entry.Timestamp) <= time.Hour*24 {
-			break
-		}
-	}
-	history = history[0:maxHistorySize]
-	return history
 }

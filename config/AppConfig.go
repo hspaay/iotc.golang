@@ -30,12 +30,14 @@ var DefaultConfigFolder = path.Join(UserHomeDir, "bin", "iotconnect", "config")
 // 	// PublisherConfig interface{}     // publisher whose configuration to load
 // }
 
-// LoadAppConfig loads the iotconnect.conf and the application configuration from
-//  the iotconnect config folder.
+// LoadAppConfig loads the application configuration from a configuration file named <publisherId>.conf in
+// the 'DefaultConfigFolder' config folder.
 //
-// altConfigFolder contains a alternate location for iotconnect configuration files.
+// altConfigFolder contains a alternate location for the configuration files.
 //     This is optional for non-default folders. Use "" for default: <userhome>/bin/iotconnect/conf
 // publisherID to load <publisherID>.conf
+// messengerConfig is the object to store messenger configuration parameters using yaml. This is optional.
+// appConfig is the object to store the application configuration using yaml. This is optional.
 func LoadAppConfig(altConfigFolder string, publisherID string, messengerConfig *messenger.MessengerConfig, appConfig interface{}) error {
 	configFolder := altConfigFolder
 	if altConfigFolder == "" {
