@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hspaay/iotconnect.golang/messenger"
+	"github.com/hspaay/iotconnect.golang/nodes"
 	"github.com/hspaay/iotconnect.golang/standard"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +21,7 @@ const zone1ID = standard.LocalZoneID
 var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
-var node1 = standard.NewNode(zone1ID, publisher1ID, node1ID)
+var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
 var node1ConfigureAddr = node1Base + "/$configure"
 var node1InputAddr = node1Base + "/$input/switch/0"
 var node1InputSetAddr = node1Base + "/$set/switch/0"
@@ -34,12 +35,12 @@ var node1valueAddr = node1Base + "/$value/switch/0"
 var node1latestAddr = node1Base + "/$latest/switch/0"
 var node1historyAddr = node1Base + "/$history/switch/0"
 
-var node1Input1 = standard.NewInput(node1, "switch", "0")
-var node1Output1 = standard.NewOutput(node1, "switch", "0")
-var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, standard.PublisherNodeID)
+var node1Input1 = nodes.NewInput(node1, "switch", "0")
+var node1Output1 = nodes.NewOutput(node1, "switch", "0")
+var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, nodes.PublisherNodeID)
 
-var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, standard.PublisherNodeID)
-var pub2Node = standard.NewNode(zone1ID, publisher2ID, standard.PublisherNodeID)
+var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, nodes.PublisherNodeID)
+var pub2Node = nodes.NewNode(zone1ID, publisher2ID, nodes.PublisherNodeID)
 
 // const node2 = new node.Node{}
 
@@ -83,7 +84,7 @@ func TestDiscover(t *testing.T) {
 		return
 	}
 	assert.NotEqual(t, tmpIn.Address, tmpOut.Address, "Input and output addresses should not be equal")
-	assert.Equal(t, tmpIn.IOType, tmpOut.IOType, "Input and output type should be equal")
+	assert.Equal(t, tmpIn.InputType, tmpOut.OutputType, "Input and output type should be equal")
 	assert.Equal(t, tmpIn.Instance, tmpOut.Instance, "Input and output instance should be equal")
 }
 
@@ -106,7 +107,7 @@ func TestNodePublication(t *testing.T) {
 	p0 := testMessenger.FindLastPublication(node1Addr)
 	assert.NotNilf(t, p0, "Publication for publisher %s not found", pubAddr)
 	assert.NotEmpty(t, p0.Signature, "Missing signature in publication")
-	var p0Node standard.Node
+	var p0Node nodes.Node
 	err := json.Unmarshal([]byte(p0.Message), &p0Node)
 	assert.NoError(t, err, "Failed parsing node message publication")
 	assert.Equal(t, node1Addr, p0Node.Address, "published node doesn't match address")
@@ -149,13 +150,13 @@ func TestAlias(t *testing.T) {
 		return
 	}
 
-	var out standard.InOutput
+	var out nodes.Output
 	err := json.Unmarshal([]byte(p3.Message), &out)
 	if !assert.NoError(t, err, "Failed to unmarshal published message") {
 		return
 	}
 	assert.Equal(t, node1Output1Addr, out.Address, "published output has unexpected address")
-	assert.Equal(t, standard.IOTypeOnOffSwitch, out.IOType, "published output has unexpected iotype")
+	assert.Equal(t, nodes.OutputTypeOnOffSwitch, out.OutputType, "published output has unexpected iotype")
 }
 
 // TestConfigure tests if the node configuration is handled
@@ -166,7 +167,7 @@ func TestConfigure(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
 	pub1.Nodes.UpdateNode(node1)
-	config := standard.NewConfig("name", standard.DataTypeString, "Friendly Name", "")
+	config := nodes.NewConfigAttr("name", nodes.DataTypeString, "Friendly Name", "")
 	pub1.Nodes.UpdateNodeConfig(node1Addr, config)
 
 	// time.Sleep(time.Second * 1) // receive publications
@@ -199,7 +200,7 @@ func TestOutputValue(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// assert.Nilf(t, node1.Config["alias"], "Alias set for node 1, unexpected")
-	node1 = standard.NewNode(zone1ID, publisher1ID, node1ID)
+	node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
@@ -249,9 +250,9 @@ func TestReceiveInput(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.SetNodeInputHandler(func(input *standard.InOutput, message *standard.SetMessage) {
+	pub1.SetNodeInputHandler(func(input *nodes.Input, message *standard.SetMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
-		pub1.OutputHistory.UpdateOutputValue(node1, input.IOType, input.Instance, message.Value)
+		pub1.OutputHistory.UpdateOutputValue(node1, input.InputType, input.Instance, message.Value)
 	})
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1) // p1

@@ -14,37 +14,16 @@ import (
 // Any modifications made to a node must be made to a copy using CloneNode and stored
 // using UpdateNode.
 type NodeList struct {
-	nodeMap      map[string]*standard.Node
-	updateMutex  *sync.Mutex               // mutex for async updating of nodes
-	updatedNodes map[string]*standard.Node // nodes by address that have been rediscovered/updated since last publication
-}
-
-// CloneNode returns a copy of the node with new Attr, Config and Status maps
-// Intended for updating the node in a concurrency safe manner in combination with UpdateNode()
-// This does not perform a deep copy of the  maps. Any updates to the map must use new instances of the values
-func CloneNode(node *standard.Node) *standard.Node {
-	newNode := *node
-
-	newNode.Attr = make(standard.AttrMap)
-	for key, value := range node.Attr {
-		newNode.Attr[key] = value
-	}
-	newNode.Config = make(standard.ConfigAttrMap)
-	for key, value := range node.Config {
-		newNode.Config[key] = value
-	}
-	newNode.Status = make(standard.AttrMap)
-	for key, value := range node.Status {
-		newNode.Status[key] = value
-	}
-	return &newNode
+	nodeMap      map[string]*Node
+	updateMutex  *sync.Mutex      // mutex for async updating of nodes
+	updatedNodes map[string]*Node // nodes by address that have been rediscovered/updated since last publication
 }
 
 // GetAllNodes returns a list of nodes
 // This method is concurrent safe
-func (nodes *NodeList) GetAllNodes() []*standard.Node {
+func (nodes *NodeList) GetAllNodes() []*Node {
 	nodes.updateMutex.Lock()
-	var nodeList = make([]*standard.Node, 0)
+	var nodeList = make([]*Node, 0)
 	for _, node := range nodes.nodeMap {
 		nodeList = append(nodeList, node)
 	}
@@ -52,22 +31,11 @@ func (nodes *NodeList) GetAllNodes() []*standard.Node {
 	return nodeList
 }
 
-// GetNodeAlias returns the node alias or node ID if no alias is set
-func (nodes *NodeList) GetNodeAlias(node *standard.Node) (alias string, hasAlias bool) {
-	hasAlias = false
-	alias = node.ID
-	aliasConfig, attrExists := node.Config[standard.AttrNameAlias]
-	if attrExists && aliasConfig.Value != "" {
-		alias = aliasConfig.Value
-	}
-	return alias, hasAlias
-}
-
 // GetNodeByAddress returns a node by its node address using the zone, publisherID and nodeID
 // address must contain the zone, publisher and nodeID. Any other fields are ignored.
 // Returns nil if address has no known node
 // This method is concurrent safe
-func (nodes *NodeList) GetNodeByAddress(address string) *standard.Node {
+func (nodes *NodeList) GetNodeByAddress(address string) *Node {
 	nodes.updateMutex.Lock()
 	var node = nodes.getNode(address)
 	nodes.updateMutex.Unlock()
@@ -77,7 +45,7 @@ func (nodes *NodeList) GetNodeByAddress(address string) *standard.Node {
 // GetNodeByID returns a node by its zone, publisher and node ID
 // Returns nil if address has no known node
 // This method is concurrent safe
-func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID string) *standard.Node {
+func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID string) *Node {
 	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", zone, publisherID, nodeID, standard.CommandNodeDiscovery)
 
 	nodes.updateMutex.Lock()
@@ -88,8 +56,8 @@ func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID strin
 
 // GetUpdatedNodes returns the list of discovered nodes that have been updated
 // clear the update on return
-func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*standard.Node {
-	var updateList []*standard.Node = make([]*standard.Node, 0)
+func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*Node {
+	var updateList []*Node = make([]*Node, 0)
 
 	nodes.updateMutex.Lock()
 	if nodes.updatedNodes != nil {
@@ -107,7 +75,7 @@ func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*standard.Node {
 // UpdateNode replaces a node or adds a new node based on node.Address
 // node is a new instance which will replace the existing instance if it exists or adds it if it
 // doesn't exist based on the node.Address. The node is also added to the list of updated nodes.
-func (nodes *NodeList) UpdateNode(node *standard.Node) {
+func (nodes *NodeList) UpdateNode(node *Node) {
 	nodes.updateMutex.Lock()
 	nodes.updateNode(node)
 	nodes.updateMutex.Unlock()
@@ -118,10 +86,10 @@ func (nodes *NodeList) UpdateNode(node *standard.Node) {
 // - node is the node to update
 // - param is the map with key-value pairs of attribute values to update
 // Returns a new node instance
-func (nodes *NodeList) UpdateNodeAttr(address string, attrParams map[string]string) *standard.Node {
+func (nodes *NodeList) UpdateNodeAttr(address string, attrParams map[string]string) *Node {
 	nodes.updateMutex.Lock()
 	node := nodes.getNode(address)
-	newNode := CloneNode(node)
+	newNode := node.Clone()
 
 	for key, value := range attrParams {
 		newNode.Attr[key] = value
@@ -136,10 +104,10 @@ func (nodes *NodeList) UpdateNodeAttr(address string, attrParams map[string]stri
 // - node is the node to update
 // - config is the config struct with description and value
 // Returns a new node instance
-func (nodes *NodeList) UpdateNodeConfig(address string, config *standard.ConfigAttr) *standard.Node {
+func (nodes *NodeList) UpdateNodeConfig(address string, config *ConfigAttr) *Node {
 	nodes.updateMutex.Lock()
 	node := nodes.getNode(address)
-	newNode := CloneNode(node)
+	newNode := node.Clone()
 
 	newNode.Config[config.ID] = *config
 
@@ -157,16 +125,16 @@ func (nodes *NodeList) UpdateNodeConfig(address string, config *standard.ConfigA
 // node remains unchanged.
 // - address is the node discovery address
 // - param is the map with key-value pairs of configuration values to update
-func (nodes *NodeList) UpdateNodeConfigValues(address string, param map[string]string) *standard.Node {
+func (nodes *NodeList) UpdateNodeConfigValues(address string, param map[string]string) *Node {
 	nodes.updateMutex.Lock()
 	node := nodes.getNode(address)
-	newNode := CloneNode(node)
+	newNode := node.Clone()
 
 	var appliedParams map[string]string = param
 	for key, value := range appliedParams {
 		config, configExists := node.Config[key]
 		if !configExists {
-			newConfig := standard.ConfigAttr{Value: value}
+			newConfig := ConfigAttr{Value: value}
 			newNode.Config[key] = newConfig
 		} else {
 			newConfig := config // shallow copy of config before changing the value
@@ -183,11 +151,11 @@ func (nodes *NodeList) UpdateNodeConfigValues(address string, param map[string]s
 // - node is the node to update
 // - param is the map with key-value pairs of status values to update
 // Returns a new node instance
-func (nodes *NodeList) UpdateNodeStatus(address string, statusParams map[string]string) *standard.Node {
+func (nodes *NodeList) UpdateNodeStatus(address string, statusParams map[string]string) *Node {
 	// Nodes are immutable
 	nodes.updateMutex.Lock()
 	node := nodes.getNode(address)
-	newNode := CloneNode(node)
+	newNode := node.Clone()
 	for key, value := range statusParams {
 		newNode.Status[key] = value
 	}
@@ -200,7 +168,7 @@ func (nodes *NodeList) UpdateNodeStatus(address string, statusParams map[string]
 // address must contain the zone, publisher and nodeID. Any other fields are ignored.
 // Intended for use within a locked section for updating, eg lock - read - update - write - unlock
 // Returns nil if address has no known node
-func (nodes *NodeList) getNode(address string) *standard.Node {
+func (nodes *NodeList) getNode(address string) *Node {
 	segments := strings.Split(address, "/")
 	if len(segments) < 3 {
 		return nil
@@ -213,10 +181,10 @@ func (nodes *NodeList) getNode(address string) *standard.Node {
 
 // updateNode replaces a node and adds it to the list of updated nodes
 // Intended for use within a locked section
-func (nodes *NodeList) updateNode(node *standard.Node) {
+func (nodes *NodeList) updateNode(node *Node) {
 	nodes.nodeMap[node.Address] = node
 	if nodes.updatedNodes == nil {
-		nodes.updatedNodes = make(map[string]*standard.Node)
+		nodes.updatedNodes = make(map[string]*Node)
 	}
 	nodes.updatedNodes[node.Address] = node
 }
@@ -224,7 +192,7 @@ func (nodes *NodeList) updateNode(node *standard.Node) {
 // NewNodeList creates a new instance for node management
 func NewNodeList() *NodeList {
 	nodes := NodeList{
-		nodeMap:     make(map[string]*standard.Node),
+		nodeMap:     make(map[string]*Node),
 		updateMutex: &sync.Mutex{},
 	}
 	return &nodes

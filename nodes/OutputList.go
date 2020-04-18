@@ -10,16 +10,16 @@ import (
 
 // OutputList with output management
 type OutputList struct {
-	outputMap      map[string]*standard.InOutput
-	updateMutex    *sync.Mutex                   // mutex for async updating of outputs
-	updatedOutputs map[string]*standard.InOutput // address of outputs that have been rediscovered/updated since last publication
+	outputMap      map[string]*Output
+	updateMutex    *sync.Mutex        // mutex for async updating of outputs
+	updatedOutputs map[string]*Output // address of outputs that have been rediscovered/updated since last publication
 }
 
 // GetOutput returns the output of one of this publisher's nodes
 // This method is concurrent safe
 // Returns nil if address has no known output
 func (outputs *OutputList) GetOutput(
-	node *standard.Node, outputType string, instance string) *standard.InOutput {
+	node *Node, outputType string, instance string) *Output {
 	// segments := strings.Split(address, "/")
 	// segments[3] = standard.CommandOutputDiscovery
 	// outputAddr := strings.Join(segments, "/")
@@ -34,8 +34,8 @@ func (outputs *OutputList) GetOutput(
 
 // GetNodeOutputs returns a list of all outputs for the given node
 // This method is concurrent safe
-func (outputs *OutputList) GetNodeOutputs(node *standard.Node) []*standard.InOutput {
-	nodeOutputs := []*standard.InOutput{}
+func (outputs *OutputList) GetNodeOutputs(node *Node) []*Output {
+	nodeOutputs := []*Output{}
 	for _, output := range outputs.outputMap {
 		if output.NodeID == node.ID {
 			nodeOutputs = append(nodeOutputs, output)
@@ -48,7 +48,7 @@ func (outputs *OutputList) GetNodeOutputs(node *standard.Node) []*standard.InOut
 // outputAddr must contain the full output address, eg <zone>/<publisher>/<node>/"$output"/<type>/<instance>
 // Returns nil if address has no known output
 // This method is concurrent safe
-func (outputs *OutputList) GetOutputByAddress(outputAddr string) *standard.InOutput {
+func (outputs *OutputList) GetOutputByAddress(outputAddr string) *Output {
 	outputs.updateMutex.Lock()
 	var output = outputs.outputMap[outputAddr]
 	outputs.updateMutex.Unlock()
@@ -57,8 +57,8 @@ func (outputs *OutputList) GetOutputByAddress(outputAddr string) *standard.InOut
 
 // GetUpdatedOutputs returns the list of discovered outputs that have been updated
 // clear the update on return
-func (outputs *OutputList) GetUpdatedOutputs(clearUpdates bool) []*standard.InOutput {
-	var updateList []*standard.InOutput = make([]*standard.InOutput, 0)
+func (outputs *OutputList) GetUpdatedOutputs(clearUpdates bool) []*Output {
+	var updateList []*Output = make([]*Output, 0)
 
 	outputs.updateMutex.Lock()
 	if outputs.updatedOutputs != nil {
@@ -75,23 +75,23 @@ func (outputs *OutputList) GetUpdatedOutputs(clearUpdates bool) []*standard.InOu
 
 // UpdateOutput replaces the output using the node.Address
 // This method is concurrent safe
-func (outputs *OutputList) UpdateOutput(output *standard.InOutput) {
+func (outputs *OutputList) UpdateOutput(output *Output) {
 	outputs.updateMutex.Lock()
 	outputs.outputMap[output.Address] = output
 	if outputs.updatedOutputs == nil {
-		outputs.updatedOutputs = make(map[string]*standard.InOutput)
+		outputs.updatedOutputs = make(map[string]*Output)
 	}
 	outputs.updatedOutputs[output.Address] = output
 	outputs.updateMutex.Unlock()
 }
 
-// NewOutput creates a new output for the given node
+// NewOutput creates a new output for the given node and adds it to the output list
 // If an output of the same type and instance exists, it will be replaced
 // node is the node that contains the output
 // outputType is one of the predefined output types. See constants in the standard
 // instance is the output instance in case of multiple instances of the same type. Use
-func (outputs *OutputList) NewOutput(node *standard.Node, outputType string, instance string) *standard.InOutput {
-	output := standard.NewOutput(node, outputType, instance)
+func (outputs *OutputList) NewOutput(node *Node, outputType string, instance string) *Output {
+	output := NewOutput(node, outputType, instance)
 	outputs.UpdateOutput(output)
 	return output
 }
@@ -99,7 +99,7 @@ func (outputs *OutputList) NewOutput(node *standard.Node, outputType string, ins
 // NewOutputList creates a new instance for output management
 func NewOutputList() *OutputList {
 	outputs := OutputList{
-		outputMap:   make(map[string]*standard.InOutput),
+		outputMap:   make(map[string]*Output),
 		updateMutex: &sync.Mutex{},
 	}
 	return &outputs

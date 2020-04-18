@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/hspaay/iotconnect.golang/messenger"
+	"github.com/hspaay/iotconnect.golang/nodes"
 	"github.com/hspaay/iotconnect.golang/standard"
 	log "github.com/sirupsen/logrus"
 )
@@ -15,18 +16,18 @@ import (
 // Start() will subscribe to discover all publishers.
 // To discover nodes, subscribe to the publisher
 type SubscriberState struct {
-	Logger        *log.Logger               //
-	messenger     messenger.IMessenger      // Message bus messenger to use
-	zoneID        string                    // The zone in which we live
-	isRunning     bool                      // publisher was started and is running
-	subscriptions map[string]*standard.Node // publishers to which we subscribe to receive their nodes
+	Logger        *log.Logger          //
+	messenger     messenger.IMessenger // Message bus messenger to use
+	zoneID        string               // The zone in which we live
+	isRunning     bool                 // publisher was started and is running
+	subscriptions nodes.NodeList       // publishers to which we subscribe to receive their nodes
 
 	// handle updates in the background
-	updateMutex *sync.Mutex                   // mutex for async updating and publishing
-	publishers  map[string]*standard.Node     // publishers on the network
-	nodes       map[string]*standard.Node     // nodes by discovery address
-	inputs      map[string]*standard.InOutput // inputs by discovery address
-	outputs     map[string]*standard.InOutput // outputs by discovery address
+	updateMutex *sync.Mutex       // mutex for async updating and publishing
+	publishers  *nodes.NodeList   // publishers on the network
+	nodes       *nodes.NodeList   // nodes by discovery address
+	inputList   *nodes.InputList  // inputs by discovery address
+	outputList  *nodes.OutputList // outputs by discovery address
 }
 
 // Start listen for publisher nodes
@@ -41,7 +42,7 @@ func (subscriber *SubscriberState) Start() {
 		subscriber.messenger.Connect("", "")
 
 		// subscribe to receive any publisher node
-		pubAddr := fmt.Sprintf("+/+/%s/%s", standard.PublisherNodeID, standard.CommandNodeDiscovery)
+		pubAddr := fmt.Sprintf("+/+/%s/%s", nodes.PublisherNodeID, standard.CommandNodeDiscovery)
 		subscriber.messenger.Subscribe(pubAddr, subscriber.handlePublisherDiscovery)
 
 		subscriber.Logger.Warningf("Subscriber started")
@@ -64,13 +65,16 @@ func (subscriber *SubscriberState) Stop() {
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
 // publication contains a message with the publisher node info
 func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publication *messenger.Publication) {
-	var pubNode standard.Node
+	var pubNode nodes.Node
 	err := json.Unmarshal([]byte(publication.Message), &pubNode)
 	if err != nil {
-		subscriber.Logger.Infof("Unable to unmarshal Publisher Node in %s", address)
+		subscriber.Logger.Warningf("Unable to unmarshal Publisher Node in %s", address)
+		return
+	} else if pubNode.Address != address {
+		subscriber.Logger.Warningf("Received publisher Node with address %s on a different address %s", pubNode.Address)
 		return
 	}
-	subscriber.publishers[address] = &pubNode
+	subscriber.publishers.UpdateNode(&pubNode)
 	subscriber.Logger.Infof("Discovered publisher %s", address)
 }
 
@@ -81,12 +85,12 @@ func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publ
 func NewSubscriber(zoneID string, messenger messenger.IMessenger) *SubscriberState {
 
 	var subscriber = &SubscriberState{
-		inputs:      make(map[string]*standard.InOutput, 0),
+		inputList:   nodes.NewInputList(),
 		Logger:      log.New(),
 		messenger:   messenger,
-		nodes:       make(map[string]*standard.Node),
-		outputs:     make(map[string]*standard.InOutput),
-		publishers:  make(map[string]*standard.Node),
+		nodes:       nodes.NewNodeList(),
+		outputList:  nodes.NewOutputList(),
+		publishers:  nodes.NewNodeList(),
 		updateMutex: &sync.Mutex{},
 		zoneID:      zoneID,
 	}

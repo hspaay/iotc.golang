@@ -36,7 +36,7 @@ var node1historyAddr = node1Base + "/$history/switch/0"
 // TestNewNode instance
 func TestNewNode(t *testing.T) {
 	nodeList := NewNodeList()
-	node := standard.NewNode(zone1ID, publisher1ID, node1ID)
+	node := NewNode(zone1ID, publisher1ID, node1ID)
 	nodeList.UpdateNode(node)
 
 	if !assert.NotNil(t, node, "Failed creating node") {
@@ -51,7 +51,7 @@ func TestNewNode(t *testing.T) {
 // Test updating of node atributes and status
 func TestAttrStatus(t *testing.T) {
 	nodeList := NewNodeList()
-	node := standard.NewNode(zone1ID, publisher1ID, node1ID)
+	node := NewNode(zone1ID, publisher1ID, node1ID)
 	nodeList.UpdateNode(node)
 
 	newAttr := map[string]string{"Manufacturer": "Bob"}
@@ -76,10 +76,10 @@ func TestAttrStatus(t *testing.T) {
 // TestConfigure tests if the node configuration is handled
 func TestConfigure(t *testing.T) {
 	nodeList := NewNodeList()
-	node := standard.NewNode(zone1ID, publisher1ID, node1ID)
+	node := NewNode(zone1ID, publisher1ID, node1ID)
 	nodeList.UpdateNode(node)
 
-	config := standard.NewConfig("name", standard.DataTypeString, "Friendly Name", "")
+	config := NewConfigAttr("name", DataTypeString, "Friendly Name", "")
 	nodeList.UpdateNodeConfig(node1Addr, config)
 
 	newValues := map[string]string{"name": "NewName"}

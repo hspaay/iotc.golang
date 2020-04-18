@@ -41,8 +41,8 @@ func (historylist *OutputHistoryList) GetOutputValueByAddress(address string) *s
 }
 
 // GetOutputValueByType returns the current output value by output type and instance
-func (historylist *OutputHistoryList) GetOutputValueByType(node *standard.Node, outputType string, instance string) *standard.HistoryValue {
-	addr := standard.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
+func (historylist *OutputHistoryList) GetOutputValueByType(node *Node, outputType string, instance string) *standard.HistoryValue {
+	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
 	return historylist.GetOutputValueByAddress(addr)
 }
 
@@ -69,13 +69,13 @@ func (historylist *OutputHistoryList) GetUpdatedOutputs(clearUpdates bool) []str
 //  it has changed or the previous update was older than the repeatDelay.
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
-func (historylist *OutputHistoryList) UpdateOutputValue(node *standard.Node, outputType string, instance string, newValue string) bool {
+func (historylist *OutputHistoryList) UpdateOutputValue(node *Node, outputType string, instance string, newValue string) bool {
 	var previous *standard.HistoryValue
 	var repeatDelay = 3600 // default repeat delay
 	var ageSeconds = -1
 	var hasUpdated = false
 
-	addr := standard.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
+	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
 
 	historylist.updateMutex.Lock()
 	// auto create the output if it hasn't been discovered yet
