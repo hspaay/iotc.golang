@@ -19,9 +19,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/hspaay/iotconnect.golang/messenger"
 	"github.com/hspaay/iotconnect.golang/nodes"
-	"github.com/hspaay/iotconnect.golang/standard"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -34,41 +34,40 @@ const (
 	DefaultPollInterval = 24 * 3600
 )
 
-// PublisherState carries the operating state of 'this' publisher
-type PublisherState struct {
-	discoverCountdown   int                                                        // countdown each heartbeat
-	discoveryInterval   int                                                        // discovery polling interval
-	discoveryHandler    func(publisher *PublisherState)                            // function that performs discovery
-	Logger              *log.Logger                                                //
-	messenger           messenger.IMessenger                                       // Message bus messenger to use
-	onNodeConfigHandler func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap // handle before applying configuration
-	onNodeInputHandler  func(input *nodes.Input, message *standard.SetMessage)     // handle to update device/service input
+// Publisher carries the operating state of 'this' publisher
+type Publisher struct {
+	discoverCountdown   int                                                                        // countdown each heartbeat
+	discoveryInterval   int                                                                        // discovery polling interval
+	discoveryHandler    func(publisher *Publisher)                                                 // function that performs discovery
+	Logger              *log.Logger                                                                //
+	messenger           messenger.IMessenger                                                       // Message bus messenger to use
+	onNodeConfigHandler func(node *nodes.Node, config messaging.NodeAttrMap) messaging.NodeAttrMap // handle before applying configuration
+	onNodeInputHandler  func(input *nodes.Input, message *messaging.SetInputMessage)               // handle to update device/service input
 
-	pollHandler    func(publisher *PublisherState) // function that performs value polling
-	pollCountdown  int                             // countdown each heartbeat
-	pollInterval   int                             // value polling interval in seconds
-	publisherID    string                          // for easy access to the pub ID
-	PublisherNode  *nodes.Node                     // This publisher's node
-	zonePublishers map[string]*nodes.Node          // publishers on the network
-	signPrivateKey *ecdsa.PrivateKey               // key for singing published messages
-	Zone           string                          // The zone this publisher lives in
+	pollHandler    func(publisher *Publisher) // function that performs value polling
+	pollCountdown  int                        // countdown each heartbeat
+	pollInterval   int                        // value polling interval in seconds
+	publisherID    string                     // for easy access to the pub ID
+	PublisherNode  *nodes.Node                // This publisher's node
+	zonePublishers map[string]*nodes.Node     // publishers on the network
+	signPrivateKey *ecdsa.PrivateKey          // key for singing published messages
+	Zone           string                     // The zone this publisher lives in
 
 	// background publications require a mutex to prevent concurrent access
 	exitChannel chan bool
-	updateMutex *sync.Mutex                     // mutex for async updating and publishing
-	configs     map[string]*nodes.ConfigAttrMap // node configuration
-	// nodes               map[string]*nodes.Node          // nodes by discovery address
-	Nodes          *nodes.NodeList                 // Node management
-	isRunning      bool                            // publisher was started and is running
-	Inputs         *nodes.InputList                // Node input management
-	Outputs        *nodes.OutputList               // Node output management
-	outputForecast map[string]standard.HistoryList // output forecast by address
-	OutputHistory  *nodes.OutputHistoryList        // output history by address
+	updateMutex *sync.Mutex // mutex for async updating and publishing
+	// configs     map[string]*nodes.ConfigAttrMap // node configuration
+	Nodes          *nodes.NodeList                        // nodes published by this publisher
+	isRunning      bool                                   // publisher was started and is running
+	Inputs         *nodes.InputList                       // inputs published by this publisher
+	Outputs        *nodes.OutputList                      // outputs published by this publisher
+	outputForecast map[string]messaging.OutputHistoryList // output forecast by address
+	OutputValues   *nodes.OutputHistory                   // output values and history published by this publisher
 }
 
 // GetConfigValue convenience function to get a configuration value
 // This retuns the 'default' value if no value is set
-func GetConfigValue(configMap nodes.ConfigAttrMap, attrName string) string {
+func GetConfigValue(configMap map[string]messaging.ConfigAttr, attrName string) string {
 	config, configExists := configMap[attrName]
 	if !configExists {
 		return ""
@@ -81,16 +80,9 @@ func GetConfigValue(configMap nodes.ConfigAttrMap, attrName string) string {
 
 // GetNode returns a node from this publisher or nil if the id isn't found in this publisher
 // This is a convenience function as publishers tend to do this quite often
-func (publisher *PublisherState) GetNode(id string) *nodes.Node {
+func (publisher *Publisher) GetNode(id string) *nodes.Node {
 	node := publisher.Nodes.GetNodeByID(publisher.Zone, publisher.publisherID, id)
 	return node
-}
-
-// SetErrorStatus provides the error reported by an output
-func (publisher *PublisherState) SetErrorStatus(node *nodes.Node, errorText string) {
-	if node != nil {
-		// TODO: track errors in node status
-	}
 }
 
 // SetDiscoveryInterval is a convenience function for periodic update of discovered
@@ -98,7 +90,7 @@ func (publisher *PublisherState) SetErrorStatus(node *nodes.Node, errorText stri
 //
 // interval in seconds to perform another discovery. Default is DefaultDiscoveryInterval
 // handler is the callback with the publisher for publishing discovery
-func (publisher *PublisherState) SetDiscoveryInterval(interval int, handler func(publisher *PublisherState)) {
+func (publisher *Publisher) SetDiscoveryInterval(interval int, handler func(publisher *Publisher)) {
 
 	publisher.Logger.Infof("discovery interval = %d seconds", interval)
 	if interval > 0 {
@@ -107,10 +99,58 @@ func (publisher *PublisherState) SetDiscoveryInterval(interval int, handler func
 	publisher.discoveryHandler = handler
 }
 
+// SetLogging sets the logging level and output file for this publisher
+// Intended for setting logging from configuration
+// levelName is the requested logging level: error, warning, info, debug
+// filename is the output log file full name including path
+func (publisher *Publisher) SetLogging(levelName string, filename string) {
+	loggingLevel := log.DebugLevel
+
+	if levelName != "" {
+		switch strings.ToLower(levelName) {
+		case "error":
+			loggingLevel = log.ErrorLevel
+		case "warn":
+		case "warning":
+			loggingLevel = log.WarnLevel
+		case "info":
+			loggingLevel = log.InfoLevel
+		case "debug":
+			loggingLevel = log.DebugLevel
+		}
+	}
+	logOut := os.Stderr
+	if filename != "" {
+		logFileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+		if err != nil {
+			publisher.Logger.Errorf("MyZoneService.SetLogging: Unable to open logfile: %s", err)
+		} else {
+			publisher.Logger.Warnf("MyZoneService.SetLogging: Send logging output to %s", filename)
+			logOut = logFileHandle
+		}
+	}
+
+	publisher.Logger = &logrus.Logger{
+		Out:   logOut,
+		Level: loggingLevel,
+		// Formatter: &prefixed.TextFormatter{
+		Formatter: &log.TextFormatter{
+			// LogFormat: "",
+			// DisableColors:   true,
+			// DisableLevelTruncation: true,
+			TimestampFormat: "2006-01-02 15:04:05.000",
+			FullTimestamp:   true,
+			// ForceFormatting: true,
+		},
+	}
+	publisher.Logger.SetReportCaller(false) // publisher logging includes caller and file:line#
+
+}
+
 // SetPollingInterval is a convenience function for periodic update of output values
 // interval in seconds to perform another poll. Default is DefaultPollInterval
 // intended for publishers that need to poll for values
-func (publisher *PublisherState) SetPollingInterval(interval int, handler func(publisher *PublisherState)) {
+func (publisher *Publisher) SetPollingInterval(interval int, handler func(publisher *Publisher)) {
 	publisher.Logger.Infof("polling interval = %d seconds", interval)
 	if interval > 0 {
 		publisher.pollInterval = interval
@@ -119,19 +159,20 @@ func (publisher *PublisherState) SetPollingInterval(interval int, handler func(p
 }
 
 // SetPollInterval determines the interval between polling
-func (publisher *PublisherState) SetPollInterval(seconds int,
-	handler func(publisher *PublisherState)) {
+func (publisher *Publisher) SetPollInterval(seconds int,
+	handler func(publisher *Publisher)) {
 	publisher.pollInterval = seconds
 	publisher.pollHandler = handler
 }
 
 // SetNodeConfigHandler set the handler for updating node configuration
-func (publisher *PublisherState) SetNodeConfigHandler(handler func(node *nodes.Node, config nodes.AttrMap) nodes.AttrMap) {
+func (publisher *Publisher) SetNodeConfigHandler(
+	handler func(node *nodes.Node, config messaging.NodeAttrMap) messaging.NodeAttrMap) {
 	publisher.onNodeConfigHandler = handler
 }
 
 // SetNodeInputHandler set the handler for updating node inputs
-func (publisher *PublisherState) SetNodeInputHandler(handler func(input *nodes.Input, message *standard.SetMessage)) {
+func (publisher *Publisher) SetNodeInputHandler(handler func(input *nodes.Input, message *messaging.SetInputMessage)) {
 	publisher.onNodeInputHandler = handler
 }
 
@@ -139,7 +180,7 @@ func (publisher *PublisherState) SetNodeInputHandler(handler func(input *nodes.I
 // synchroneous publications for testing
 // onConfig handles updates to configuration, nil if no config to process
 // onSetInput handles commands to update inputs, nil if there are no inputs to control
-func (publisher *PublisherState) Start() {
+func (publisher *Publisher) Start() {
 
 	if !publisher.isRunning {
 		publisher.Logger.Warningf("Starting publisher %s", publisher.publisherID)
@@ -153,15 +194,15 @@ func (publisher *PublisherState) Start() {
 		// TODO: support LWT
 		publisher.messenger.Connect("", "")
 
-		// Subscribe to receive configuration and set messages
-		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.Zone, publisher.publisherID, standard.CommandConfigure)
+		// Subscribe to receive configuration and set messages for any of our nodes
+		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.Zone, publisher.publisherID, messaging.CommandConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
-		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.Zone, publisher.publisherID, standard.CommandSet)
+		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.Zone, publisher.publisherID, messaging.CommandSet)
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.Zone, nodes.PublisherNodeID, standard.CommandNodeDiscovery)
+		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.Zone, messaging.PublisherNodeID, messaging.CommandNodeDiscovery)
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher
@@ -173,7 +214,7 @@ func (publisher *PublisherState) Start() {
 
 // Stop publishing
 // Wait until the heartbeat loop has finished processing messages
-func (publisher *PublisherState) Stop() {
+func (publisher *Publisher) Stop() {
 	publisher.Logger.Warningf("Stopping publisher %s", publisher.publisherID)
 	publisher.updateMutex.Lock()
 	if publisher.isRunning {
@@ -188,26 +229,8 @@ func (publisher *PublisherState) Stop() {
 	publisher.Logger.Info("... bye bye")
 }
 
-// VerifyMessageSignature Verify the message is signed by the sender
-// The node of the sender must have been received for its public key
-func (publisher *PublisherState) VerifyMessageSignature(
-	sender string, message json.RawMessage, base64signature string) bool {
-
-	publisher.updateMutex.Lock()
-	node := publisher.zonePublishers[sender]
-	publisher.updateMutex.Unlock()
-
-	if node == nil {
-		publisher.Logger.Warningf("VerifyMessageSignature unknown sender %s", sender)
-		return false
-	}
-	var pubKey *ecdsa.PublicKey = standard.DecodePublicKey(node.Identity.PublicKeySigning)
-	valid := standard.VerifyEcdsaSignature(message, base64signature, pubKey)
-	return valid
-}
-
 // WaitForSignal waits until a TERM or INT signal is received
-func (publisher *PublisherState) WaitForSignal() {
+func (publisher *Publisher) WaitForSignal() {
 
 	// catch all signals since not explicitly listing
 	exitChannel := make(chan os.Signal, 1)
@@ -221,42 +244,8 @@ func (publisher *PublisherState) WaitForSignal() {
 	fmt.Println(sig)
 }
 
-// handle an incoming a set command for one of our nodes. This:
-// - check if the signature is valid
-// - check if the node is valid
-// - pass the input value update to the adapter's onNodeInputHandler callback
-func (publisher *PublisherState) handleNodeInput(address string, publication *messenger.Publication) {
-	// Check that address is one of our inputs
-	segments := strings.Split(address, "/")
-	segments[3] = standard.CommandInputDiscovery
-	inputAddr := strings.Join(segments, "/")
-
-	input := publisher.Inputs.GetInputByAddress(inputAddr)
-
-	if input == nil || publication.Message == nil {
-		publisher.Logger.Infof("handleNodeInput unknown input for address %s or missing message", address)
-		return
-	}
-	// Decode the message into a SetMessage type
-	var setMessage standard.SetMessage
-	err := json.Unmarshal([]byte(publication.Message), &setMessage)
-	if err != nil {
-		publisher.Logger.Infof("Unable to unmarshal SetMessage in %s", address)
-		return
-	}
-	// Verify that the message comes from the sender using the sender's public key
-	isValid := publisher.VerifyMessageSignature(setMessage.Sender, publication.Message, publication.Signature)
-	if !isValid {
-		publisher.Logger.Warningf("Incoming message verification failed for sender: %s", setMessage.Sender)
-		return
-	}
-	if publisher.onNodeInputHandler != nil {
-		publisher.onNodeInputHandler(input, &setMessage)
-	}
-}
-
 // Main heartbeat loop to publish, discove and poll value updates
-func (publisher *PublisherState) heartbeatLoop() {
+func (publisher *Publisher) heartbeatLoop() {
 	publisher.Logger.Warningf("starting heartbeat loop")
 	publisher.exitChannel <- false
 
@@ -294,21 +283,22 @@ func (publisher *PublisherState) heartbeatLoop() {
 	publisher.Logger.Warningf("Ending loop of publisher %s", publisher.publisherID)
 }
 
-// handlePublisherDiscovery stores discovered (remote) publishers in the zone for their public key
-// Used to verify signatures of incoming configuration and input messages
-// address contains the publisher's discovery address: zone/publisher/$publisher/$node
-// publication contains a message with the publisher node info
-func (publisher *PublisherState) handlePublisherDiscovery(address string, publication *messenger.Publication) {
-	var pubNode nodes.Node
-	err := json.Unmarshal(publication.Message, &pubNode)
-	if err != nil {
-		publisher.Logger.Warningf("Unable to unmarshal Publisher Node in %s: %s", address, err)
-		return
-	}
+// VerifyMessageSignature Verify a received message is signed by the sender
+// The node of the sender must have been received for its public key
+func (publisher *Publisher) VerifyMessageSignature(
+	sender string, message json.RawMessage, base64signature string) bool {
+
 	publisher.updateMutex.Lock()
-	publisher.zonePublishers[address] = &pubNode
+	node := publisher.zonePublishers[sender]
 	publisher.updateMutex.Unlock()
-	publisher.Logger.Infof("Discovered publisher %s", address)
+
+	if node == nil {
+		publisher.Logger.Warningf("VerifyMessageSignature unknown sender %s", sender)
+		return false
+	}
+	var pubKey *ecdsa.PublicKey = messenger.DecodePublicKey(node.Identity.PublicKeySigning)
+	valid := messenger.VerifyEcdsaSignature(message, base64signature, pubKey)
+	return valid
 }
 
 // NewPublisher creates a publisher instance and node for use in publications
@@ -320,23 +310,23 @@ func (publisher *PublisherState) handlePublisherDiscovery(address string, public
 func NewPublisher(
 	zoneID string,
 	publisherID string,
-	messenger messenger.IMessenger,
-) *PublisherState {
+	sender messenger.IMessenger,
+) *Publisher {
 
-	var pubNode = nodes.NewNode(zoneID, publisherID, nodes.PublisherNodeID)
+	var pubNode = nodes.NewNode(zoneID, publisherID, messaging.PublisherNodeID)
 
 	// IotConnect core running state of the publisher
-	var publisher = &PublisherState{
+	var publisher = &Publisher{
 		discoveryInterval: DefaultDiscoveryInterval,
 		exitChannel:       make(chan bool),
 		Inputs:            nodes.NewInputList(),
 		// Logger:            log.New(),
-		messenger:      messenger,
+		messenger:      sender,
 		Nodes:          nodes.NewNodeList(),
 		Outputs:        nodes.NewOutputList(),
-		OutputHistory:  nodes.NewOutputHistoryList(),
-		outputForecast: make(map[string]standard.HistoryList),
-		// outputHistory:     make(map[string]standard.HistoryList),
+		OutputValues:   nodes.NewOutputValue(),
+		outputForecast: make(map[string]messaging.OutputHistoryList),
+		// outputHistory:     make(map[string]messaging.HistoryList),
 		pollCountdown:  1, // run discovery before poll
 		pollInterval:   DefaultPollInterval,
 		publisherID:    publisherID,
@@ -345,20 +335,7 @@ func NewPublisher(
 		Zone:           zoneID,
 		zonePublishers: make(map[string]*nodes.Node),
 	}
-	publisher.Logger = &logrus.Logger{
-		Out:   os.Stderr,
-		Level: logrus.DebugLevel,
-		// Formatter: &prefixed.TextFormatter{
-		Formatter: &log.TextFormatter{
-			// LogFormat: "",
-			// DisableColors:   true,
-			// DisableLevelTruncation: true,
-			TimestampFormat: "2006-01-02 15:04:05.000",
-			FullTimestamp:   true,
-			// ForceFormatting: true,
-		},
-	}
-	publisher.Logger.SetReportCaller(false) // publisher logging includes caller and file:line#
+	publisher.SetLogging("debug", "")
 
 	// generate private/public key for signing and store the public key in the publisher identity
 	// TODO: store keys
@@ -369,11 +346,11 @@ func NewPublisher(
 	if err != nil {
 		publisher.Logger.Errorf("Failed to create keys for signing: %s", err)
 	}
-	privStr, pubStr := standard.EncodeKeys(privKey, &privKey.PublicKey)
+	privStr, pubStr := messenger.EncodeKeys(privKey, &privKey.PublicKey)
 	_ = privStr
 
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
-	pubNode.Identity = &nodes.Identity{
+	pubNode.Identity = &messaging.PublisherIdentity{
 		Address:          pubNode.Address,
 		PublicKeySigning: pubStr,
 		Publisher:        publisherID,

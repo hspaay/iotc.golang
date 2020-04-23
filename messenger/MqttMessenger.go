@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/hspaay/iotconnect.golang/messaging"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,7 @@ type MqttMessenger struct {
 // TopicSubscription holds subscriptions to restore after disconnect
 type TopicSubscription struct {
 	address string
-	handler func(address string, publication *Publication)
+	handler func(address string, publication *messaging.Publication)
 	token   pahomqtt.Token // for debugging
 	client  *MqttMessenger //
 	log     *log.Logger
@@ -173,7 +174,7 @@ func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt
 	// NOTE: Scope in this callback is not always retained. Pipe notifications through a channel and handle in goroutine
 	address := msg.Topic()
 	rawPayload := msg.Payload()
-	var publication Publication
+	var publication messaging.Publication
 	err := json.Unmarshal(rawPayload, &publication)
 	if err != nil {
 		subscription.log.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
@@ -190,7 +191,7 @@ func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt
 // address to publish on.
 // retained to have the broker retain the address value
 // payload is converted to string if it isn't a byte array, as Paho doesn't handle int and bool
-func (messenger *MqttMessenger) Publish(address string, retained bool, publication *Publication) error {
+func (messenger *MqttMessenger) Publish(address string, retained bool, publication *messaging.Publication) error {
 	var err error
 
 	//fullTopic := fmt.Sprintf("%s/%s/%s", messenger.config.Base, messenger.deviceId, addressLevels)
@@ -265,7 +266,7 @@ func (messenger *MqttMessenger) resubscribe() {
 // qos: Quality of service for subscription: 0, 1, 2
 // handler: callback handler.
 func (messenger *MqttMessenger) Subscribe(
-	address string, onMessage func(address string, publication *Publication)) {
+	address string, onMessage func(address string, publication *messaging.Publication)) {
 	if messenger.pahoClient == nil {
 		err := errors.New("mqtt.Subscribe: Unable to subscribe. Missing the MQTT client")
 		messenger.Logger.Error(err)

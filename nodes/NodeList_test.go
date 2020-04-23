@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hspaay/iotconnect.golang/standard"
+	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,7 +12,7 @@ const node1ID = "node1"
 const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
 const publisher2ID = "publisher2"
-const zone1ID = standard.LocalZoneID
+const zone1ID = messaging.LocalZoneID
 
 var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
@@ -54,10 +54,10 @@ func TestAttrStatus(t *testing.T) {
 	node := NewNode(zone1ID, publisher1ID, node1ID)
 	nodeList.UpdateNode(node)
 
-	newAttr := map[string]string{"Manufacturer": "Bob"}
+	newAttr := map[messaging.NodeAttr]string{"Manufacturer": "Bob"}
 	nodeList.UpdateNodeAttr(node1Addr, newAttr)
 
-	newStatus := map[string]string{"LastUpdated": "now"}
+	newStatus := map[messaging.NodeStatus]string{"LastUpdated": "now"}
 	nodeList.UpdateNodeStatus(node1Addr, newStatus)
 
 	node1 := nodeList.GetNodeByAddress(node1Addr)
@@ -79,14 +79,14 @@ func TestConfigure(t *testing.T) {
 	node := NewNode(zone1ID, publisher1ID, node1ID)
 	nodeList.UpdateNode(node)
 
-	config := NewConfigAttr("name", DataTypeString, "Friendly Name", "")
+	config := NewConfigAttr(messaging.NodeAttrName, messaging.DataTypeString, "Friendly Name", "")
 	nodeList.UpdateNodeConfig(node1Addr, config)
 
-	newValues := map[string]string{"name": "NewName"}
+	newValues := map[messaging.NodeAttr]string{messaging.NodeAttrName: "NewName"}
 	nodeList.UpdateNodeConfigValues(node1Addr, newValues)
 
 	node = nodeList.GetNodeByAddress(node1Addr)
-	c := node.Config["name"]
+	c := node.Config[messaging.NodeAttrName]
 	if !assert.NotNil(t, c, "Can't find configuration for name") {
 		return
 	}

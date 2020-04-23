@@ -6,13 +6,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hspaay/iotconnect.golang/messaging"
 	log "github.com/sirupsen/logrus"
 )
 
 // DummyMessenger that implements IMessenger
 type DummyMessenger struct {
 	Logger        *log.Logger
-	Publications  map[string]*Publication
+	Publications  map[string]*messaging.Publication
 	subscriptions []Subscription
 	publishMutex  *sync.Mutex // mutex for concurrent publishing of messages
 }
@@ -20,7 +21,7 @@ type DummyMessenger struct {
 // Subscription to messages
 type Subscription struct {
 	address string
-	handler func(address string, publication *Publication)
+	handler func(address string, publication *messaging.Publication)
 }
 
 // Connect the messenger
@@ -33,7 +34,7 @@ func (messenger *DummyMessenger) Disconnect() {
 }
 
 // FindLastPublication with the given address
-func (messenger *DummyMessenger) FindLastPublication(addr string) *Publication {
+func (messenger *DummyMessenger) FindLastPublication(addr string) *messaging.Publication {
 	messenger.publishMutex.Lock()
 	pub := messenger.Publications[addr]
 	messenger.publishMutex.Unlock()
@@ -43,8 +44,8 @@ func (messenger *DummyMessenger) FindLastPublication(addr string) *Publication {
 // OnReceive function to simulate a received message
 func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 	messageParts := strings.Split(address, "/")
-	var payload Publication
-	var publication Publication
+	var payload messaging.Publication
+	var publication messaging.Publication
 	var rawStr = string(rawPayload)
 	_ = rawStr
 	err := json.Unmarshal(rawPayload, &payload)
@@ -89,7 +90,7 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 }
 
 // Publish a JSON encoded message
-func (messenger *DummyMessenger) Publish(address string, retained bool, publication *Publication) error {
+func (messenger *DummyMessenger) Publish(address string, retained bool, publication *messaging.Publication) error {
 	messenger.publishMutex.Lock()
 	messenger.Publications[address] = publication
 	messenger.publishMutex.Unlock()
@@ -106,7 +107,7 @@ func (messenger *DummyMessenger) Publish(address string, retained bool, publicat
 
 // PublishRaw message
 func (messenger *DummyMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
-	payload := Publication{
+	payload := messaging.Publication{
 		Message: message,
 	}
 	messenger.publishMutex.Lock()
@@ -117,8 +118,9 @@ func (messenger *DummyMessenger) PublishRaw(address string, retained bool, messa
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
-	address string, onMessage func(address string, publication *Publication)) {
+	address string, onMessage func(address string, publication *messaging.Publication)) {
 
+	messenger.Logger.Infof("mqtt.Subscribe: address %sd", address)
 	subscription := Subscription{address: address, handler: onMessage}
 	messenger.publishMutex.Lock()
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
@@ -133,7 +135,7 @@ func NewDummyMessenger() *DummyMessenger {
 
 	var messenger = &DummyMessenger{
 		Logger:        logger,
-		Publications:  make(map[string]*Publication, 0),
+		Publications:  make(map[string]*messaging.Publication, 0),
 		subscriptions: make([]Subscription, 0),
 		publishMutex:  &sync.Mutex{},
 	}

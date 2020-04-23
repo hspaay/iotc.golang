@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/hspaay/iotconnect.golang/messenger"
 	"github.com/hspaay/iotconnect.golang/nodes"
-	"github.com/hspaay/iotconnect.golang/standard"
 )
 
 // GetForecast returns the output's forecast list
 // Returns nil if the type or instance is unknown or no forecast is available
-func (publisher *PublisherState) GetForecast(output *nodes.Output) standard.HistoryList {
+func (publisher *Publisher) GetForecast(output *nodes.Output) messaging.OutputHistoryList {
 	publisher.updateMutex.Lock()
 	var forecastList = publisher.outputForecast[output.Address]
 	publisher.updateMutex.Unlock()
@@ -21,7 +21,7 @@ func (publisher *PublisherState) GetForecast(output *nodes.Output) standard.Hist
 }
 
 // PublishUpdates publishes updated nodes, inputs and outputs
-func (publisher *PublisherState) PublishUpdates() {
+func (publisher *Publisher) PublishUpdates() {
 	if publisher.messenger == nil {
 		publisher.Logger.Error("PublishUpdates: No messenger")
 		return // can't do anything here, just go home
@@ -51,51 +51,31 @@ func (publisher *PublisherState) PublishUpdates() {
 }
 
 // UpdateForecast publishes the output forecast list of values"
-func (publisher *PublisherState) UpdateForecast(node *nodes.Node, outputType string, outputInstance string, forecast standard.HistoryList) {
+func (publisher *Publisher) UpdateForecast(node *nodes.Node, outputType string, outputInstance string, forecast messaging.OutputHistoryList) {
 	addr := nodes.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, outputInstance)
 
 	publisher.updateMutex.Lock()
 	publisher.outputForecast[addr] = forecast
 	output := publisher.Outputs.GetOutputByAddress(addr)
 	aliasAddress := publisher.getOutputAliasAddress(addr)
-	publisher.publishForecastCommand(aliasAddress, output)
+	publisher.publishForecast(aliasAddress, output)
 	publisher.updateMutex.Unlock()
-}
-
-// UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
-func (publisher *PublisherState) UpdateOutputStringList(node *nodes.Node, outputType string, outputInstance string, values []string) {
-	valuesAsString, _ := json.Marshal(values)
-	publisher.OutputHistory.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
-}
-
-// UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
-func (publisher *PublisherState) UpdateOutputFloatList(node *nodes.Node, outputType string, outputInstance string, values []float32) {
-	valuesAsString, _ := json.Marshal(values)
-	publisher.OutputHistory.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
-}
-
-// UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
-func (publisher *PublisherState) UpdateOutputIntList(node *nodes.Node, outputType string, outputInstance string, values []int) {
-	valuesAsString, _ := json.Marshal(values)
-	if publisher.OutputHistory.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString)) {
-		publisher.publishOutputValues()
-	}
 }
 
 // Replace the address with the node's alias instead the node ID, if available
 // return the address if the node doesn't have an alias
 // This method is not thread safe and should only be used in a locked section
-func (publisher *PublisherState) getOutputAliasAddress(address string) string {
+func (publisher *Publisher) getOutputAliasAddress(address string) string {
 	node := publisher.Nodes.GetNodeByAddress(address)
 	if node == nil {
 		return address
 	}
-	aliasConfig, configExists := node.Config[nodes.AttrNameAlias]
-	if !configExists || (aliasConfig.Value == "") {
+	alias, hasAlias := node.GetAlias()
+	if !hasAlias {
 		return address
 	}
 	parts := strings.Split(address, "/")
-	parts[2] = aliasConfig.Value
+	parts[2] = alias
 	aliasAddr := strings.Join(parts, "/")
 	return aliasAddr
 }
@@ -103,9 +83,9 @@ func (publisher *PublisherState) getOutputAliasAddress(address string) string {
 // publish all node output values in the $event command
 // zone/publisher/node/$event
 // TODO: decide when to invoke this
-func (publisher *PublisherState) publishEventCommand(aliasAddress string, node *nodes.Node) {
+func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = standard.CommandEvent
+	aliasSegments[3] = messaging.CommandEvent
 	addr := strings.Join(aliasSegments[:4], "/")
 	publisher.Logger.Infof("publish node event: %s", addr)
 
@@ -113,11 +93,11 @@ func (publisher *PublisherState) publishEventCommand(aliasAddress string, node *
 	event := make(map[string]string)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	for _, output := range outputs {
-		latest := publisher.OutputHistory.GetOutputValueByAddress(output.Address)
+		latest := publisher.OutputValues.GetOutputValueByAddress(output.Address)
 		attrID := output.OutputType + "/" + output.Instance
 		event[attrID] = latest.Value
 	}
-	eventMessage := &standard.EventMessage{
+	eventMessage := &messaging.OutputEventMessage{
 		Address:   addr,
 		Event:     event,
 		Sender:    publisher.PublisherNode.Address,
@@ -128,22 +108,22 @@ func (publisher *PublisherState) publishEventCommand(aliasAddress string, node *
 
 // publish the $latest output value
 // not thread-safe, using within a locked section
-func (publisher *PublisherState) publishLatestCommand(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = standard.CommandLatest
+	aliasSegments[3] = messaging.CommandLatest
 	addr := strings.Join(aliasSegments, "/")
 
 	// zone/publisher/node/$latest/iotype/instance
-	latest := publisher.OutputHistory.GetOutputValueByAddress(output.Address)
+	latest := publisher.OutputValues.GetOutputValueByAddress(output.Address)
 	if latest == nil {
 		publisher.Logger.Warningf("publishLatest, no latest value. This is unexpected")
 		return
 	}
 	publisher.Logger.Infof("publish output latest: %s", addr)
-	latestMessage := &standard.LatestMessage{
+	latestMessage := &messaging.OutputLatestMessage{
 		Address:   addr,
 		Sender:    publisher.PublisherNode.Address,
-		Timestamp: latest.Timestamp.Format("2006-01-02T15:04:05.000-0700"),
+		Timestamp: latest.Timestamp,
 		// Timestamp: latest.TimeStamp,
 		Unit:  string(output.Unit),
 		Value: latest.Value,
@@ -153,13 +133,13 @@ func (publisher *PublisherState) publishLatestCommand(aliasAddress string, outpu
 
 // publish the $forecast output values retained=true
 // not thread-safe, using within a locked section
-func (publisher *PublisherState) publishForecastCommand(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = standard.CommandForecast
+	aliasSegments[3] = messaging.CommandForecast
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
-	forecastMessage := &standard.ForecastMessage{
+	forecastMessage := &messaging.OutputForecastMessage{
 		Address:   addr,
 		Duration:  0, // tbd
 		Sender:    publisher.PublisherNode.Address,
@@ -172,19 +152,19 @@ func (publisher *PublisherState) publishForecastCommand(aliasAddress string, out
 
 // publish the $history output values retained=true
 // not thread-safe, using within a locked section
-func (publisher *PublisherState) publishHistoryCommand(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishHistory(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = standard.CommandHistory
+	aliasSegments[3] = messaging.CommandHistory
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
-	historyMessage := &standard.HistoryMessage{
+	historyMessage := &messaging.OutputHistoryMessage{
 		Address:   addr,
 		Duration:  0, // tbd
 		Sender:    publisher.PublisherNode.Address,
 		Timestamp: timeStampStr,
 		Unit:      string(output.Unit),
-		History:   publisher.OutputHistory.GetHistory(output.Address),
+		History:   publisher.OutputValues.GetHistory(output.Address),
 	}
 	publisher.publishMessage(addr, true, historyMessage)
 }
@@ -193,15 +173,15 @@ func (publisher *PublisherState) publishHistoryCommand(aliasAddress string, outp
 // not thread-safe, using within a locked section
 // address of the publication
 // object to publish. This will be marshalled to JSON and signed by this publisher
-func (publisher *PublisherState) publishMessage(address string, retained bool, object interface{}) {
+func (publisher *Publisher) publishMessage(address string, retained bool, object interface{}) {
 	buffer, err := json.MarshalIndent(object, " ", " ")
 	if err != nil {
 		publisher.Logger.Errorf("Error marshalling message for address %s: %s", address, err)
 		return
 	}
-	signature := standard.CreateEcdsaSignature(buffer, publisher.signPrivateKey)
+	signature := messenger.CreateEcdsaSignature(buffer, publisher.signPrivateKey)
 
-	publication := &messenger.Publication{
+	publication := &messaging.Publication{
 		Message:   buffer,
 		Signature: signature,
 	}
@@ -210,17 +190,17 @@ func (publisher *PublisherState) publishMessage(address string, retained bool, o
 
 // publish the raw output $value (retained)
 // not thread-safe, using within a locked section
-func (publisher *PublisherState) publishValueCommand(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishValueCommand(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
 
 	// publish raw value with the $value command
 	// zone/publisher/node/$value/iotype/instance
-	latest := publisher.OutputHistory.GetOutputValueByAddress(output.Address)
+	latest := publisher.OutputValues.GetOutputValueByAddress(output.Address)
 	if latest == nil {
 		publisher.Logger.Warningf("publishValue, no latest value. This is unexpected")
 		return
 	}
-	aliasSegments[3] = standard.CommandValue
+	aliasSegments[3] = messaging.CommandValue
 	addr := strings.Join(aliasSegments, "/")
 	s := latest.Value
 	if len(s) > 30 {
@@ -233,14 +213,14 @@ func (publisher *PublisherState) publishValueCommand(aliasAddress string, output
 
 // publishOutputValues publishes pending updates to output values
 // not thread-safe, using within a locked section
-func (publisher *PublisherState) publishOutputValues() {
+func (publisher *Publisher) publishOutputValues() {
 	// publish updated output values using alias address if configured
-	addressesOfUpdatedOutputs := publisher.OutputHistory.GetUpdatedOutputs(true)
+	addressesOfUpdatedOutputs := publisher.OutputValues.GetUpdatedOutputs(true)
 	for _, addr := range addressesOfUpdatedOutputs {
 		aliasAddress := publisher.getOutputAliasAddress(addr)
 		output := publisher.Outputs.GetOutputByAddress(addr)
 		publisher.publishValueCommand(aliasAddress, output)
-		publisher.publishLatestCommand(aliasAddress, output)
-		publisher.publishHistoryCommand(aliasAddress, output)
+		publisher.publishLatest(aliasAddress, output)
+		publisher.publishHistory(aliasAddress, output)
 	}
 }

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/hspaay/iotconnect.golang/messenger"
 	"github.com/hspaay/iotconnect.golang/nodes"
-	"github.com/hspaay/iotconnect.golang/standard"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +16,7 @@ const node1ID = "node1"
 const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
 const publisher2ID = "publisher2"
-const zone1ID = standard.LocalZoneID
+const zone1ID = messaging.LocalZoneID
 
 var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
@@ -37,10 +37,10 @@ var node1historyAddr = node1Base + "/$history/switch/0"
 
 var node1Input1 = nodes.NewInput(node1, "switch", "0")
 var node1Output1 = nodes.NewOutput(node1, "switch", "0")
-var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, nodes.PublisherNodeID)
+var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, messaging.PublisherNodeID)
 
-var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, nodes.PublisherNodeID)
-var pub2Node = nodes.NewNode(zone1ID, publisher2ID, nodes.PublisherNodeID)
+var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, messaging.PublisherNodeID)
+var pub2Node = nodes.NewNode(zone1ID, publisher2ID, messaging.PublisherNodeID)
 
 // const node2 = new node.Node{}
 
@@ -135,7 +135,7 @@ func TestAlias(t *testing.T) {
 
 	// Stress concurrency, run test with -race
 	for i := 1; i < 30; i++ {
-		go pub1.Nodes.UpdateNodeConfigValues(node1Addr, map[string]string{"alias": node1AliasID})
+		go pub1.Nodes.UpdateNodeConfigValues(node1Addr, map[messaging.NodeAttr]string{"alias": node1AliasID})
 		time.Sleep(130 * time.Millisecond)
 		node := pub1.Nodes.GetNodeByAddress(node1Addr)
 		json.Marshal(node)
@@ -156,7 +156,7 @@ func TestAlias(t *testing.T) {
 		return
 	}
 	assert.Equal(t, node1Output1Addr, out.Address, "published output has unexpected address")
-	assert.Equal(t, nodes.OutputTypeOnOffSwitch, out.OutputType, "published output has unexpected iotype")
+	assert.Equal(t, messaging.OutputTypeOnOffSwitch, out.OutputType, "published output has unexpected iotype")
 }
 
 // TestConfigure tests if the node configuration is handled
@@ -167,18 +167,18 @@ func TestConfigure(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
 	pub1.Nodes.UpdateNode(node1)
-	config := nodes.NewConfigAttr("name", nodes.DataTypeString, "Friendly Name", "")
+	config := nodes.NewConfigAttr("name", messaging.DataTypeString, "Friendly Name", "")
 	pub1.Nodes.UpdateNodeConfig(node1Addr, config)
 
 	// time.Sleep(time.Second * 1) // receive publications
 
 	// publish a configuration update for the name -> NewName
-	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "config": {"name":"NewName"} }`,
-		node1ConfigureAddr, pubAddr, time.Now().Format(standard.TimeFormat))
+	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "attr": {"name":"NewName"} }`,
+		node1ConfigureAddr, pubAddr, time.Now().Format(messaging.TimeFormat))
 	// message = `{ "a": "Hello world" }`
 	var m json.RawMessage
 	m = json.RawMessage(message)
-	signatureBase64 := standard.CreateEcdsaSignature(m, pub1.signPrivateKey)
+	signatureBase64 := messenger.CreateEcdsaSignature(m, pub1.signPrivateKey)
 	payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	testMessenger.OnReceive(node1ConfigureAddr, []byte(payload))
 
@@ -206,7 +206,7 @@ func TestOutputValue(t *testing.T) {
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1)
 	pub1.Outputs.UpdateOutput(node1Output1)
-	pub1.OutputHistory.UpdateOutputValue(node1, node1Output1Type, node1Output1Instance, "true")
+	pub1.OutputValues.UpdateOutputValue(node1, node1Output1Type, node1Output1Instance, "true")
 
 	pub1.PublishUpdates()
 	// time.Sleep(time.Second * 1) // receive publications
@@ -222,7 +222,7 @@ func TestOutputValue(t *testing.T) {
 
 	// test $latest publication
 	p2 := testMessenger.FindLastPublication(node1latestAddr)
-	var latest standard.LatestMessage
+	var latest messaging.OutputLatestMessage
 	if !assert.NotNil(t, p2.Message) {
 		return
 	}
@@ -231,17 +231,17 @@ func TestOutputValue(t *testing.T) {
 
 	// test $history publication
 	p3 := testMessenger.FindLastPublication(node1historyAddr)
-	var history standard.HistoryMessage
+	var history messaging.OutputHistoryMessage
 	json.Unmarshal([]byte(p3.Message), &history)
 	assert.Len(t, history.History, 1, "History length differs")
 
 	// test int, float, string list publication
 	intList := []int{1, 2, 3}
-	pub1.UpdateOutputIntList(node1, node1Output1Type, node1Output1Instance, intList)
+	pub1.OutputValues.UpdateOutputIntList(node1, node1Output1Type, node1Output1Instance, intList)
 	floatList := []float32{1.3, 2.5, 3.09}
-	pub1.UpdateOutputFloatList(node1, node1Output1Type, node1Output1Instance, floatList)
+	pub1.OutputValues.UpdateOutputFloatList(node1, node1Output1Type, node1Output1Instance, floatList)
 	stringList := []string{"hello", "world"}
-	pub1.UpdateOutputStringList(node1, node1Output1Type, node1Output1Instance, stringList)
+	pub1.OutputValues.UpdateOutputStringList(node1, node1Output1Type, node1Output1Instance, stringList)
 }
 
 // TestReceiveInput tests receiving input control commands
@@ -250,9 +250,9 @@ func TestReceiveInput(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.SetNodeInputHandler(func(input *nodes.Input, message *standard.SetMessage) {
+	pub1.SetNodeInputHandler(func(input *nodes.Input, message *messaging.SetInputMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
-		pub1.OutputHistory.UpdateOutputValue(node1, input.InputType, input.Instance, message.Value)
+		pub1.OutputValues.UpdateOutputValue(node1, input.InputType, input.Instance, message.Value)
 	})
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1) // p1
@@ -263,8 +263,8 @@ func TestReceiveInput(t *testing.T) {
 	// time.Sleep(time.Second * 1) // receive publications
 
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
-		node1InputSetAddr, pubAddr, time.Now().Format(standard.TimeFormat))
-	signatureBase64 := standard.CreateEcdsaSignature([]byte(message), pub1.signPrivateKey)
+		node1InputSetAddr, pubAddr, time.Now().Format(messaging.TimeFormat))
+	signatureBase64 := messenger.CreateEcdsaSignature([]byte(message), pub1.signPrivateKey)
 	// publicKey := &publisher.signPrivateKey.PublicKey
 	// test := publisher.ecdsaVerify([]byte(message), signatureBase64, publicKey)
 	// _ = test
@@ -272,7 +272,7 @@ func TestReceiveInput(t *testing.T) {
 	payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	testMessenger.OnReceive(node1InputSetAddr, []byte(payload))
 
-	val := pub1.OutputHistory.GetOutputValueByType(node1, node1Output1Type, node1Output1Instance)
+	val := pub1.OutputValues.GetOutputValueByType(node1, node1Output1Type, node1Output1Instance)
 	if !assert.NotNilf(t, val, "Unable to find output value for output %s/%s/%s", node1.Address, node1Output1Type, node1Output1Instance) {
 		return
 	}

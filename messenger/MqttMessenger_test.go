@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +26,7 @@ type PubMessage struct {
 
 var pub1Message = &PubMessage{Name: "bob"}
 var pub1Buffer, _ = json.Marshal(pub1Message)
-var pub1 = Publication{Message: pub1Buffer}
+var pub1 = messaging.Publication{Message: pub1Buffer}
 
 // TestConnect to mqtt broker
 func TestConnect(t *testing.T) {
@@ -62,7 +63,7 @@ func TestPublishSubscribe(t *testing.T) {
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 
-	messenger.Subscribe(pub1Addr, func(addr string, pub *Publication) {
+	messenger.Subscribe(pub1Addr, func(addr string, pub *messaging.Publication) {
 		err := json.Unmarshal(pub.Message, &receivedMessage)
 		assert.NoError(t, err, "Received message can't be parsed")
 

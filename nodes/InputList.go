@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hspaay/iotconnect.golang/standard"
+	"github.com/hspaay/iotconnect.golang/messaging"
 )
 
 // InputList with input management
@@ -24,7 +24,7 @@ func (inputs *InputList) GetInput(
 	// segments[3] = standard.CommandInputDiscovery
 	// inputAddr := strings.Join(segments, "/")
 	inputAddr := fmt.Sprintf("%s/%s/%s/%s/%s/%s", node.Zone, node.PublisherID, node.ID,
-		standard.CommandInputDiscovery, outputType, instance)
+		messaging.CommandInputDiscovery, outputType, instance)
 
 	inputs.updateMutex.Lock()
 	var input = inputs.inputMap[inputAddr]

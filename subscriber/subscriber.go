@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hspaay/iotconnect.golang/messenger"
+	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/hspaay/iotconnect.golang/nodes"
-	"github.com/hspaay/iotconnect.golang/standard"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,7 +16,7 @@ import (
 // To discover nodes, subscribe to the publisher
 type SubscriberState struct {
 	Logger        *log.Logger          //
-	messenger     messenger.IMessenger // Message bus messenger to use
+	messenger     messaging.IMessenger // Message bus messenger to use
 	zoneID        string               // The zone in which we live
 	isRunning     bool                 // publisher was started and is running
 	subscriptions nodes.NodeList       // publishers to which we subscribe to receive their nodes
@@ -42,7 +41,7 @@ func (subscriber *SubscriberState) Start() {
 		subscriber.messenger.Connect("", "")
 
 		// subscribe to receive any publisher node
-		pubAddr := fmt.Sprintf("+/+/%s/%s", nodes.PublisherNodeID, standard.CommandNodeDiscovery)
+		pubAddr := fmt.Sprintf("+/+/%s/%s", nodes.PublisherNodeID, messaging.CommandNodeDiscovery)
 		subscriber.messenger.Subscribe(pubAddr, subscriber.handlePublisherDiscovery)
 
 		subscriber.Logger.Warningf("Subscriber started")
@@ -64,7 +63,7 @@ func (subscriber *SubscriberState) Stop() {
 // Used to verify signatures of incoming configuration and input messages
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
 // publication contains a message with the publisher node info
-func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publication *messenger.Publication) {
+func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publication *messaging.Publication) {
 	var pubNode nodes.Node
 	err := json.Unmarshal([]byte(publication.Message), &pubNode)
 	if err != nil {
@@ -82,7 +81,7 @@ func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publ
 // outputs and receive output values
 // zoneID for the zone this subscriber lives in
 // messenger for subscribing to the message bus
-func NewSubscriber(zoneID string, messenger messenger.IMessenger) *SubscriberState {
+func NewSubscriber(zoneID string, messenger messaging.IMessenger) *SubscriberState {
 
 	var subscriber = &SubscriberState{
 		inputList:   nodes.NewInputList(),

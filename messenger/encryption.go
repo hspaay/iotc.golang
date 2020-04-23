@@ -1,5 +1,5 @@
-// Package standard with ECDSA signing and encryption functions
-package standard
+// Package messenger with ECDSA signing and encryption functions
+package messenger
 
 import (
 	"crypto/ecdsa"

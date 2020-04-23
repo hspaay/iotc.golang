@@ -6,13 +6,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotconnect.golang/standard"
+	"github.com/hspaay/iotconnect.golang/messaging"
 )
 
-// NodeList with node management
-// To facilitate concurrent read-write, nodes are treated as immutable.
-// Any modifications made to a node must be made to a copy using CloneNode and stored
-// using UpdateNode.
+// NodeList for concurrency safe node management using Copy on Write
+// Nodes are immutable. Any modifications made are applied to a new instance. The old node instance
+// is discarded and replaced with the new instance.
+// To make changes to a node directly, always Clone the node first and use UpdateNode to apply the change.
 type NodeList struct {
 	nodeMap      map[string]*Node
 	updateMutex  *sync.Mutex      // mutex for async updating of nodes
@@ -20,46 +20,48 @@ type NodeList struct {
 }
 
 // GetAllNodes returns a list of nodes
-// This method is concurrent safe
 func (nodes *NodeList) GetAllNodes() []*Node {
 	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+
 	var nodeList = make([]*Node, 0)
 	for _, node := range nodes.nodeMap {
 		nodeList = append(nodeList, node)
 	}
-	nodes.updateMutex.Unlock()
 	return nodeList
 }
 
 // GetNodeByAddress returns a node by its node address using the zone, publisherID and nodeID
 // address must contain the zone, publisher and nodeID. Any other fields are ignored.
 // Returns nil if address has no known node
-// This method is concurrent safe
 func (nodes *NodeList) GetNodeByAddress(address string) *Node {
 	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+
 	var node = nodes.getNode(address)
-	nodes.updateMutex.Unlock()
 	return node
 }
 
 // GetNodeByID returns a node by its zone, publisher and node ID
 // Returns nil if address has no known node
-// This method is concurrent safe
 func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID string) *Node {
-	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", zone, publisherID, nodeID, standard.CommandNodeDiscovery)
+	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", zone, publisherID, nodeID, messaging.CommandNodeDiscovery)
 
 	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+
 	var node = nodes.nodeMap[nodeAddr]
-	nodes.updateMutex.Unlock()
 	return node
 }
 
-// GetUpdatedNodes returns the list of discovered nodes that have been updated
-// clear the update on return
+// GetUpdatedNodes returns the list of nodes that have been updated
+// clearUpdates clears the list of updates. Intended for publishing only updated nodes.
 func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*Node {
 	var updateList []*Node = make([]*Node, 0)
 
 	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+
 	if nodes.updatedNodes != nil {
 		for _, node := range nodes.updatedNodes {
 			updateList = append(updateList, node)
@@ -68,100 +70,100 @@ func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*Node {
 			nodes.updatedNodes = nil
 		}
 	}
-	nodes.updateMutex.Unlock()
 	return updateList
 }
 
+// // SetErrorStatus sets an active error status for the node
+// // Use ClearErrorStatus to remove the most active error status
+// func (nodes *NodeList) SetErrorStatus(node *Node, errorMsg string) {
+// 	if node != nil {
+// 		nodes.updateMutex.Lock()
+// 		defer nodes.updateMutex.Unlock()
+// 		node.Status["error"] = errorMsg
+// 	}
+// }
+
 // UpdateNode replaces a node or adds a new node based on node.Address
-// node is a new instance which will replace the existing instance if it exists or adds it if it
-// doesn't exist based on the node.Address. The node is also added to the list of updated nodes.
+// Intended to support Node immutability by making changes to a copy of a node and replacing
+// the existing node with the updated node
+// The updated node will be published
 func (nodes *NodeList) UpdateNode(node *Node) {
 	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
 	nodes.updateNode(node)
-	nodes.updateMutex.Unlock()
 }
 
-// UpdateNodeAttr updates a node's attributes and publishes the updated node.
+// UpdateNodeAttr updates node's attributes and publishes the updated node.
+// Node is marked as modified for publication only if one of the attrParams has changes
 // Use when additional node attributes has been discovered.
-// - node is the node to update
+// - address of the node to update
 // - param is the map with key-value pairs of attribute values to update
-// Returns a new node instance
-func (nodes *NodeList) UpdateNodeAttr(address string, attrParams map[string]string) *Node {
+func (nodes *NodeList) UpdateNodeAttr(address string, attrParams map[messaging.NodeAttr]string) {
 	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
 	node := nodes.getNode(address)
 	newNode := node.Clone()
-
-	for key, value := range attrParams {
-		newNode.Attr[key] = value
+	changed := node.UpdateNodeAttr(attrParams)
+	if changed {
+		nodes.updateNode(newNode)
 	}
-	nodes.updateNode(newNode)
-	nodes.updateMutex.Unlock()
-	return newNode
 }
 
 // UpdateNodeConfig updates a node's configuration and publishes the updated node
+// Nodes are immutable. A new node is created and published and the old node instance is discarded.
 // Use this when a device configuration has been identified, or when the config value updates.
 // - node is the node to update
 // - config is the config struct with description and value
 // Returns a new node instance
-func (nodes *NodeList) UpdateNodeConfig(address string, config *ConfigAttr) *Node {
+func (nodes *NodeList) UpdateNodeConfig(address string, configAttr *messaging.ConfigAttr) {
 	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
 	node := nodes.getNode(address)
+	if node == nil {
+		return
+	}
 	newNode := node.Clone()
-
-	newNode.Config[config.ID] = *config
-
+	newNode.Config[configAttr.ID] = *configAttr
 	nodes.updateNode(newNode)
-	nodes.updateMutex.Unlock()
-	return newNode
 }
 
-// UpdateNodeConfigValues applies an update to a node's existing configuration and publish the updated node.
-// To be called by the configuration update handler after receiving a $configure command. The handler
-// must only apply configuration updates that can be applied directly and have been validated.
-// Some configuration, like for example ZWave device configuration, must be set to the device first and
-// not through this function. When the device accepts the configuration, use UpdateNodeConfig to apply it.
-// This function is concurrency safe. A new node instance is created with the new config. The original
-// node remains unchanged.
+// UpdateNodeStatus updates one or more node's status attributes
+// Nodes are immutable. If one or more stastus values have changed then a new node is created and
+// published and the old node instance is discarded.
+// - address of the node to update
+// - param is the map with key-value pairs of node status
+func (nodes *NodeList) UpdateNodeStatus(address string, attrParams map[messaging.NodeStatus]string) {
+	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+	node := nodes.getNode(address)
+	if node == nil {
+		return
+	}
+	newNode := node.Clone()
+	changed := node.UpdateNodeStatus(attrParams)
+	if changed {
+		nodes.updateNode(newNode)
+	}
+}
+
+// UpdateNodeConfigValues applies an update to a node's existing configuration
+// Nodes are immutable. If one or more configuration values have changed then a new node is created and
+// published and the old node instance is discarded.
 // - address is the node discovery address
 // - param is the map with key-value pairs of configuration values to update
-func (nodes *NodeList) UpdateNodeConfigValues(address string, param map[string]string) *Node {
+func (nodes *NodeList) UpdateNodeConfigValues(address string, param map[messaging.NodeAttr]string) {
 	nodes.updateMutex.Lock()
-	node := nodes.getNode(address)
-	newNode := node.Clone()
+	defer nodes.updateMutex.Unlock()
 
-	var appliedParams map[string]string = param
-	for key, value := range appliedParams {
-		config, configExists := node.Config[key]
-		if !configExists {
-			newConfig := ConfigAttr{Value: value}
-			newNode.Config[key] = newConfig
-		} else {
-			newConfig := config // shallow copy of config before changing the value
-			newConfig.Value = value
-			newNode.Config[key] = newConfig
-		}
-	}
-	nodes.updateNode(newNode)
-	nodes.updateMutex.Unlock()
-	return newNode
-}
-
-// UpdateNodeStatus updates a node's status attribute.
-// - node is the node to update
-// - param is the map with key-value pairs of status values to update
-// Returns a new node instance
-func (nodes *NodeList) UpdateNodeStatus(address string, statusParams map[string]string) *Node {
-	// Nodes are immutable
-	nodes.updateMutex.Lock()
 	node := nodes.getNode(address)
-	newNode := node.Clone()
-	for key, value := range statusParams {
-		newNode.Status[key] = value
+	if node == nil {
+		return
 	}
-	nodes.updateNode(newNode)
-	nodes.updateMutex.Unlock()
-	return newNode
+	newNode := node.Clone()
+	changed := newNode.UpdateNodeConfigValues(param)
+	if changed {
+		nodes.updateNode(newNode)
+	}
 }
 
 // getNode returns a node by its node address using the zone, publisherID and nodeID
@@ -173,7 +175,7 @@ func (nodes *NodeList) getNode(address string) *Node {
 	if len(segments) < 3 {
 		return nil
 	}
-	segments[3] = standard.CommandNodeDiscovery
+	segments[3] = messaging.CommandNodeDiscovery
 	nodeAddr := strings.Join(segments[:4], "/")
 	var node = nodes.nodeMap[nodeAddr]
 	return node

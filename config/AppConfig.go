@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/hspaay/iotconnect.golang/messenger"
+	"github.com/hspaay/iotconnect.golang/messaging"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -38,7 +38,7 @@ var DefaultConfigFolder = path.Join(UserHomeDir, "bin", "iotconnect", "config")
 // publisherID to load <publisherID>.conf
 // messengerConfig is the object to store messenger configuration parameters using yaml. This is optional.
 // appConfig is the object to store the application configuration using yaml. This is optional.
-func LoadAppConfig(altConfigFolder string, publisherID string, messengerConfig *messenger.MessengerConfig, appConfig interface{}) error {
+func LoadAppConfig(altConfigFolder string, publisherID string, messengerConfig *messaging.MessengerConfig, appConfig interface{}) error {
 	configFolder := altConfigFolder
 	if altConfigFolder == "" {
 		configFolder = DefaultConfigFolder

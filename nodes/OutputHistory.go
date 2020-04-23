@@ -1,67 +1,86 @@
-// Package nodes with handling of node output history values
+// Package nodes with handling of node output values
 package nodes
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
-	"github.com/hspaay/iotconnect.golang/standard"
+	"github.com/hspaay/iotconnect.golang/messaging"
 )
 
-// OutputHistoryList with output history value management
-type OutputHistoryList struct {
-	outputHistory  map[string]standard.HistoryList // history lists by output address
-	updatedOutputs map[string]string               // addresses of updated outputs
-	updateMutex    *sync.Mutex                     // mutex for async updating of outputs
+// OutputHistory with output history value management
+type OutputHistory struct {
+	historyLists   map[string]messaging.OutputHistoryList // history lists by output address
+	updatedOutputs map[string]string                      // addresses of updated outputs
+	updateMutex    *sync.Mutex                            // mutex for async updating of outputs
 }
 
 // GetHistory returns the history list
 // Returns nil if the type or instance is unknown
-func (historylist *OutputHistoryList) GetHistory(address string) standard.HistoryList {
-	historylist.updateMutex.Lock()
-	var historyList = historylist.outputHistory[address]
-	historylist.updateMutex.Unlock()
+func (outputValues *OutputHistory) GetHistory(address string) messaging.OutputHistoryList {
+	outputValues.updateMutex.Lock()
+	var historyList = outputValues.historyLists[address]
+	outputValues.updateMutex.Unlock()
 	return historyList
 }
 
 // GetOutputValueByAddress returns the most recent output value by output discovery address
 // This returns a HistoryValue object with the latest value and timestamp it was updated
-func (historylist *OutputHistoryList) GetOutputValueByAddress(address string) *standard.HistoryValue {
-	var latest *standard.HistoryValue
+func (outputValues *OutputHistory) GetOutputValueByAddress(address string) *messaging.OutputValue {
+	var latest *messaging.OutputValue
 
-	historylist.updateMutex.Lock()
-	history := historylist.outputHistory[address]
-	historylist.updateMutex.Unlock()
+	outputValues.updateMutex.Lock()
+	history := outputValues.historyLists[address]
+	outputValues.updateMutex.Unlock()
 
 	if history == nil || len(history) == 0 {
 		return nil
 	}
-	latest = history[0]
+	latest = &history[0]
 	return latest
 }
 
 // GetOutputValueByType returns the current output value by output type and instance
-func (historylist *OutputHistoryList) GetOutputValueByType(node *Node, outputType string, instance string) *standard.HistoryValue {
+func (outputValues *OutputHistory) GetOutputValueByType(node *Node, outputType string, instance string) *messaging.OutputValue {
 	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
-	return historylist.GetOutputValueByAddress(addr)
+	return outputValues.GetOutputValueByAddress(addr)
 }
 
 // GetUpdatedOutputs returns a list of output addresses that have updated values
 // clear the update outputs list on return
-func (historylist *OutputHistoryList) GetUpdatedOutputs(clearUpdates bool) []string {
+func (outputValues *OutputHistory) GetUpdatedOutputs(clearUpdates bool) []string {
 	var addrList []string = make([]string, 0)
 
-	historylist.updateMutex.Lock()
-	if historylist.updatedOutputs != nil {
-		for _, addr := range historylist.updatedOutputs {
+	outputValues.updateMutex.Lock()
+	if outputValues.updatedOutputs != nil {
+		for _, addr := range outputValues.updatedOutputs {
 			addrList = append(addrList, addr)
 		}
 		if clearUpdates {
-			historylist.updatedOutputs = nil
+			outputValues.updatedOutputs = nil
 		}
 	}
-	historylist.updateMutex.Unlock()
+	outputValues.updateMutex.Unlock()
 	return addrList
+}
+
+// UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
+func (outputValues *OutputHistory) UpdateOutputFloatList(node *Node, outputType string, outputInstance string, values []float32) bool {
+	valuesAsString, _ := json.Marshal(values)
+	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+}
+
+// UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
+func (outputValues *OutputHistory) UpdateOutputIntList(node *Node, outputType string, outputInstance string, values []int) bool {
+	valuesAsString, _ := json.Marshal(values)
+	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+}
+
+// UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
+func (outputValues *OutputHistory) UpdateOutputStringList(node *Node, outputType string, outputInstance string, values []string) bool {
+	valuesAsString, _ := json.Marshal(values)
+	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputValue adds the new node output value to the front of the history
@@ -69,26 +88,27 @@ func (historylist *OutputHistoryList) GetUpdatedOutputs(clearUpdates bool) []str
 //  it has changed or the previous update was older than the repeatDelay.
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
-func (historylist *OutputHistoryList) UpdateOutputValue(node *Node, outputType string, instance string, newValue string) bool {
-	var previous *standard.HistoryValue
+func (outputValues *OutputHistory) UpdateOutputValue(node *Node, outputType string, instance string, newValue string) bool {
+	var previous *messaging.OutputValue
 	var repeatDelay = 3600 // default repeat delay
 	var ageSeconds = -1
 	var hasUpdated = false
 
 	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
 
-	historylist.updateMutex.Lock()
+	outputValues.updateMutex.Lock()
 	// auto create the output if it hasn't been discovered yet
-	// output := historylist.Outputs.GetOutputByAddress(addr)
-	history := historylist.outputHistory[addr]
+	// output := outputvalue.Outputs.GetOutputByAddress(addr)
+	history := outputValues.historyLists[addr]
 
 	// only update output if value changes or delay has passed
 	if node.RepeatDelay != 0 {
 		repeatDelay = node.RepeatDelay
 	}
 	if len(history) > 0 {
-		previous = history[0]
-		age := time.Now().Sub(previous.Timestamp)
+		previous = &history[0]
+		prevTime := time.Unix(previous.EpochTime, 0)
+		age := time.Now().Sub(prevTime)
 		ageSeconds = int(age.Seconds())
 	}
 
@@ -96,16 +116,16 @@ func (historylist *OutputHistoryList) UpdateOutputValue(node *Node, outputType s
 	if doUpdate {
 		newHistory := updateHistory(history, newValue, node.HistorySize)
 
-		historylist.outputHistory[addr] = newHistory
+		outputValues.historyLists[addr] = newHistory
 		hasUpdated = true
 
-		if historylist.updatedOutputs == nil {
-			historylist.updatedOutputs = make(map[string]string)
+		if outputValues.updatedOutputs == nil {
+			outputValues.updatedOutputs = make(map[string]string)
 		}
-		historylist.updatedOutputs[addr] = addr
+		outputValues.updatedOutputs[addr] = addr
 
 	}
-	historylist.updateMutex.Unlock()
+	outputValues.updateMutex.Unlock()
 	return hasUpdated
 }
 
@@ -116,24 +136,24 @@ func (historylist *OutputHistoryList) UpdateOutputValue(node *Node, outputType s
 // newValue contains the value to include in the history along with the current timestamp
 // maxHistorySize is optional and limits the size in addition to the 24 hour limit
 // returns the history list with the new value at the front of the list
-func updateHistory(history standard.HistoryList, newValue string, maxHistorySize int) standard.HistoryList {
+func updateHistory(history messaging.OutputHistoryList, newValue string, maxHistorySize int) messaging.OutputHistoryList {
 
 	timeStamp := time.Now()
-	// timeStampStr := timeStamp.Format("2006-01-02T15:04:05.000-0700")
+	timeStampStr := timeStamp.Format(messaging.TimeFormat)
 
-	latest := standard.HistoryValue{
-		Timestamp: timeStamp,
-		// TimeStamp: timeStampStr,
-		Value: newValue,
+	latest := messaging.OutputValue{
+		Timestamp: timeStampStr,
+		EpochTime: timeStamp.Unix(),
+		Value:     newValue,
 	}
 	if history == nil {
-		history = make(standard.HistoryList, 1)
+		history = make(messaging.OutputHistoryList, 1)
 	} else {
 		// make room at the front of the slice
-		history = append(history, &latest)
+		history = append(history, latest)
 		copy(history[1:], history[0:])
 	}
-	history[0] = &latest
+	history[0] = latest
 
 	// remove old entries, determine the max
 	if maxHistorySize == 0 || len(history) < maxHistorySize {
@@ -142,7 +162,8 @@ func updateHistory(history standard.HistoryList, newValue string, maxHistorySize
 	// cap at 24 hours
 	for ; maxHistorySize > 1; maxHistorySize-- {
 		entry := history[maxHistorySize-1]
-		if timeStamp.Sub(entry.Timestamp) <= time.Hour*24 {
+		entrytime := time.Unix(entry.EpochTime, 0)
+		if timeStamp.Sub(entrytime) <= time.Hour*24 {
 			break
 		}
 	}
@@ -150,21 +171,11 @@ func updateHistory(history standard.HistoryList, newValue string, maxHistorySize
 	return history
 }
 
-// // Get the latest output historyvalue
-// // This is not thread-safe. Use within a locked area
-// func (historylist *HistoryList) getLatestOutputValue(inoutput *standard.InOutput) *standard.HistoryValue {
-// 	history := historylist.outputHistory[inoutput.Address]
-// 	if history == nil || len(history) == 0 {
-// 		return nil
-// 	}
-// 	return history[0]
-// }
-
-// NewOutputHistoryList creates a new instance for output value history management
-func NewOutputHistoryList() *OutputHistoryList {
-	outputs := OutputHistoryList{
-		outputHistory: make(map[string]standard.HistoryList),
-		updateMutex:   &sync.Mutex{},
+// NewOutputValue creates a new instance for output value and history management
+func NewOutputValue() *OutputHistory {
+	outputs := OutputHistory{
+		historyLists: make(map[string]messaging.OutputHistoryList),
+		updateMutex:  &sync.Mutex{},
 	}
 	return &outputs
 }
