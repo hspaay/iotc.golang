@@ -38,5 +38,5 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, publication 
 		params = publisher.onNodeConfigHandler(node, params)
 	}
 	// process the requested configuration
-	publisher.Nodes.UpdateNodeConfigValues(address, params)
+	publisher.Nodes.SetNodeConfigValues(address, params)
 }

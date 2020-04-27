@@ -4,6 +4,21 @@ package messaging
 // PublisherNodeID to use when node is a publisher
 const PublisherNodeID = "$publisher" // reserved node ID for publishers
 
+// NodeAttr with predefined names of node attributes and configuration
+type NodeAttr string
+
+// NodeAttrMap for storing node attributes
+type NodeAttrMap map[NodeAttr]string
+
+// NodeRunState running state options
+type NodeRunState string
+
+// NodeStatus various node status attributes
+type NodeStatus string
+
+// ConfigAttrMap for storing node configuration
+type ConfigAttrMap map[string]ConfigAttr
+
 // ConfigAttr describing the configuration of the device/service or sensor
 type ConfigAttr struct {
 	DataType    DataType `json:"datatype,omitempty"`    // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
@@ -16,9 +31,6 @@ type ConfigAttr struct {
 	Secret      bool     `json:"secret,omitempty"`      // the attribute value was set encrypted. Don't publish the value.
 	Value       string   `json:"value,omitempty"`       // Current value of the attribute. Could be a string or map
 }
-
-// NodeAttrMap for storing node attributes
-type NodeAttrMap map[NodeAttr]string
 
 // NodeConfigureMessage with values to update a node configuration
 type NodeConfigureMessage struct {
@@ -59,11 +71,9 @@ type NodeDiscoveryMessage struct {
 	RepeatDelay       int                     `json:"repeatDelay"`                 // delay in seconds before repeating the same value, default 1 hour
 }
 
-// NodeAttr with predefined names of node attributes and configuration
-type NodeAttr string
-
 // Predefined node attribute names that describe the node.
-// When they are configurable they also appear in Node Config section
+// When they are configurable they also appear in Node Config section.
+// See also NodeStatusXxx below for attributes that describe the state of the node
 const (
 	NodeAttrAddress      NodeAttr = "address"      // the node's internal address
 	NodeAttrAlias        NodeAttr = "alias"        // node alias for publishing inputs and outputs
@@ -91,9 +101,6 @@ const (
 	NodeAttrSubnet       NodeAttr = "subnet"       // IP subnets configuration
 )
 
-// NodeStatus various node status attributes
-type NodeStatus string
-
 // Various NodeStatus attributes
 const (
 	NodeStatusErrorCount    NodeStatus = "errors"        // nr of errors reported on this device
@@ -106,9 +113,6 @@ const (
 	NodeStatusRxCount       NodeStatus = "received"      // Nr of messages received from device
 	NodeStatusTxCount       NodeStatus = "sent"          // Nr of messages send to device
 )
-
-// NodeRunState running state options
-type NodeRunState string
 
 // Various Running States
 const (
@@ -127,33 +131,34 @@ type NodeType string
 
 // Various Types of Nodes
 const (
-	NodeTypeAlarm          NodeType = "alarm"         // an alarm emitter
-	NodeTypeAVControl      NodeType = "avcontrol"     // Audio/Video controller
-	NodeTypeBeacon         NodeType = "beacon"        // device is a location beacon
-	NodeTypeButton         NodeType = "button"        // device is a physical button device with one or more buttons
-	NodeTypeAdapter        NodeType = "adapter"       // software adapter or service, eg virtual device
-	NodeTypePhone          NodeType = "phone"         // device is a phone
-	NodeTypeCamera         NodeType = "camera"        // Node with camera
-	NodeTypeComputer       NodeType = "computer"      // General purpose computer
-	NodeTypeDimmer         NodeType = "dimmer"        // light dimmer
-	NodeTypeGateway        NodeType = "gateway"       // Node is a gateway for other nodes (onewire, zwave, etc)
-	NodeTypeKeyPad         NodeType = "keypad"        // Entry key pad
-	NodeTypeLock           NodeType = "lock"          // Electronic door lock
-	NodeTypeMultiSensor    NodeType = "multisensor"   // Node with multiple sensors
-	NodeTypeNetRouter      NodeType = "networkrouter" // Node is a network router
-	NodeTypeNetSwitch      NodeType = "networkswitch" // Node is a network switch
-	NodeTypeNetWifiAP      NodeType = "wifiap"        // Node is a wireless access point
-	NodeTypePowerMeter     NodeType = "powermeter"    // Node is a power meter
-	NodeTypeRepeater       NodeType = "repeater"      // Node is a zwave or other signal repeater
-	NodeTypeReceiver       NodeType = "receiver"      // Node is a (not so) smart radio/receiver/amp (eg, denon)
-	NodeTypeSensor         NodeType = "sensor"        // Node is a single sensor (volt,...)
-	NodeTypeSmartLight     NodeType = "smartlight"    // Node is a smart light, eg philips hue
-	NodeTypeSwitch         NodeType = "switch"        // Node is a physical on/off switch
-	NodeTypeThermometer    NodeType = "thermometer"   // Node is a temperature meter
-	NodeTypeThermostat     NodeType = "thermostat"    // Node is a thermostat control unit
-	NodeTypeTV             NodeType = "tv"            // Node is a (not so) smart TV
-	NodeTypeUnknown        NodeType = "unknown"       // type not identified
-	NodeTypeWallpaper      NodeType = "wallpaper"     // Node is a wallpaper montage of multiple images
-	NodeTypeWaterValve     NodeType = "watervalve"    // Water valve control unit
-	NodeTypeWeatherStation NodeType = "weatherstation"
+	NodeTypeAlarm           NodeType = "alarm"           // an alarm emitter
+	NodeTypeAVControl       NodeType = "avcontrol"       // Audio/Video controller
+	NodeTypeBeacon          NodeType = "beacon"          // device is a location beacon
+	NodeTypeButton          NodeType = "button"          // device is a physical button device with one or more buttons
+	NodeTypeAdapter         NodeType = "adapter"         // software adapter or service, eg virtual device
+	NodeTypePhone           NodeType = "phone"           // device is a phone
+	NodeTypeCamera          NodeType = "camera"          // Node with camera
+	NodeTypeComputer        NodeType = "computer"        // General purpose computer
+	NodeTypeDimmer          NodeType = "dimmer"          // light dimmer
+	NodeTypeGateway         NodeType = "gateway"         // Node is a gateway for other nodes (onewire, zwave, etc)
+	NodeTypeKeyPad          NodeType = "keypad"          // Entry key pad
+	NodeTypeLock            NodeType = "lock"            // Electronic door lock
+	NodeTypeMultiSensor     NodeType = "multisensor"     // Node with multiple sensors
+	NodeTypeNetRouter       NodeType = "networkrouter"   // Node is a network router
+	NodeTypeNetSwitch       NodeType = "networkswitch"   // Node is a network switch
+	NodeTypeNetWifiAP       NodeType = "wifiap"          // Node is a wireless access point
+	NodeTypePowerMeter      NodeType = "powermeter"      // Node is a power meter
+	NodeTypeRepeater        NodeType = "repeater"        // Node is a zwave or other signal repeater
+	NodeTypeReceiver        NodeType = "receiver"        // Node is a (not so) smart radio/receiver/amp (eg, denon)
+	NodeTypeSensor          NodeType = "sensor"          // Node is a single sensor (volt,...)
+	NodeTypeSmartLight      NodeType = "smartlight"      // Node is a smart light, eg philips hue
+	NodeTypeSwitch          NodeType = "switch"          // Node is a physical on/off switch
+	NodeTypeThermometer     NodeType = "thermometer"     // Node is a temperature meter
+	NodeTypeThermostat      NodeType = "thermostat"      // Node is a thermostat control unit
+	NodeTypeTV              NodeType = "tv"              // Node is a (not so) smart TV
+	NodeTypeUnknown         NodeType = "unknown"         // type not identified
+	NodeTypeWallpaper       NodeType = "wallpaper"       // Node is a wallpaper montage of multiple images
+	NodeTypeWaterValve      NodeType = "watervalve"      // Water valve control unit
+	NodeTypeWeatherForecast NodeType = "weatherforecast" // Node provides current and forecasted weather
+	NodeTypeWeatherStation  NodeType = "weatherstation"  // Node is a weatherstation device
 )

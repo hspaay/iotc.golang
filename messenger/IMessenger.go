@@ -16,7 +16,7 @@ type MessengerConfig struct {
 	ClientID string `yaml:"clientid,omitempty"` // optional connect ID, must be unique. Default is generated.
 	PubQos   byte   `yaml:"pubqos"`             // publish messages with QOS=1
 	SubQos   byte   `yaml:"subqos"`             // subscribe to messages with QOS=1
-	Zone     string `yaml:"zone"`               // Zone in which this messenger publishes
+	Zone     string `yaml:"zone"`               // Zone in which this messenger publishes. Default is "local"
 }
 
 // IMessenger interface for messenger implementations

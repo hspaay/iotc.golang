@@ -21,7 +21,7 @@ const zone1ID = messaging.LocalZoneID
 var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
-var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
+var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID, messaging.NodeTypeUnknown)
 var node1ConfigureAddr = node1Base + "/$configure"
 var node1InputAddr = node1Base + "/$input/switch/0"
 var node1InputSetAddr = node1Base + "/$set/switch/0"
@@ -40,7 +40,7 @@ var node1Output1 = nodes.NewOutput(node1, "switch", "0")
 var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, messaging.PublisherNodeID)
 
 var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, messaging.PublisherNodeID)
-var pub2Node = nodes.NewNode(zone1ID, publisher2ID, messaging.PublisherNodeID)
+var pub2Node = nodes.NewNode(zone1ID, publisher2ID, messaging.PublisherNodeID, messaging.NodeTypeUnknown)
 
 // const node2 = new node.Node{}
 
@@ -135,7 +135,7 @@ func TestAlias(t *testing.T) {
 
 	// Stress concurrency, run test with -race
 	for i := 1; i < 30; i++ {
-		go pub1.Nodes.UpdateNodeConfigValues(node1Addr, map[messaging.NodeAttr]string{"alias": node1AliasID})
+		go pub1.Nodes.SetNodeConfigValues(node1Addr, map[messaging.NodeAttr]string{"alias": node1AliasID})
 		time.Sleep(130 * time.Millisecond)
 		node := pub1.Nodes.GetNodeByAddress(node1Addr)
 		json.Marshal(node)
@@ -168,7 +168,7 @@ func TestConfigure(t *testing.T) {
 	pub1.Start() // call start to subscribe to node updates
 	pub1.Nodes.UpdateNode(node1)
 	config := nodes.NewConfigAttr("name", messaging.DataTypeString, "Friendly Name", "")
-	pub1.Nodes.UpdateNodeConfig(node1Addr, config)
+	pub1.Nodes.SetNodeConfig(node1Addr, config)
 
 	// time.Sleep(time.Second * 1) // receive publications
 
@@ -200,7 +200,7 @@ func TestOutputValue(t *testing.T) {
 	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
 
 	// assert.Nilf(t, node1.Config["alias"], "Alias set for node 1, unexpected")
-	node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID)
+	node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID, messaging.NodeTypeUnknown)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()

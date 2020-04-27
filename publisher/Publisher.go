@@ -144,7 +144,6 @@ func (publisher *Publisher) SetLogging(levelName string, filename string) {
 		},
 	}
 	publisher.Logger.SetReportCaller(false) // publisher logging includes caller and file:line#
-
 }
 
 // SetPollingInterval is a convenience function for periodic update of output values
@@ -177,11 +176,15 @@ func (publisher *Publisher) SetNodeInputHandler(handler func(input *nodes.Input,
 }
 
 // Start publishing and listen for configuration and input messages
-// synchroneous publications for testing
+// Start will fail if no messenger has been provided.
 // onConfig handles updates to configuration, nil if no config to process
 // onSetInput handles commands to update inputs, nil if there are no inputs to control
 func (publisher *Publisher) Start() {
 
+	if publisher.messenger == nil {
+		publisher.Logger.Errorf("Can't start publisher %s without a messenger. See SetMessenger()", publisher.publisherID)
+		return
+	}
 	if !publisher.isRunning {
 		publisher.Logger.Warningf("Starting publisher %s", publisher.publisherID)
 		publisher.updateMutex.Lock()
@@ -195,14 +198,14 @@ func (publisher *Publisher) Start() {
 		publisher.messenger.Connect("", "")
 
 		// Subscribe to receive configuration and set messages for any of our nodes
-		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.Zone, publisher.publisherID, messaging.CommandConfigure)
+		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.Zone, publisher.publisherID, messaging.MessageTypeConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
-		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.Zone, publisher.publisherID, messaging.CommandSet)
+		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.Zone, publisher.publisherID, messaging.MessageTypeSet)
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.Zone, messaging.PublisherNodeID, messaging.CommandNodeDiscovery)
+		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.Zone, messaging.PublisherNodeID, messaging.MessageTypeNodeDiscovery)
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher
@@ -313,7 +316,7 @@ func NewPublisher(
 	sender messenger.IMessenger,
 ) *Publisher {
 
-	var pubNode = nodes.NewNode(zoneID, publisherID, messaging.PublisherNodeID)
+	var pubNode = nodes.NewNode(zoneID, publisherID, messaging.PublisherNodeID, messaging.NodeTypeAdapter)
 
 	// IotConnect core running state of the publisher
 	var publisher = &Publisher{

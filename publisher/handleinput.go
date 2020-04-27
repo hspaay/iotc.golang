@@ -15,7 +15,7 @@ import (
 func (publisher *Publisher) handleNodeInput(address string, publication *messaging.Publication) {
 	// Check that address is one of our inputs
 	segments := strings.Split(address, "/")
-	segments[3] = messaging.CommandInputDiscovery
+	segments[3] = messaging.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
 
 	input := publisher.Inputs.GetInputByAddress(inputAddr)

@@ -85,7 +85,7 @@ func (publisher *Publisher) getOutputAliasAddress(address string) string {
 // TODO: decide when to invoke this
 func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.CommandEvent
+	aliasSegments[3] = messaging.MessageTypeEvent
 	addr := strings.Join(aliasSegments[:4], "/")
 	publisher.Logger.Infof("publish node event: %s", addr)
 
@@ -110,7 +110,7 @@ func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) 
 // not thread-safe, using within a locked section
 func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.CommandLatest
+	aliasSegments[3] = messaging.MessageTypeLatest
 	addr := strings.Join(aliasSegments, "/")
 
 	// zone/publisher/node/$latest/iotype/instance
@@ -125,7 +125,7 @@ func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Out
 		Sender:    publisher.PublisherNode.Address,
 		Timestamp: latest.Timestamp,
 		// Timestamp: latest.TimeStamp,
-		Unit:  string(output.Unit),
+		Unit:  output.Unit,
 		Value: latest.Value,
 	}
 	publisher.publishMessage(addr, true, latestMessage)
@@ -135,7 +135,7 @@ func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Out
 // not thread-safe, using within a locked section
 func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.CommandForecast
+	aliasSegments[3] = messaging.MessageTypeForecast
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
@@ -144,7 +144,7 @@ func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.O
 		Duration:  0, // tbd
 		Sender:    publisher.PublisherNode.Address,
 		Timestamp: timeStampStr,
-		Unit:      string(output.Unit),
+		Unit:      output.Unit,
 		Forecast:  publisher.outputForecast[output.Address],
 	}
 	publisher.publishMessage(addr, true, forecastMessage)
@@ -154,7 +154,7 @@ func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.O
 // not thread-safe, using within a locked section
 func (publisher *Publisher) publishHistory(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.CommandHistory
+	aliasSegments[3] = messaging.MessageTypeHistory
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
@@ -163,7 +163,7 @@ func (publisher *Publisher) publishHistory(aliasAddress string, output *nodes.Ou
 		Duration:  0, // tbd
 		Sender:    publisher.PublisherNode.Address,
 		Timestamp: timeStampStr,
-		Unit:      string(output.Unit),
+		Unit:      output.Unit,
 		History:   publisher.OutputValues.GetHistory(output.Address),
 	}
 	publisher.publishMessage(addr, true, historyMessage)
@@ -200,7 +200,7 @@ func (publisher *Publisher) publishValueCommand(aliasAddress string, output *nod
 		publisher.Logger.Warningf("publishValue, no latest value. This is unexpected")
 		return
 	}
-	aliasSegments[3] = messaging.CommandValue
+	aliasSegments[3] = messaging.MessageTypeValue
 	addr := strings.Join(aliasSegments, "/")
 	s := latest.Value
 	if len(s) > 30 {

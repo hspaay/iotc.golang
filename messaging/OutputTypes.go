@@ -143,7 +143,7 @@ type OutputDiscoveryMessage struct {
 	Instance    string   `json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
 	OutputType  string   `json:"type,omitempty"`        // type of input or output as per IOTypeXyz
 	NodeID      string   `json:"nodeID"`                // The node ID
-	Unit        string   `json:"unit,omitempty"`        // unit of value
+	Unit        Unit     `json:"unit,omitempty"`        // unit of output value
 }
 
 // OutputEventMessage message with multiple output values
@@ -164,7 +164,7 @@ type OutputForecastMessage struct {
 	Forecast  OutputHistoryList `json:"forecast"`
 	Sender    string            `json:"sender"`
 	Timestamp string            `json:"timestamp"`
-	Unit      string            `json:"unit,omitempty"`
+	Unit      Unit              `json:"unit,omitempty"`
 }
 
 // OutputHistoryMessage with historical output value
@@ -174,7 +174,7 @@ type OutputHistoryMessage struct {
 	History   OutputHistoryList `json:"history"`
 	Sender    string            `json:"sender"`
 	Timestamp string            `json:"timestamp"`
-	Unit      string            `json:"unit,omitempty"`
+	Unit      Unit              `json:"unit,omitempty"`
 }
 
 // OutputLatestMessage struct to send/receive the '$latest' command
@@ -182,6 +182,6 @@ type OutputLatestMessage struct {
 	Address   string `json:"address"`
 	Sender    string `json:"sender"`
 	Timestamp string `json:"timestamp"` // timestamp of value
-	Unit      string `json:"unit,omitempty"`
+	Unit      Unit   `json:"unit,omitempty"`
 	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
 }

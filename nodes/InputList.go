@@ -24,7 +24,7 @@ func (inputs *InputList) GetInput(
 	// segments[3] = standard.CommandInputDiscovery
 	// inputAddr := strings.Join(segments, "/")
 	inputAddr := fmt.Sprintf("%s/%s/%s/%s/%s/%s", node.Zone, node.PublisherID, node.ID,
-		messaging.CommandInputDiscovery, outputType, instance)
+		messaging.MessageTypeInputDiscovery, outputType, instance)
 
 	inputs.updateMutex.Lock()
 	var input = inputs.inputMap[inputAddr]

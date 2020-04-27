@@ -7,16 +7,17 @@ import (
 	"sync"
 
 	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotconnect.golang/messenger"
 	"github.com/hspaay/iotconnect.golang/nodes"
 	log "github.com/sirupsen/logrus"
 )
 
-// SubscriberState carries the operating state of the subscriber
+// Subscriber carries the operating state of the subscriber
 // Start() will subscribe to discover all publishers.
 // To discover nodes, subscribe to the publisher
-type SubscriberState struct {
+type Subscriber struct {
 	Logger        *log.Logger          //
-	messenger     messaging.IMessenger // Message bus messenger to use
+	messenger     messenger.IMessenger // Message bus messenger to use
 	zoneID        string               // The zone in which we live
 	isRunning     bool                 // publisher was started and is running
 	subscriptions nodes.NodeList       // publishers to which we subscribe to receive their nodes
@@ -30,7 +31,7 @@ type SubscriberState struct {
 }
 
 // Start listen for publisher nodes
-func (subscriber *SubscriberState) Start() {
+func (subscriber *Subscriber) Start() {
 	if !subscriber.isRunning {
 		subscriber.Logger.Warningf("Starting subscriber")
 		subscriber.updateMutex.Lock()
@@ -41,7 +42,7 @@ func (subscriber *SubscriberState) Start() {
 		subscriber.messenger.Connect("", "")
 
 		// subscribe to receive any publisher node
-		pubAddr := fmt.Sprintf("+/+/%s/%s", nodes.PublisherNodeID, messaging.CommandNodeDiscovery)
+		pubAddr := fmt.Sprintf("+/+/%s/%s", messaging.PublisherNodeID, messaging.MessageTypeNodeDiscovery)
 		subscriber.messenger.Subscribe(pubAddr, subscriber.handlePublisherDiscovery)
 
 		subscriber.Logger.Warningf("Subscriber started")
@@ -49,7 +50,7 @@ func (subscriber *SubscriberState) Start() {
 }
 
 // Stop listen for messages
-func (subscriber *SubscriberState) Stop() {
+func (subscriber *Subscriber) Stop() {
 	if subscriber.isRunning {
 		subscriber.Logger.Warningf("Stopping subscriber")
 		subscriber.updateMutex.Lock()
@@ -63,7 +64,7 @@ func (subscriber *SubscriberState) Stop() {
 // Used to verify signatures of incoming configuration and input messages
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
 // publication contains a message with the publisher node info
-func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publication *messaging.Publication) {
+func (subscriber *Subscriber) handlePublisherDiscovery(address string, publication *messaging.Publication) {
 	var pubNode nodes.Node
 	err := json.Unmarshal([]byte(publication.Message), &pubNode)
 	if err != nil {
@@ -81,9 +82,9 @@ func (subscriber *SubscriberState) handlePublisherDiscovery(address string, publ
 // outputs and receive output values
 // zoneID for the zone this subscriber lives in
 // messenger for subscribing to the message bus
-func NewSubscriber(zoneID string, messenger messaging.IMessenger) *SubscriberState {
+func NewSubscriber(zoneID string, messenger messenger.IMessenger) *Subscriber {
 
-	var subscriber = &SubscriberState{
+	var subscriber = &Subscriber{
 		inputList:   nodes.NewInputList(),
 		Logger:      log.New(),
 		messenger:   messenger,

@@ -14,14 +14,14 @@ type Input struct {
 
 // MakeInputDiscoveryAddress creates the address for the input discovery
 func MakeInputDiscoveryAddress(zone string, publisherID string, nodeID string, inputType string, instance string) string {
-	address := fmt.Sprintf("%s/%s/%s/"+messaging.CommandInputDiscovery+"/%s/%s",
+	address := fmt.Sprintf("%s/%s/%s/"+messaging.MessageTypeInputDiscovery+"/%s/%s",
 		zone, publisherID, nodeID, inputType, instance)
 	return address
 }
 
 // MakeInputSetAddress creates the address used to update an input value
 func MakeInputSetAddress(zone string, publisherID string, nodeID string, ioType string, instance string) string {
-	address := fmt.Sprintf("%s/%s/%s/"+messaging.CommandSet+"/%s/%s",
+	address := fmt.Sprintf("%s/%s/%s/"+messaging.MessageTypeSet+"/%s/%s",
 		zone, publisherID, nodeID, ioType, instance)
 	return address
 }

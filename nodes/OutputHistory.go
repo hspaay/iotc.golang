@@ -111,9 +111,9 @@ func (outputValues *OutputHistory) UpdateOutputValue(node *Node, outputType stri
 		age := time.Now().Sub(prevTime)
 		ageSeconds = int(age.Seconds())
 	}
-
 	doUpdate := ageSeconds < 0 || ageSeconds > repeatDelay || newValue != previous.Value
 	if doUpdate {
+		//
 		newHistory := updateHistory(history, newValue, node.HistorySize)
 
 		outputValues.historyLists[addr] = newHistory

@@ -24,7 +24,7 @@ func (outputs *OutputList) GetOutput(
 	// segments[3] = standard.CommandOutputDiscovery
 	// outputAddr := strings.Join(segments, "/")
 	outputAddr := fmt.Sprintf("%s/%s/%s/%s/%s/%s", node.Zone, node.PublisherID, node.ID,
-		messaging.CommandOutputDiscovery, outputType, instance)
+		messaging.MessageTypeOutputDiscovery, outputType, instance)
 
 	outputs.updateMutex.Lock()
 	var output = outputs.outputMap[outputAddr]

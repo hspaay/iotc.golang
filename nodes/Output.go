@@ -14,7 +14,7 @@ type Output struct {
 
 // MakeOutputDiscoveryAddress for publishing or subscribing
 func MakeOutputDiscoveryAddress(zone string, publisherID string, nodeID string, ioType string, instance string) string {
-	address := fmt.Sprintf("%s/%s/%s/"+messaging.CommandOutputDiscovery+"/%s/%s",
+	address := fmt.Sprintf("%s/%s/%s/"+messaging.MessageTypeOutputDiscovery+"/%s/%s",
 		zone, publisherID, nodeID, ioType, instance)
 	return address
 }

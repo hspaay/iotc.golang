@@ -1,6 +1,6 @@
 # Test yaml configuration for iotconnect messenger
 
-server: "server.domain"
+server: "localhost"
 
 login: "bob"
 
