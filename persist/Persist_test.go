@@ -1,5 +1,5 @@
-// Package config - Load and save publisher application configuration
-package config
+// Package persist - Load and save publisher application configuration
+package persist
 
 import (
 	"testing"

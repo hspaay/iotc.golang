@@ -42,12 +42,12 @@ var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, messaging.Pub
 var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, messaging.PublisherNodeID)
 var pub2Node = nodes.NewNode(zone1ID, publisher2ID, messaging.PublisherNodeID, messaging.NodeTypeUnknown)
 
-// const node2 = new node.Node{}
+var msgConfig *messenger.MessengerConfig = &messenger.MessengerConfig{Zone: zone1ID}
 
 // TestNew publisher instance
 func TestNewPublisher(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 	if !assert.NotNil(t, pub1, "Failed creating publisher") {
 		return
 	}
@@ -60,8 +60,8 @@ func TestNewPublisher(t *testing.T) {
 
 // TestDiscover tests if discovered nodes, input and output are propery accessible via the publisher
 func TestDiscover(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 	pub1.Nodes.UpdateNode(node1)
 	tmpNode := pub1.Nodes.GetNodeByAddress(node1Addr)
 	if !(assert.NotNil(t, tmpNode, "Failed getting discovered node") &&
@@ -90,8 +90,8 @@ func TestDiscover(t *testing.T) {
 
 // TestNodePublication tests if discoveries are published.
 func TestNodePublication(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 
 	// Start synchroneous publications to verify publications in order
 	pub1.Start()                            // publisher is first publication [0]
@@ -124,8 +124,8 @@ func TestNodePublication(t *testing.T) {
 
 // TestAlias tests if the the alias is used in the inout address publication
 func TestAlias(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
@@ -161,8 +161,8 @@ func TestAlias(t *testing.T) {
 
 // TestConfigure tests if the node configuration is handled
 func TestConfigure(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
@@ -196,8 +196,8 @@ func TestConfigure(t *testing.T) {
 
 // TestOutputValue tests publication of output values
 func TestOutputValue(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 
 	// assert.Nilf(t, node1.Config["alias"], "Alias set for node 1, unexpected")
 	node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID, messaging.NodeTypeUnknown)
@@ -246,8 +246,8 @@ func TestOutputValue(t *testing.T) {
 
 // TestReceiveInput tests receiving input control commands
 func TestReceiveInput(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.SetNodeInputHandler(func(input *nodes.Input, message *messaging.SetInputMessage) {
@@ -283,13 +283,13 @@ func TestReceiveInput(t *testing.T) {
 
 // TestDiscoveryPublishers tests receiving other publishers
 func TestDiscoveryPublishers(t *testing.T) {
-	var testMessenger = messenger.NewDummyMessenger()
-	pub1 := NewPublisher(zone1ID, publisher1ID, testMessenger)
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(publisher1ID, testMessenger, "")
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
 
-	publisher2 := NewPublisher(zone1ID, publisher2ID, testMessenger)
+	publisher2 := NewPublisher(publisher2ID, testMessenger, "")
 	publisher2.Start()
 	// wait for incoming messages to be processed
 

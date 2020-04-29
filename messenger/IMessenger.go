@@ -9,13 +9,14 @@ import (
 
 // MessengerConfig with configuration of a messenger
 type MessengerConfig struct {
-	Server   string `yaml:"server"`             // Messenger hostname or ip address
-	Port     uint16 `yaml:"port,omitempty"`     // optional port, default is 8883 for TLS
-	Login    string `yaml:"login"`              // messenger login name
-	Password string `yaml:"credentials"`        // messenger login credentials
 	ClientID string `yaml:"clientid,omitempty"` // optional connect ID, must be unique. Default is generated.
-	PubQos   byte   `yaml:"pubqos"`             // publish messages with QOS=1
-	SubQos   byte   `yaml:"subqos"`             // subscribe to messages with QOS=1
+	Login    string `yaml:"login"`              // messenger login name
+	Port     uint16 `yaml:"port,omitempty"`     // optional port, default is 8883 for TLS
+	Password string `yaml:"credentials"`        // messenger login credentials
+	PubQos   byte   `yaml:"pubqos,omitempty"`   // publishing QOS 0-2. Default=0
+	Server   string `yaml:"server"`             // Message bus server/broker hostname or ip address, required
+	SubQos   byte   `yaml:"subqos,omitempty"`   // Subscription QOS 0-2. Default=0
+	Type     string `yaml:"type,omitempty"`     // Messenger client type: "DummyMessenger" (default) or "MQTTMessenger"
 	Zone     string `yaml:"zone"`               // Zone in which this messenger publishes. Default is "local"
 }
 
@@ -36,6 +37,9 @@ type IMessenger interface {
 	// This will prevent the LWT publication so publishers must publish a graceful disconnect
 	// message.
 	Disconnect()
+
+	// Return the zone the messenger publishes in
+	GetZone() string
 
 	// Sign and Publish a message
 	// address to subscribe to as per IotConnect standard

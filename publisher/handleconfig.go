@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 
 	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotconnect.golang/persist"
 )
 
 // handle an incoming a configuration command for one of our nodes. This:
 // - check if the signature is valid
 // - check if the node is valid
 // - pass the configuration update to the adapter's callback set in Start()
+// - save node configuration if persistence is set
 // TODO: support for authorization per node
 func (publisher *Publisher) handleNodeConfigCommand(address string, publication *messaging.Publication) {
 	publisher.Logger.Infof("handleNodeConfig on address %s", address)
@@ -39,4 +41,7 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, publication 
 	}
 	// process the requested configuration
 	publisher.Nodes.SetNodeConfigValues(address, params)
+	if publisher.persistFolder != "" {
+		persist.SaveNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
+	}
 }

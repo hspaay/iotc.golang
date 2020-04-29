@@ -1,8 +1,11 @@
 # Test yaml configuration for iotconnect messenger
 
+type: "DummyMessenger"
+
 server: "localhost"
 
 login: "bob"
 
 credentials: "pass"
 
+zone: "local"

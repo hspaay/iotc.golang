@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -14,6 +15,7 @@ import (
 type DummyMessenger struct {
 	Logger        *log.Logger
 	Publications  map[string]*messaging.Publication
+	config        *MessengerConfig // for zone configuration
 	subscriptions []Subscription
 	publishMutex  *sync.Mutex // mutex for concurrent publishing of messages
 }
@@ -39,6 +41,16 @@ func (messenger *DummyMessenger) FindLastPublication(addr string) *messaging.Pub
 	pub := messenger.Publications[addr]
 	messenger.publishMutex.Unlock()
 	return pub
+}
+
+// GetZone returns the zone in which this messenger operates
+// This is provided via the messenger config file or defaults to messaging.LocalZoneID
+func (messenger *DummyMessenger) GetZone() string {
+	zone := messenger.config.Zone
+	if zone == "" {
+		return messaging.LocalZoneID
+	}
+	return zone
 }
 
 // OnReceive function to simulate a received message
@@ -129,11 +141,12 @@ func (messenger *DummyMessenger) Subscribe(
 
 // NewDummyMessenger provides a messenger for messages that go no.where...
 // logger to use for debug messages
-func NewDummyMessenger() *DummyMessenger {
-	var logger = log.New()
-	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
-
+func NewDummyMessenger(config *MessengerConfig, logger *logrus.Logger) *DummyMessenger {
+	if logger == nil {
+		logger = logrus.New()
+	}
 	var messenger = &DummyMessenger{
+		config:        config,
 		Logger:        logger,
 		Publications:  make(map[string]*messaging.Publication, 0),
 		subscriptions: make([]Subscription, 0),

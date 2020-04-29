@@ -54,9 +54,9 @@ type PublisherIdentity struct {
 	Zone             string `json:"zone"`             // Zone in which publisher lives
 }
 
-// NodeDiscoveryMessage definition
+// NodeDiscoveryMessage definition published in node discovery
 type NodeDiscoveryMessage struct {
-	ID                string                  `json:"id"`
+	ID                string                  `json:"id"`                          // Node's immutable ID
 	Address           string                  `json:"address"`                     // Node discovery address
 	Attr              NodeAttrMap             `json:"attr,omitempty"`              // Node/service info attributes
 	Config            map[NodeAttr]ConfigAttr `json:"config,omitempty"`            // Node/service configuration.
@@ -67,8 +67,8 @@ type NodeDiscoveryMessage struct {
 	Status            map[NodeStatus]string   `json:"status,omitempty"`            // additional node status details
 	Type              NodeType                `json:"type"`                        // node type
 	Zone              string                  `json:"zone"`                        // Zone in which node lives
-	HistorySize       int                     `json:"historySize"`                 // size of history for inputs and outputs, default automatically for 24 hours
-	RepeatDelay       int                     `json:"repeatDelay"`                 // delay in seconds before repeating the same value, default 1 hour
+	HistorySize       int                     `json:"historySize,omitempty"`       // size of history for inputs and outputs, default automatically for 24 hours
+	RepeatDelay       int                     `json:"repeatDelay,omitempty"`       // delay in seconds before republishing this node's outputs when their value doesn't change. Default 1 hour
 }
 
 // Predefined node attribute names that describe the node.

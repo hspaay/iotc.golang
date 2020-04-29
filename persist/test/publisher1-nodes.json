@@ -6,9 +6,7 @@
       "publisher": "publisher1",
       "runstate": "",
       "type": "adapter",
-      "zone": "zone1",
-      "historySize": 0,
-      "repeatDelay": 0
+      "zone": "zone1"
     }
   }
 }

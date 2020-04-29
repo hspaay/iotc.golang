@@ -24,16 +24,13 @@ const TLSPort = 8883
 
 // MqttMessenger that implements IMessenger
 type MqttMessenger struct {
-	config        *MessengerConfig    // connect information
-	pahoClient    pahomqtt.Client     // Paho MQTT Client
-	subscriptions []TopicSubscription // list of TopicSubscription for re-subscribing after reconnect
-	Logger        *log.Logger         // Logger provided by user
-	//config          myzone.MyZoneConfig            // configuration for the mqtt connection
-	//messageChannel  chan *IncomingMessage
-	isRunning bool // listen for messages while running
-	//
-	tlsVerifyServerCert bool   // verify the server certificate, this requires a Root CA signed cert
-	tlsCACertFile       string // path to CA certificate
+	config              *MessengerConfig    // connect information
+	pahoClient          pahomqtt.Client     // Paho MQTT Client
+	subscriptions       []TopicSubscription // list of TopicSubscription for re-subscribing after reconnect
+	Logger              *log.Logger         // Logger provided by user
+	isRunning           bool                // listen for messages while running
+	tlsVerifyServerCert bool                // verify the server certificate, this requires a Root CA signed cert
+	tlsCACertFile       string              // path to CA certificate
 }
 
 // TopicSubscription holds subscriptions to restore after disconnect
@@ -167,24 +164,14 @@ func (messenger *MqttMessenger) Disconnect() {
 	}
 }
 
-// Wrapper for message handling.
-// Use a channel to handle the message in a gorouting.
-// This fixes a problem with losing context in callbacks. Not sure what is going on though.
-func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt.Message) {
-	// NOTE: Scope in this callback is not always retained. Pipe notifications through a channel and handle in goroutine
-	address := msg.Topic()
-	rawPayload := msg.Payload()
-	var publication messaging.Publication
-	err := json.Unmarshal(rawPayload, &publication)
-	if err != nil {
-		subscription.log.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
-		return
+// GetZone returns the zone in which this messenger operates
+// This is provided via the messenger config file or defaults to messaging.LocalZoneID
+func (messenger *MqttMessenger) GetZone() string {
+	zone := messenger.config.Zone
+	if zone == "" {
+		return messaging.LocalZoneID
 	}
-	subscription.log.Infof("MqttMessenger.onMessage. address=%s, subscription=%s, retained=%v",
-		address, subscription.address, msg.Retained())
-	subscription.handler(address, &publication)
-	//message := &IncomingMessage{msgTopic, payload, subscription}
-	//subscription.client.messageChannel <- message
+	return zone
 }
 
 // Publish value using the device address as base
@@ -234,6 +221,26 @@ func (messenger *MqttMessenger) PublishRaw(address string, retained bool, messag
 		//return err
 	}
 	return err
+}
+
+// Wrapper for message handling.
+// Use a channel to handle the message in a gorouting.
+// This fixes a problem with losing context in callbacks. Not sure what is going on though.
+func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt.Message) {
+	// NOTE: Scope in this callback is not always retained. Pipe notifications through a channel and handle in goroutine
+	address := msg.Topic()
+	rawPayload := msg.Payload()
+	var publication messaging.Publication
+	err := json.Unmarshal(rawPayload, &publication)
+	if err != nil {
+		subscription.log.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
+		return
+	}
+	subscription.log.Infof("MqttMessenger.onMessage. address=%s, subscription=%s, retained=%v",
+		address, subscription.address, msg.Retained())
+	subscription.handler(address, &publication)
+	//message := &IncomingMessage{msgTopic, payload, subscription}
+	//subscription.client.messageChannel <- message
 }
 
 // subscribe to addresss after establishing connection

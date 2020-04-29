@@ -184,6 +184,26 @@ func (nodes *NodeList) UpdateNode(node *Node) {
 	nodes.updateNode(node)
 }
 
+// UpdateNodes replaces a collection of nodes
+// Intended to update the list with nodes from persistent storage
+func (nodes *NodeList) UpdateNodes(updates map[string]*Node) {
+	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+	for _, node := range updates {
+		// fill in missing fields
+		if node.Attr == nil {
+			node.Attr = map[messaging.NodeAttr]string{}
+		}
+		if node.Config == nil {
+			node.Config = map[messaging.NodeAttr]messaging.ConfigAttr{}
+		}
+		if node.Status == nil {
+			node.Status = make(map[messaging.NodeStatus]string)
+		}
+		nodes.updateNode(node)
+	}
+}
+
 // getNode returns a node by its node address using the zone, publisherID and nodeID
 // address must contain the zone, publisher and nodeID. Any other fields are ignored.
 // Intended for use within a locked section for updating, eg lock - read - update - write - unlock

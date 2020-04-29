@@ -150,7 +150,7 @@ func NewConfigAttr(id messaging.NodeAttr, dataType messaging.DataType, descripti
 	return &config
 }
 
-// NewNode instance
+// NewNode create a node instance. Use UpdateNode to add it to the publisher
 func NewNode(zoneID string, publisherID string, nodeID string, nodeType messaging.NodeType) *Node {
 	address := MakeNodeDiscoveryAddress(zoneID, publisherID, nodeID)
 	return &Node{

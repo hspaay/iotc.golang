@@ -22,6 +22,7 @@ import (
 	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/hspaay/iotconnect.golang/messenger"
 	"github.com/hspaay/iotconnect.golang/nodes"
+	"github.com/hspaay/iotconnect.golang/persist"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -34,16 +35,23 @@ const (
 	DefaultPollInterval = 24 * 3600
 )
 
+// NodeConfigHandler callback when command to update node config is received
+type NodeConfigHandler func(node *nodes.Node, config messaging.NodeAttrMap) messaging.NodeAttrMap
+
+// NodeInputHandler callback when command to update node input is received
+type NodeInputHandler func(input *nodes.Input, message *messaging.SetInputMessage)
+
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
-	discoverCountdown   int                                                                        // countdown each heartbeat
-	discoveryInterval   int                                                                        // discovery polling interval
-	discoveryHandler    func(publisher *Publisher)                                                 // function that performs discovery
-	Logger              *log.Logger                                                                //
-	messenger           messenger.IMessenger                                                       // Message bus messenger to use
-	onNodeConfigHandler func(node *nodes.Node, config messaging.NodeAttrMap) messaging.NodeAttrMap // handle before applying configuration
-	onNodeInputHandler  func(input *nodes.Input, message *messaging.SetInputMessage)               // handle to update device/service input
+	discoverCountdown   int                        // countdown each heartbeat
+	discoveryInterval   int                        // discovery polling interval
+	discoveryHandler    func(publisher *Publisher) // function that performs discovery
+	Logger              *log.Logger                //
+	messenger           messenger.IMessenger       // Message bus messenger to use
+	onNodeConfigHandler NodeConfigHandler          // handle before applying configuration
+	onNodeInputHandler  NodeInputHandler           // handle to update device/service input
 
+	persistFolder  string                     // optional folder to persist nodes
 	pollHandler    func(publisher *Publisher) // function that performs value polling
 	pollCountdown  int                        // countdown each heartbeat
 	pollInterval   int                        // value polling interval in seconds
@@ -51,7 +59,7 @@ type Publisher struct {
 	PublisherNode  *nodes.Node                // This publisher's node
 	zonePublishers map[string]*nodes.Node     // publishers on the network
 	signPrivateKey *ecdsa.PrivateKey          // key for singing published messages
-	Zone           string                     // The zone this publisher lives in
+	ZoneID         string                     // The zone this publisher lives in
 
 	// background publications require a mutex to prevent concurrent access
 	exitChannel chan bool
@@ -81,7 +89,7 @@ func GetConfigValue(configMap map[string]messaging.ConfigAttr, attrName string) 
 // GetNode returns a node from this publisher or nil if the id isn't found in this publisher
 // This is a convenience function as publishers tend to do this quite often
 func (publisher *Publisher) GetNode(id string) *nodes.Node {
-	node := publisher.Nodes.GetNodeByID(publisher.Zone, publisher.publisherID, id)
+	node := publisher.Nodes.GetNodeByID(publisher.ZoneID, publisher.publisherID, id)
 	return node
 }
 
@@ -176,9 +184,9 @@ func (publisher *Publisher) SetNodeInputHandler(handler func(input *nodes.Input,
 }
 
 // Start publishing and listen for configuration and input messages
+// This will load previously saved nodes
 // Start will fail if no messenger has been provided.
-// onConfig handles updates to configuration, nil if no config to process
-// onSetInput handles commands to update inputs, nil if there are no inputs to control
+// persistNodes will load previously saved nodes at startup and save them on configuration change
 func (publisher *Publisher) Start() {
 
 	if publisher.messenger == nil {
@@ -190,6 +198,10 @@ func (publisher *Publisher) Start() {
 		publisher.updateMutex.Lock()
 		publisher.isRunning = true
 		publisher.updateMutex.Unlock()
+		if publisher.persistFolder != "" {
+			persist.LoadNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
+		}
+
 		go publisher.heartbeatLoop()
 		// wait for the heartbeat to start
 		<-publisher.exitChannel
@@ -198,14 +210,14 @@ func (publisher *Publisher) Start() {
 		publisher.messenger.Connect("", "")
 
 		// Subscribe to receive configuration and set messages for any of our nodes
-		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.Zone, publisher.publisherID, messaging.MessageTypeConfigure)
+		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.ZoneID, publisher.publisherID, messaging.MessageTypeConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
-		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.Zone, publisher.publisherID, messaging.MessageTypeSet)
+		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.ZoneID, publisher.publisherID, messaging.MessageTypeSet)
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.Zone, messaging.PublisherNodeID, messaging.MessageTypeNodeDiscovery)
+		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.ZoneID, messaging.PublisherNodeID, messaging.MessageTypeNodeDiscovery)
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher
@@ -215,7 +227,7 @@ func (publisher *Publisher) Start() {
 	}
 }
 
-// Stop publishing
+// Stop publishing and save nodes
 // Wait until the heartbeat loop has finished processing messages
 func (publisher *Publisher) Stop() {
 	publisher.Logger.Warningf("Stopping publisher %s", publisher.publisherID)
@@ -229,6 +241,9 @@ func (publisher *Publisher) Stop() {
 	} else {
 		publisher.updateMutex.Unlock()
 	}
+	// if publisher.persistFolder != "" {
+	// 	persist.SaveNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
+	// }
 	publisher.Logger.Info("... bye bye")
 }
 
@@ -305,21 +320,28 @@ func (publisher *Publisher) VerifyMessageSignature(
 }
 
 // NewPublisher creates a publisher instance and node for use in publications
-// zoneID for the zone this publisher lives in
+//
+// appID is the application ID used to load the publisher configuration and nodes
+//     <appID.yaml> for the publisher configuration -> publisherID
+//     <appID-nodes.json> for the nodes
+// messenger to use fo publications and for the zone to publish in
+// logger is the optional logger to use.
+//
 // publisherID of this publisher, unique within the zone
 // messenger for publishing onto the message bus
-// onConfig method handles incoming configuration requests. Default is to update the config directly
-// onInput method handles commands to control published inputs
+// configFolder location of persistent nodes file. "" when not to persist.
+//      See persist.DefaultConfigFolder for default
 func NewPublisher(
-	zoneID string,
 	publisherID string,
 	sender messenger.IMessenger,
+	persistFolder string,
 ) *Publisher {
-
+	var zoneID = sender.GetZone()
 	var pubNode = nodes.NewNode(zoneID, publisherID, messaging.PublisherNodeID, messaging.NodeTypeAdapter)
 
 	// IotConnect core running state of the publisher
 	var publisher = &Publisher{
+		persistFolder:     persistFolder,
 		discoveryInterval: DefaultDiscoveryInterval,
 		exitChannel:       make(chan bool),
 		Inputs:            nodes.NewInputList(),
@@ -335,7 +357,7 @@ func NewPublisher(
 		publisherID:    publisherID,
 		PublisherNode:  pubNode,
 		updateMutex:    &sync.Mutex{},
-		Zone:           zoneID,
+		ZoneID:         zoneID,
 		zonePublishers: make(map[string]*nodes.Node),
 	}
 	publisher.SetLogging("debug", "")
@@ -360,6 +382,7 @@ func NewPublisher(
 		Timestamp:        timeStampStr,
 		Zone:             zoneID,
 	}
+
 	publisher.Nodes.UpdateNode(pubNode)
 	return publisher
 }
