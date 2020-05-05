@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 	"github.com/stretchr/testify/assert"
 )
 

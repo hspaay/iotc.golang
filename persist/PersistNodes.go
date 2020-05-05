@@ -21,7 +21,7 @@ const OutputsFileSuffix = "-outputs.json"
 // altConfigFolder contains a alternate location for the configuration files, intended for testing.
 //   Use "" for default, which is <userhome>/.config/iotconnect
 // publisherID determines the filename: <publisherID-nodes.json>
-// nodelist is the object to hold list of nodes
+// nodelist is the address of a list that holds nodes
 func LoadNodes(altConfigFolder string, publisherID string, nodelist interface{}) error {
 	configFolder := altConfigFolder
 	if altConfigFolder == "" {
@@ -46,7 +46,7 @@ func LoadNodes(altConfigFolder string, publisherID string, nodelist interface{})
 // SaveNodes saves the nodelist to a JSON file
 // configFolder contains the location for the configuration files
 // publisherID determines the filename: <publisherID-nodes.json>
-// nodelist is the object to hold list of nodes
+// nodelist is a list of nodes to save
 func SaveNodes(configFolder string, publisherID string, nodeList interface{}) error {
 	return SaveToJSON(configFolder, publisherID+NodesFileSuffix, nodeList)
 }

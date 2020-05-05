@@ -4,7 +4,7 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 )
 
 // Output contains logic for using the data from the input discovery message

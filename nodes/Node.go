@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 )
 
 // Node contains logic for using the data from the node discovery message

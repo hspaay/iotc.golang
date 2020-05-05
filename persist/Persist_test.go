@@ -4,8 +4,8 @@ package persist
 import (
 	"testing"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
-	"github.com/hspaay/iotconnect.golang/nodes"
+	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/nodes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,16 +49,16 @@ func TestSave(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	nodeList := make(map[string]*nodes.Node)
-	nodeList2 := make(map[string]*nodes.Node)
-	nodeList["node1"] = nodes.NewNode("zone1", "publisher1", "node1", messaging.NodeTypeAdapter)
+	nodeList := make([]*nodes.Node, 0)
+	nodeList2 := make([]*nodes.Node, 0)
+	nodeList = append(nodeList, nodes.NewNode("zone1", "publisher1", "node1", messaging.NodeTypeAdapter))
 
 	err := SaveNodes(ConfigFolder, PublisherID, nodeList)
 	assert.NoError(t, err, "Failed saving config")
 
 	err = LoadNodes(ConfigFolder, PublisherID, &nodeList2)
 	assert.NoError(t, err, "Failed loading app config")
-	nodeList2Node1 := nodeList2["node1"]
+	nodeList2Node1 := nodeList2[0]
 	if assert.NotNil(t, nodeList2Node1) {
 		return
 	}

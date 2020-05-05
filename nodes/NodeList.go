@@ -6,15 +6,17 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 )
 
-// NodeList for concurrency safe node management using Copy on Write
+// NodeList for concurrency safe node management using Copy on Write.
+//  To serialize the node list use GetAllNodes and UpdateNodes
 // Nodes are immutable. Any modifications made are applied to a new instance. The old node instance
 // is discarded and replaced with the new instance.
 // To make changes to a node directly, always Clone the node first and use UpdateNode to apply the change.
 type NodeList struct {
-	NodeMap      map[string]*Node `json:"nodes"`
+	// don't access directly. This is only accessible for serialization
+	nodeMap      map[string]*Node
 	updateMutex  *sync.Mutex      // mutex for async updating of nodes
 	updatedNodes map[string]*Node // nodes by address that have been rediscovered/updated since last publication
 }
@@ -25,7 +27,7 @@ func (nodes *NodeList) GetAllNodes() []*Node {
 	defer nodes.updateMutex.Unlock()
 
 	var nodeList = make([]*Node, 0)
-	for _, node := range nodes.NodeMap {
+	for _, node := range nodes.nodeMap {
 		nodeList = append(nodeList, node)
 	}
 	return nodeList
@@ -50,7 +52,7 @@ func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID strin
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 
-	var node = nodes.NodeMap[nodeAddr]
+	var node = nodes.nodeMap[nodeAddr]
 	return node
 }
 
@@ -77,10 +79,6 @@ func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*Node {
 // Use SetRunState to clear the runstate.
 func (nodes *NodeList) SetErrorStatus(node *Node, errorMsg string) (changed bool) {
 	if node != nil {
-		nodes.updateMutex.Lock()
-		defer nodes.updateMutex.Unlock()
-		newNode := node.Clone()
-
 		// newNode.SetErrorState(errorMsg)
 		statusUpdate := map[messaging.NodeStatus]string{
 			messaging.NodeStatusLastError: errorMsg,
@@ -88,10 +86,14 @@ func (nodes *NodeList) SetErrorStatus(node *Node, errorMsg string) (changed bool
 		changed = nodes.SetNodeStatus(node, statusUpdate)
 
 		if node.RunState != messaging.NodeRunStateError {
+			nodes.updateMutex.Lock()
+			defer nodes.updateMutex.Unlock()
+			newNode := node.Clone()
+
 			changed = true
-			node.RunState = messaging.NodeRunStateError
+			newNode.RunState = messaging.NodeRunStateError
+			nodes.updateNode(newNode)
 		}
-		nodes.updateNode(newNode)
 	}
 	return changed
 }
@@ -229,11 +231,12 @@ func (nodes *NodeList) UpdateNode(node *Node) {
 	nodes.updateNode(node)
 }
 
-// UpdateNodes replaces a collection of nodes
+// UpdateNodes updates a list of nodes
 // Intended to update the list with nodes from persistent storage
-func (nodes *NodeList) UpdateNodes(updates map[string]*Node) {
+func (nodes *NodeList) UpdateNodes(updates []*Node) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
+
 	for _, node := range updates {
 		// fill in missing fields
 		if node.Attr == nil {
@@ -260,14 +263,14 @@ func (nodes *NodeList) getNode(address string) *Node {
 	}
 	segments[3] = messaging.MessageTypeNodeDiscovery
 	nodeAddr := strings.Join(segments[:4], "/")
-	var node = nodes.NodeMap[nodeAddr]
+	var node = nodes.nodeMap[nodeAddr]
 	return node
 }
 
 // updateNode replaces a node and adds it to the list of updated nodes
 // Intended for use within a locked section
 func (nodes *NodeList) updateNode(node *Node) {
-	nodes.NodeMap[node.Address] = node
+	nodes.nodeMap[node.Address] = node
 	if nodes.updatedNodes == nil {
 		nodes.updatedNodes = make(map[string]*Node)
 	}
@@ -277,7 +280,7 @@ func (nodes *NodeList) updateNode(node *Node) {
 // NewNodeList creates a new instance for node management
 func NewNodeList() *NodeList {
 	nodes := NodeList{
-		NodeMap:     make(map[string]*Node),
+		nodeMap:     make(map[string]*Node),
 		updateMutex: &sync.Mutex{},
 	}
 	return &nodes
