@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )

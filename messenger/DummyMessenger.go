@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )

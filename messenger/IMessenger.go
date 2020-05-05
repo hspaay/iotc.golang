@@ -4,7 +4,7 @@ package messenger
 import (
 	"encoding/json"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 )
 
 // MessengerConfig with configuration of a messenger

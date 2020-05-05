@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sync"
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,6 +33,7 @@ type MqttMessenger struct {
 	isRunning           bool                // listen for messages while running
 	tlsVerifyServerCert bool                // verify the server certificate, this requires a Root CA signed cert
 	tlsCACertFile       string              // path to CA certificate
+	updateMutex         *sync.Mutex         // mutex for async updating of subscriptions
 }
 
 // TopicSubscription holds subscriptions to restore after disconnect
@@ -152,7 +154,10 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 // Disconnect from the MQTT broker and unsubscribe from all addresss and set
 // device state to disconnected
 func (messenger *MqttMessenger) Disconnect() {
+	messenger.updateMutex.Lock()
 	messenger.isRunning = false
+	messenger.updateMutex.Unlock()
+
 	if messenger.pahoClient != nil {
 		messenger.Logger.Warningf("Disconnect: Set state to disconnected and close connection")
 		//messenger.publish("$state", "disconnected")
@@ -249,7 +254,10 @@ func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt
 // this will re-subscribe to those addresss as PahoMqtt drops the subscriptions after disconnect.
 //
 func (messenger *MqttMessenger) resubscribe() {
-	//
+	// prevent simultaneous access to subscriptions
+	messenger.updateMutex.Lock()
+	defer messenger.updateMutex.Unlock()
+
 	messenger.Logger.Infof("mqtt.resubscribe to %d addresss", len(messenger.subscriptions))
 	for _, subscription := range messenger.subscriptions {
 		// clear existing subscription
@@ -270,17 +278,12 @@ func (messenger *MqttMessenger) resubscribe() {
 
 // Subscribe to a address
 // Subscribers are automatically resubscribed after the connection is restored
+// If no connection exists, then subscriptions are stored until a connection is established.
 // address: address to subscribe to. This can contain wildcards.
 // qos: Quality of service for subscription: 0, 1, 2
 // handler: callback handler.
 func (messenger *MqttMessenger) Subscribe(
 	address string, onMessage func(address string, publication *messaging.Publication)) {
-	if messenger.pahoClient == nil {
-		err := errors.New("mqtt.Subscribe: Unable to subscribe. Missing the MQTT client")
-		messenger.Logger.Error(err)
-		//return errors.New("missing mqtt client")
-		// return err
-	}
 	subscription := TopicSubscription{
 		address: address,
 		handler: onMessage,
@@ -288,11 +291,15 @@ func (messenger *MqttMessenger) Subscribe(
 		client:  messenger,
 		log:     messenger.Logger,
 	}
+	messenger.updateMutex.Lock()
+	defer messenger.updateMutex.Unlock()
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
 
 	messenger.Logger.Infof("mqtt.Subscribe: address %s, qos %d", address, messenger.config.SubQos)
 	//messenger.pahoClient.Subscribe(address, qos, addressSubscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
-	messenger.pahoClient.Subscribe(address, messenger.config.SubQos, subscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
+	if messenger.pahoClient != nil {
+		messenger.pahoClient.Subscribe(address, messenger.config.SubQos, subscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
+	}
 	// return nil
 }
 
@@ -308,6 +315,7 @@ func NewMqttMessenger(config *MessengerConfig, logger *log.Logger) *MqttMessenge
 		//messageChannel: make(chan *IncomingMessage),
 		tlsCACertFile:       "/etc/mosquitto/certs/zcas_ca.crt",
 		tlsVerifyServerCert: true,
+		updateMutex:         &sync.Mutex{},
 	}
 	return messenger
 }

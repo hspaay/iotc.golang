@@ -1,6 +1,6 @@
-# iotconnect.golang
+# iotc.golang
 
-iotconnect.golang is an implementation of the IotConnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation. The standard can be found at: https://github.com/hspaay/iotconnect.standard
+iotc.golang is an implementation of the IotConnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation. The standard can be found at: https://github.com/hspaay/iotc.standard
 
 ## Status
 
@@ -59,18 +59,18 @@ Recommended installation of your publisher on a linux platform. The iotconnect n
 
 The folder structure for deployment as a normal user:
 * ~/bin/iotconnect/bin      location of the publisher binaries
-* ~/bin/iotconnect/config   location of the configuration files, including iotconnect.conf
+* ~/bin/iotconnect/config   location of the configuration files, including iotc.conf
 * ~/bin/iotconnect/logs     logging output
 
-When deploying as an system application, create these folders and update /etc/iotconnect.conf
-* /etc/iotconnect/conf         location of iotconnect.conf main configuration file
+When deploying as an system application, create these folders and update /etc/iotc.conf
+* /etc/iotconnect/conf         location of iotc.conf main configuration file
 * /opt/iotconnect/             location of the publisher binaries
 * /var/lib/iotconnect/         location of the persistence files
 * /var/log/iotconnect/         location of iotconnect log files
 
 Starting a publisher using systemd 
-1. Edit the paths in iotconnect.service to make sure the folder and user IDs are correct
-2. Copy the iotconnect@.service and iotconnect.target files to /etc/systemd/system/
+1. Edit the paths in iotc.service to make sure the folder and user IDs are correct
+2. Copy the iotconnect@.service and iotc.target files to /etc/systemd/system/
 3. Start manually using systemd using myweather as an example:
    $ sudo service iotconnect@myweather start
 4. To enable autostart:
@@ -110,7 +110,7 @@ $ go mod init myweather
 Create a file named 'myweather.go' that looks like:
 ~~~golang
 package main
-import "github.com/hspaay/iotconnect.golang"
+import "github.com/hspaay/iotc.golang"
 import "fmt"
 func main() {
   fmt.Printf("hello, myweather\n")
@@ -156,7 +156,7 @@ func main() {
   publisher = publisher.NewPublisher(ZoneID, PublisherID, messenger)
 
   // Update the forecast once an hour
-  iotconnect.SetDefaultOutputInterval(3600, this.PollOutputs)
+  iotc.SetDefaultOutputInterval(3600, this.PollOutputs)
 
   // See below for Discover and Poll functions
   publisher.Start(nil, nil, Discover, Poll)
