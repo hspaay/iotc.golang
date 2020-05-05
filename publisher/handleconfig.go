@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/hspaay/iotconnect.golang/messaging"
-	"github.com/hspaay/iotconnect.golang/persist"
 )
 
 // handle an incoming a configuration command for one of our nodes. This:
@@ -41,7 +40,4 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, publication 
 	}
 	// process the requested configuration
 	publisher.Nodes.SetNodeConfigValues(address, params)
-	if publisher.persistFolder != "" {
-		persist.SaveNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
-	}
 }

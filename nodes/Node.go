@@ -13,6 +13,8 @@ type Node struct {
 	messaging.NodeDiscoveryMessage `json:"node"`
 }
 
+// type Node = messaging.NodeDiscoveryMessage
+
 // Clone returns a copy of the node with new Attr, Config and Status maps
 // Intended for updating the node in a concurrent safe manner in combination with UpdateNode()
 // This does clones map values. Any updates to the map must use new instances of the values
@@ -70,21 +72,7 @@ func (node *Node) GetConfigValue(attrName messaging.NodeAttr) (value string, con
 	return config.Value, configExists
 }
 
-// SetErrorState sets the node runState to error and sets a error message in the node status
-// Use SetRunState to clear the runstate.
-// Returns true if one or more attributes have changed
-func (node *Node) SetErrorState(message string) (changed bool) {
-	changed = node.SetNodeStatus(
-		map[messaging.NodeStatus]string{messaging.NodeStatusLastError: message},
-	)
-	if node.RunState != messaging.NodeRunStateError {
-		changed = true
-		node.RunState = messaging.NodeRunStateError
-	}
-	return changed
-}
-
-// UpdateNodeAttr is a convenience function to update multiple attributes of a configuration
+// SetNodeAttr is a convenience function to update multiple attributes of a configuration
 // Intended to update read-only attributes that describe the node.
 // Returns true if one or more attributes have changed
 func (node *Node) SetNodeAttr(attrParams map[messaging.NodeAttr]string) (changed bool) {
@@ -98,7 +86,7 @@ func (node *Node) SetNodeAttr(attrParams map[messaging.NodeAttr]string) (changed
 	return changed
 }
 
-// UpdateNodeConfigValues applies an update to a node's configuration values
+// SetNodeConfigValues applies an update to a node's configuration values
 // - param is the map with key-value pairs of configuration values to update
 // Returns true if one or more attributes have changed
 func (node *Node) SetNodeConfigValues(params map[messaging.NodeAttr]string) (changed bool) {
@@ -120,37 +108,33 @@ func (node *Node) SetNodeConfigValues(params map[messaging.NodeAttr]string) (cha
 	return changed
 }
 
-// UpdateNodeStatus is a convenience function to update multiple node status fields
-// Returns true if one or more status values have changed
-func (node *Node) SetNodeStatus(attrParams map[messaging.NodeStatus]string) (changed bool) {
-	changed = false
-	for key, value := range attrParams {
-		if node.Status[key] != value {
-			node.Status[key] = value
-			changed = true
-		}
-	}
-	return changed
-}
-
 // MakeNodeDiscoveryAddress for publishing
+// zoneID of the zone the node lives in.
+// publisherID of the publisher for this node, unique for the zone
+// nodeID of the node itself, unique for the publisher
 func MakeNodeDiscoveryAddress(zoneID string, publisherID string, nodeID string) string {
 	address := fmt.Sprintf("%s/%s/%s/"+messaging.MessageTypeNodeDiscovery, zoneID, publisherID, nodeID)
 	return address
 }
 
 // NewConfigAttr instance for holding node configuration
-func NewConfigAttr(id messaging.NodeAttr, dataType messaging.DataType, description string, value string) *messaging.ConfigAttr {
+// id of the attribute. See also messaging.NodeAttr for standard IDs
+// dataType of the value. See also messaging.DataType for standard types.
+// description of the value for humans
+// defaultValue to use as default configuration value
+// returns a new Configuration Attribute instance. Use nodes.SetNodeConfig to update the node with this configuration
+func NewConfigAttr(id messaging.NodeAttr, dataType messaging.DataType, description string, defaultValue string) *messaging.ConfigAttr {
 	config := messaging.ConfigAttr{
 		ID:          id,
 		DataType:    dataType,
 		Description: description,
-		Value:       value,
+		Default:     defaultValue,
 	}
 	return &config
 }
 
-// NewNode create a node instance. Use UpdateNode to add it to the publisher
+// NewNode create a node instance.
+// Use UpdateNode to add it to the publisher
 func NewNode(zoneID string, publisherID string, nodeID string, nodeType messaging.NodeType) *Node {
 	address := MakeNodeDiscoveryAddress(zoneID, publisherID, nodeID)
 	return &Node{

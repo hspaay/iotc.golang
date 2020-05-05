@@ -9,6 +9,7 @@ import (
 	"github.com/hspaay/iotconnect.golang/messaging"
 	"github.com/hspaay/iotconnect.golang/messenger"
 	"github.com/hspaay/iotconnect.golang/nodes"
+	"github.com/hspaay/iotconnect.golang/persist"
 )
 
 // GetForecast returns the output's forecast list
@@ -21,6 +22,7 @@ func (publisher *Publisher) GetForecast(output *nodes.Output) messaging.OutputHi
 }
 
 // PublishUpdates publishes updated nodes, inputs and outputs
+// If updates are available then nodes are saved
 func (publisher *Publisher) PublishUpdates() {
 	if publisher.messenger == nil {
 		publisher.Logger.Error("PublishUpdates: No messenger")
@@ -37,16 +39,28 @@ func (publisher *Publisher) PublishUpdates() {
 		publisher.Logger.Infof("publish node discovery: %s", node.Address)
 		publisher.publishMessage(node.Address, true, node)
 	}
+	if len(nodeList) > 0 && publisher.persistFolder != "" {
+		// allNodes := publisher.Nodes.GetAllNodes()
+		persist.SaveNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
+	}
 	// publish updated input or output discovery
 	for _, input := range inputList {
 		aliasAddress := publisher.getOutputAliasAddress(input.Address)
 		publisher.Logger.Infof("publish input discovery: %s", aliasAddress)
 		publisher.publishMessage(aliasAddress, true, input)
 	}
+	if len(inputList) > 0 && publisher.persistFolder != "" {
+		allInputs := publisher.Inputs.GetAllInputs()
+		persist.SaveInputs(publisher.persistFolder, publisher.publisherID, allInputs)
+	}
 	for _, output := range outputList {
 		aliasAddress := publisher.getOutputAliasAddress(output.Address)
 		publisher.Logger.Infof("publish output discovery: %s", aliasAddress)
 		publisher.publishMessage(aliasAddress, true, output)
+	}
+	if len(outputList) > 0 && publisher.persistFolder != "" {
+		allOutputs := publisher.Outputs.GetAllOutputs()
+		persist.SaveOutputs(publisher.persistFolder, publisher.publisherID, allOutputs)
 	}
 }
 

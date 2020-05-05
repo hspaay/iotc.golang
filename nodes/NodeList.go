@@ -14,7 +14,7 @@ import (
 // is discarded and replaced with the new instance.
 // To make changes to a node directly, always Clone the node first and use UpdateNode to apply the change.
 type NodeList struct {
-	nodeMap      map[string]*Node
+	NodeMap      map[string]*Node `json:"nodes"`
 	updateMutex  *sync.Mutex      // mutex for async updating of nodes
 	updatedNodes map[string]*Node // nodes by address that have been rediscovered/updated since last publication
 }
@@ -25,7 +25,7 @@ func (nodes *NodeList) GetAllNodes() []*Node {
 	defer nodes.updateMutex.Unlock()
 
 	var nodeList = make([]*Node, 0)
-	for _, node := range nodes.nodeMap {
+	for _, node := range nodes.NodeMap {
 		nodeList = append(nodeList, node)
 	}
 	return nodeList
@@ -50,7 +50,7 @@ func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID strin
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 
-	var node = nodes.nodeMap[nodeAddr]
+	var node = nodes.NodeMap[nodeAddr]
 	return node
 }
 
@@ -74,15 +74,26 @@ func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*Node {
 }
 
 // SetErrorStatus sets the node RunState to error with a message in the node status NodeStateLastError
-// Use ClearErrorStatus to remove the most active error status
-func (nodes *NodeList) SetErrorStatus(node *Node, errorMsg string) {
+// Use SetRunState to clear the runstate.
+func (nodes *NodeList) SetErrorStatus(node *Node, errorMsg string) (changed bool) {
 	if node != nil {
 		nodes.updateMutex.Lock()
 		defer nodes.updateMutex.Unlock()
 		newNode := node.Clone()
-		newNode.SetErrorState(errorMsg)
+
+		// newNode.SetErrorState(errorMsg)
+		statusUpdate := map[messaging.NodeStatus]string{
+			messaging.NodeStatusLastError: errorMsg,
+		}
+		changed = nodes.SetNodeStatus(node, statusUpdate)
+
+		if node.RunState != messaging.NodeRunStateError {
+			changed = true
+			node.RunState = messaging.NodeRunStateError
+		}
 		nodes.updateNode(newNode)
 	}
+	return changed
 }
 
 // SetNodeAttr updates node's attributes and publishes the updated node.
@@ -120,10 +131,10 @@ func (nodes *NodeList) SetNodeConfig(address string, configAttr *messaging.Confi
 }
 
 // SetNodeRunState updates the node's runstate status
-func (nodes *NodeList) SetNodeRunState(address string, runState messaging.NodeRunState) {
+func (nodes *NodeList) SetNodeRunState(node *Node, runState messaging.NodeRunState) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
-	node := nodes.getNode(address)
+	// node := nodes.getNode(address)
 	if node == nil {
 		return
 	}
@@ -135,23 +146,57 @@ func (nodes *NodeList) SetNodeRunState(address string, runState messaging.NodeRu
 	}
 }
 
+// // SetNodeStatus updates one or more node's status attributes
+// // Nodes are immutable. If one or more status values have changed then a new node is created and
+// // published. The old node instance is discarded.
+// // - address of the node to update
+// // - param is the map with key-value pairs of node status
+// func (nodes *NodeList) SetNodeStatus(address string, attrParams map[messaging.NodeStatus]string) {
+// 	nodes.updateMutex.Lock()
+// 	defer nodes.updateMutex.Unlock()
+// 	node := nodes.getNode(address)
+// 	if node == nil {
+// 		return
+// 	}
+// 	newNode := node.Clone()
+// 	changed := false
+// 	for key, value := range attrParams {
+// 		if newNode.Status[key] != value {
+// 			newNode.Status[key] = value
+// 			changed = true
+// 		}
+// 	}
+
+// 	if changed {
+// 		nodes.updateNode(newNode)
+// 	}
+// }
+
 // SetNodeStatus updates one or more node's status attributes
-// Nodes are immutable. If one or more stastus values have changed then a new node is created and
-// published and the old node instance is discarded.
+// Nodes are immutable. If one or more status values have changed then a new node is created and
+// published. The old node instance is discarded.
 // - address of the node to update
-// - param is the map with key-value pairs of node status
-func (nodes *NodeList) SetNodeStatus(address string, attrParams map[messaging.NodeStatus]string) {
+// - statusAttr is the map with key-value pairs of updated node statusses
+func (nodes *NodeList) SetNodeStatus(node *Node, statusAttr map[messaging.NodeStatus]string) (changed bool) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
-	node := nodes.getNode(address)
-	if node == nil {
-		return
-	}
+	// node := nodes.getNode(address)
+	// if node == nil {
+	// 	return
+	// }
 	newNode := node.Clone()
-	changed := node.SetNodeStatus(attrParams)
+	changed = false
+	for key, value := range statusAttr {
+		if newNode.Status[key] != value {
+			newNode.Status[key] = value
+			changed = true
+		}
+	}
+
 	if changed {
 		nodes.updateNode(newNode)
 	}
+	return changed
 }
 
 // SetNodeConfigValues applies an update to a node's existing configuration
@@ -215,14 +260,14 @@ func (nodes *NodeList) getNode(address string) *Node {
 	}
 	segments[3] = messaging.MessageTypeNodeDiscovery
 	nodeAddr := strings.Join(segments[:4], "/")
-	var node = nodes.nodeMap[nodeAddr]
+	var node = nodes.NodeMap[nodeAddr]
 	return node
 }
 
 // updateNode replaces a node and adds it to the list of updated nodes
 // Intended for use within a locked section
 func (nodes *NodeList) updateNode(node *Node) {
-	nodes.nodeMap[node.Address] = node
+	nodes.NodeMap[node.Address] = node
 	if nodes.updatedNodes == nil {
 		nodes.updatedNodes = make(map[string]*Node)
 	}
@@ -232,7 +277,7 @@ func (nodes *NodeList) updateNode(node *Node) {
 // NewNodeList creates a new instance for node management
 func NewNodeList() *NodeList {
 	nodes := NodeList{
-		nodeMap:     make(map[string]*Node),
+		NodeMap:     make(map[string]*Node),
 		updateMutex: &sync.Mutex{},
 	}
 	return &nodes

@@ -58,7 +58,7 @@ func TestAttrStatus(t *testing.T) {
 	nodeList.SetNodeAttr(node1Addr, newAttr)
 
 	newStatus := map[messaging.NodeStatus]string{"LastUpdated": "now"}
-	nodeList.SetNodeStatus(node1Addr, newStatus)
+	nodeList.SetNodeStatus(node, newStatus)
 
 	node1 := nodeList.GetNodeByAddress(node1Addr)
 	val, hasAttr := node1.Attr["Manufacturer"]

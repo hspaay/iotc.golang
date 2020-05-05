@@ -15,6 +15,18 @@ type InputList struct {
 	updatedInputs map[string]*Input // inputs that have been rediscovered/updated since last publication
 }
 
+// GetAllInputs returns the list of inputs
+func (inputs *InputList) GetAllInputs() []*Input {
+	inputs.updateMutex.Lock()
+	defer inputs.updateMutex.Unlock()
+
+	var inputList = make([]*Input, 0)
+	for _, input := range inputs.inputMap {
+		inputList = append(inputList, input)
+	}
+	return inputList
+}
+
 // GetInput returns the input of one of this publisher's nodes
 // Returns nil if address has no known input
 // address with node type and instance. The command will be ignored.

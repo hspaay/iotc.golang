@@ -13,6 +13,7 @@ import (
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -297,6 +298,9 @@ func (messenger *MqttMessenger) Subscribe(
 
 // NewMqttMessenger creates a new MQTT messenger instance
 func NewMqttMessenger(config *MessengerConfig, logger *log.Logger) *MqttMessenger {
+	if logger == nil {
+		logger = logrus.New()
+	}
 	messenger := &MqttMessenger{
 		pahoClient: nil,
 		Logger:     logger,

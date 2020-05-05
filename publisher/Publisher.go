@@ -86,9 +86,9 @@ func GetConfigValue(configMap map[string]messaging.ConfigAttr, attrName string) 
 	return config.Value
 }
 
-// GetNode returns a node from this publisher or nil if the id isn't found in this publisher
+// GetNodeByID returns a node from this publisher or nil if the id isn't found in this publisher
 // This is a convenience function as publishers tend to do this quite often
-func (publisher *Publisher) GetNode(id string) *nodes.Node {
+func (publisher *Publisher) GetNodeByID(id string) *nodes.Node {
 	node := publisher.Nodes.GetNodeByID(publisher.ZoneID, publisher.publisherID, id)
 	return node
 }
@@ -227,7 +227,7 @@ func (publisher *Publisher) Start() {
 	}
 }
 
-// Stop publishing and save nodes
+// Stop publishing
 // Wait until the heartbeat loop has finished processing messages
 func (publisher *Publisher) Stop() {
 	publisher.Logger.Warningf("Stopping publisher %s", publisher.publisherID)
@@ -241,9 +241,6 @@ func (publisher *Publisher) Stop() {
 	} else {
 		publisher.updateMutex.Unlock()
 	}
-	// if publisher.persistFolder != "" {
-	// 	persist.SaveNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
-	// }
 	publisher.Logger.Info("... bye bye")
 }
 

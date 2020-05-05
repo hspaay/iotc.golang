@@ -15,6 +15,18 @@ type OutputList struct {
 	updatedOutputs map[string]*Output // address of outputs that have been rediscovered/updated since last publication
 }
 
+// GetAllOutputs returns the list of outputs
+func (outputs *OutputList) GetAllOutputs() []*Output {
+	outputs.updateMutex.Lock()
+	defer outputs.updateMutex.Unlock()
+
+	var outputList = make([]*Output, 0)
+	for _, output := range outputs.outputMap {
+		outputList = append(outputList, output)
+	}
+	return outputList
+}
+
 // GetOutput returns the output of one of this publisher's nodes
 // This method is concurrent safe
 // Returns nil if address has no known output

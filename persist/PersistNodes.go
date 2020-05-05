@@ -11,6 +11,8 @@ import (
 
 // NodesFileSuffix to append to name of the file containing saved nodes
 const NodesFileSuffix = "-nodes.json"
+const InputsFileSuffix = "-inputs.json"
+const OutputsFileSuffix = "-outputs.json"
 
 // LoadNodes loads previously saved publisher node messages from JSON file.
 // Existing nodes are replaced if they exist in the JSON file. Custom nodes must be updated
@@ -37,31 +39,52 @@ func LoadNodes(altConfigFolder string, publisherID string, nodelist interface{})
 		log.Errorf("LoadNodes: Error parsing JSON node file %s: %v", nodesFile, err)
 		return err
 	}
-	log.Infof("Save: Node list loaded successfully from %s", nodesFile)
+	log.Infof("LoadNodes: Node list loaded successfully from %s", nodesFile)
 	return nil
 }
 
 // SaveNodes saves the nodelist to a JSON file
-// altConfigFolder contains a alternate location for the configuration files, intended for testing.
+// configFolder contains the location for the configuration files
+// publisherID determines the filename: <publisherID-nodes.json>
+// nodelist is the object to hold list of nodes
+func SaveNodes(configFolder string, publisherID string, nodeList interface{}) error {
+	return SaveToJSON(configFolder, publisherID+NodesFileSuffix, nodeList)
+}
+
+// SaveInputs saves the inputlist to a JSON file
+// configFolder contains the location for the configuration files
 //   Use "" for default, which is <userhome>/.config/iotconnect
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the object to hold list of nodes
-func SaveNodes(altConfigFolder string, publisherID string, nodelist interface{}) error {
-	configFolder := altConfigFolder
-	if altConfigFolder == "" {
-		configFolder = DefaultConfigFolder
-	}
-	rawNodes, err := json.MarshalIndent(nodelist, "", "  ")
+func SaveInputs(configFolder string, publisherID string, inputList interface{}) error {
+	return SaveToJSON(configFolder, publisherID+InputsFileSuffix, inputList)
+}
+
+// SaveOutputs saves the outputlist to a JSON file
+// configFolder contains the location for the configuration files
+//   Use "" for default, which is <userhome>/.config/iotconnect
+// publisherID determines the filename: <publisherID-nodes.json>
+// nodelist is the object to hold list of nodes
+func SaveOutputs(configFolder string, publisherID string, outputList interface{}) error {
+	return SaveToJSON(configFolder, publisherID+OutputsFileSuffix, outputList)
+}
+
+// SaveToJSON saves the given collection to a JSON file
+// configFolder contains the location for the configuration files
+// filename is the name to save the collection under
+// nodelist is the object to hold list of nodes
+func SaveToJSON(configFolder string, fileName string, collection interface{}) error {
+	jsonText, err := json.MarshalIndent(collection, "", "  ")
 	if err != nil {
-		log.Errorf("Save: Error Marshalling YAML node list '%s' configuration: %v", publisherID, err)
+		log.Errorf("Save: Error Marshalling JSON collection '%s': %v", fileName, err)
 		return err
 	}
-	nodesFile := path.Join(configFolder, publisherID+NodesFileSuffix)
-	err = ioutil.WriteFile(nodesFile, rawNodes, 0664)
+	fullPath := path.Join(configFolder, fileName)
+	err = ioutil.WriteFile(fullPath, jsonText, 0664)
 	if err != nil {
-		log.Errorf("Save: Error saving node list file %s: %v", nodesFile, err)
+		log.Errorf("Save: Error saving collection to JSON file %s: %v", fullPath, err)
 		return err
 	}
-	log.Infof("Save: Node list saved successfully to %s", nodesFile)
+	log.Infof("Save: Collection saved successfully to JSON file %s", fullPath)
 	return nil
 }
