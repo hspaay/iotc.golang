@@ -4,8 +4,8 @@ package publisher
 import (
 	"encoding/json"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
-	"github.com/hspaay/iotconnect.golang/nodes"
+	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/nodes"
 )
 
 // // handleNodeDiscovery collects and saves any discovered node

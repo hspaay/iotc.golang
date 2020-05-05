@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 )
 
 // handle an incoming a set command for one of our nodes. This:

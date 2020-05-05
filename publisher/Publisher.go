@@ -19,10 +19,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
-	"github.com/hspaay/iotconnect.golang/messenger"
-	"github.com/hspaay/iotconnect.golang/nodes"
-	"github.com/hspaay/iotconnect.golang/persist"
+	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/messenger"
+	"github.com/hspaay/iotc.golang/nodes"
+	"github.com/hspaay/iotc.golang/persist"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -64,7 +64,7 @@ type Publisher struct {
 	// background publications require a mutex to prevent concurrent access
 	exitChannel chan bool
 	updateMutex *sync.Mutex // mutex for async updating and publishing
-	// configs     map[string]*nodes.ConfigAttrMap // node configuration
+
 	Nodes          *nodes.NodeList                        // nodes published by this publisher
 	isRunning      bool                                   // publisher was started and is running
 	Inputs         *nodes.InputList                       // inputs published by this publisher
@@ -199,7 +199,9 @@ func (publisher *Publisher) Start() {
 		publisher.isRunning = true
 		publisher.updateMutex.Unlock()
 		if publisher.persistFolder != "" {
-			persist.LoadNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
+			nodeList := make([]*nodes.Node, 0)
+			persist.LoadNodes(publisher.persistFolder, publisher.publisherID, &nodeList)
+			publisher.Nodes.UpdateNodes(nodeList)
 		}
 
 		go publisher.heartbeatLoop()

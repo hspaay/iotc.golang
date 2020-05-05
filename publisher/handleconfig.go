@@ -4,7 +4,7 @@ package publisher
 import (
 	"encoding/json"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
+	"github.com/hspaay/iotc.golang/messaging"
 )
 
 // handle an incoming a configuration command for one of our nodes. This:

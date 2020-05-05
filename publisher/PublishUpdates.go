@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
-	"github.com/hspaay/iotconnect.golang/messenger"
-	"github.com/hspaay/iotconnect.golang/nodes"
-	"github.com/hspaay/iotconnect.golang/persist"
+	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/messenger"
+	"github.com/hspaay/iotc.golang/nodes"
+	"github.com/hspaay/iotc.golang/persist"
 )
 
 // GetForecast returns the output's forecast list
@@ -40,8 +40,8 @@ func (publisher *Publisher) PublishUpdates() {
 		publisher.publishMessage(node.Address, true, node)
 	}
 	if len(nodeList) > 0 && publisher.persistFolder != "" {
-		// allNodes := publisher.Nodes.GetAllNodes()
-		persist.SaveNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
+		allNodes := publisher.Nodes.GetAllNodes()
+		persist.SaveNodes(publisher.persistFolder, publisher.publisherID, allNodes)
 	}
 	// publish updated input or output discovery
 	for _, input := range inputList {

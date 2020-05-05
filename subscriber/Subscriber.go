@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hspaay/iotconnect.golang/messaging"
-	"github.com/hspaay/iotconnect.golang/messenger"
-	"github.com/hspaay/iotconnect.golang/nodes"
+	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/messenger"
+	"github.com/hspaay/iotc.golang/nodes"
 	log "github.com/sirupsen/logrus"
 )
 
