@@ -1,6 +1,6 @@
 # iotc.golang
 
-iotc.golang is an implementation of the IotConnect standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation. The standard can be found at: https://github.com/hspaay/iotc.standard
+iotc.golang is an implementation of the IoTConnect (iotc) standard for publishing and subscribing to IoT information on a message bus. This library is part of the reference implementation. The standard can be found at: https://github.com/hspaay/iotc.standard
 
 ## Status
 
@@ -21,7 +21,7 @@ A similar library for the Python and Javascript/Typescript languages is planned 
 
 * systemd launcher of adapters for Linux 
 * Messenger for MQTT brokers
-* Management of nodes, inputs and outputs (see IotConnect standard for further explanation)
+* Management of nodes, inputs and outputs (see IoTConnect standard for further explanation)
 * Publish discovery when nodes are updated 
 * Publish updates to output values 
 * Signing of published messages
@@ -55,32 +55,32 @@ This example uses Go modules as this lets you control versioning and choose your
 
 ## Installing Publishers
 
-Recommended installation of your publisher on a linux platform. The iotconnect namespace is used for publisher applications:
+Recommended installation of your publisher on a linux platform. The iotc namespace is used for publisher applications:
 
 The folder structure for deployment as a normal user:
-* ~/bin/iotconnect/bin      location of the publisher binaries
-* ~/bin/iotconnect/config   location of the configuration files, including iotc.conf
-* ~/bin/iotconnect/logs     logging output
+* ~/bin/iotc/bin      location of the publisher binaries
+* ~/bin/iotc/config   location of the configuration files, including iotc.conf
+* ~/bin/iotc/logs     logging output
 
 When deploying as an system application, create these folders and update /etc/iotc.conf
-* /etc/iotconnect/conf         location of iotc.conf main configuration file
-* /opt/iotconnect/             location of the publisher binaries
-* /var/lib/iotconnect/         location of the persistence files
-* /var/log/iotconnect/         location of iotconnect log files
+* /etc/iotc/conf         location of iotc.conf main configuration file
+* /opt/iotc/             location of the publisher binaries
+* /var/lib/iotc/         location of the persistence files
+* /var/log/iotc/         location of iotc log files
 
 Starting a publisher using systemd 
 1. Edit the paths in iotc.service to make sure the folder and user IDs are correct
-2. Copy the iotconnect@.service and iotc.target files to /etc/systemd/system/
+2. Copy the iotc@.service and iotc.target files to /etc/systemd/system/
 3. Start manually using systemd using myweather as an example:
-   $ sudo service iotconnect@myweather start
+   $ sudo service iotc@myweather start
 4. To enable autostart:
-   $ sudo systemctl enable iotconnect@myweather
+   $ sudo systemctl enable iotc@myweather
 5. To disable autostart:
-   $ sudo systemctl disable iotconnect@myweather
+   $ sudo systemctl disable iotc@myweather
 
 ## Contributing
 
-Contribution to the iotconnect project is welcome. There are many areas where help is needed, especially with building publishers for IoT and other devices.
+Contribution to the IoTConnect project is welcome. There are many areas where help is needed, especially with building publishers for IoT and other devices.
 See [CONTRIBUTING](docs/CONTRIBUTING.md) for guidelines.
 
 ## Questions
@@ -93,7 +93,7 @@ Common questions will be captured in the [Q&A](docs/FAQ.md).
 
 ... under construction ...
 
-This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/iotconnect/myweather*
+This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/iotc/myweather*
 The publisher is called myweather, and each node is a city. More cities can be added with more nodes. 
 This example assumes you have a MQTT broker running locally. 
 
@@ -102,8 +102,8 @@ This example assumes you have a MQTT broker running locally.
 This uses golang modules so you can use the folder of your choice. More info here: https://blog.golang.org/using-go-modules
 
 ~~~bash
-$ mkdir -p ~/Projects/iotconnect/myweather
-$ cd ~/Projects/iotconnect/myweather
+$ mkdir -p ~/Projects/iotc/myweather
+$ cd ~/Projects/iotc/myweather
 $ go mod init myweather
    > go: creating new go.mod: module myweather
 ~~~
@@ -137,7 +137,7 @@ Change myweather.go to look like this:
 ~~~golang
 package myweather
 
-import "github.com/hspaay/iotconnect"
+import "github.com/hspaay/iotc"
 
 const ZoneID = standard.LocalZoneID
 const MqttServerAddress = "localhost"
@@ -171,7 +171,7 @@ function Discover(publisher *Publisher) {
 }
 
 // Poll obtains the forcast and updates the output value.
-// The iotconnect library will automatically publish the output discovery and values.
+// The iotc library will automatically publish the output discovery and values.
 function Poll(publisher *Publisher) {
   node = publisher.GetNode(NodeId)
   configValues = publisher.GetNodeConfigValues(node)
