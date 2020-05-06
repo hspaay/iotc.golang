@@ -5,17 +5,17 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // handle an incoming a set command for one of our nodes. This:
 // - check if the signature is valid
 // - check if the node is valid
 // - pass the input value update to the adapter's onNodeInputHandler callback
-func (publisher *Publisher) handleNodeInput(address string, publication *messaging.Publication) {
+func (publisher *Publisher) handleNodeInput(address string, publication *iotc.Publication) {
 	// Check that address is one of our inputs
 	segments := strings.Split(address, "/")
-	segments[3] = messaging.MessageTypeInputDiscovery
+	segments[3] = iotc.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
 
 	input := publisher.Inputs.GetInputByAddress(inputAddr)
@@ -25,7 +25,7 @@ func (publisher *Publisher) handleNodeInput(address string, publication *messagi
 		return
 	}
 	// Decode the message into a SetMessage type
-	var setMessage messaging.SetInputMessage
+	var setMessage iotc.SetInputMessage
 	err := json.Unmarshal([]byte(publication.Message), &setMessage)
 	if err != nil {
 		publisher.Logger.Infof("Unable to unmarshal SetMessage in %s", address)

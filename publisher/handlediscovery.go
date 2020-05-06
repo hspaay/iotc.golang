@@ -4,12 +4,12 @@ package publisher
 import (
 	"encoding/json"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/nodes"
 )
 
 // // handleNodeDiscovery collects and saves any discovered node
-// func (publisher *Publisher) handleNodeDiscovery(address string, publication *messaging.Publication) {
+// func (publisher *Publisher) handleNodeDiscovery(address string, publication *iotc.Publication) {
 // 	var pubNode nodes.Node
 // 	err := json.Unmarshal(publication.Message, &pubNode)
 // 	if err != nil {
@@ -31,7 +31,7 @@ import (
 // Used to verify signatures of incoming configuration and input messages
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
 // publication contains a message with the publisher node info
-func (publisher *Publisher) handlePublisherDiscovery(address string, publication *messaging.Publication) {
+func (publisher *Publisher) handlePublisherDiscovery(address string, publication *iotc.Publication) {
 	var pubNode nodes.Node
 	err := json.Unmarshal(publication.Message, &pubNode)
 	if err != nil {

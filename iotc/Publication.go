@@ -1,5 +1,5 @@
-// Package messaging with message pulication type
-package messaging
+// Package iotc with IoTConnect message pulication type
+package iotc
 
 import "encoding/json"
 

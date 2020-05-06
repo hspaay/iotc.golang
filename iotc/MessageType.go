@@ -1,5 +1,5 @@
-// Package messaging with message types used in message addressing
-package messaging
+// Package iotc with IoTConnect message types used in message addressing
+package iotc
 
 // MessageType used in message addressing
 type MessageType string
@@ -20,7 +20,8 @@ const (
 	MessageTypeUpgrade         = "$upgrade"   // perform firmware upgrade, payload is UpgradeMessage
 	MessageTypeValue           = "$value"     // raw output value
 	// LocalZone ID for local-only zones (eg, no sharing outside this zone)
-	LocalZoneID = "local"
+	LocalZoneID = "local" // local area zone
+	TestZoneID  = "test"  // Zone to use in testing
 	// PublisherNodeID to use when none is provided
 	// PublisherNodeID = "$publisher" // reserved node ID for publishers
 )

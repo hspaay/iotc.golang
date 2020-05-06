@@ -6,19 +6,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // OutputHistory with output history value management
 type OutputHistory struct {
-	historyLists   map[string]messaging.OutputHistoryList // history lists by output address
-	updatedOutputs map[string]string                      // addresses of updated outputs
-	updateMutex    *sync.Mutex                            // mutex for async updating of outputs
+	historyLists   map[string]iotc.OutputHistoryList // history lists by output address
+	updatedOutputs map[string]string                 // addresses of updated outputs
+	updateMutex    *sync.Mutex                       // mutex for async updating of outputs
 }
 
 // GetHistory returns the history list
 // Returns nil if the type or instance is unknown
-func (outputValues *OutputHistory) GetHistory(address string) messaging.OutputHistoryList {
+func (outputValues *OutputHistory) GetHistory(address string) iotc.OutputHistoryList {
 	outputValues.updateMutex.Lock()
 	var historyList = outputValues.historyLists[address]
 	outputValues.updateMutex.Unlock()
@@ -27,8 +27,8 @@ func (outputValues *OutputHistory) GetHistory(address string) messaging.OutputHi
 
 // GetOutputValueByAddress returns the most recent output value by output discovery address
 // This returns a HistoryValue object with the latest value and timestamp it was updated
-func (outputValues *OutputHistory) GetOutputValueByAddress(address string) *messaging.OutputValue {
-	var latest *messaging.OutputValue
+func (outputValues *OutputHistory) GetOutputValueByAddress(address string) *iotc.OutputValue {
+	var latest *iotc.OutputValue
 
 	outputValues.updateMutex.Lock()
 	history := outputValues.historyLists[address]
@@ -42,7 +42,7 @@ func (outputValues *OutputHistory) GetOutputValueByAddress(address string) *mess
 }
 
 // GetOutputValueByType returns the current output value by output type and instance
-func (outputValues *OutputHistory) GetOutputValueByType(node *Node, outputType string, instance string) *messaging.OutputValue {
+func (outputValues *OutputHistory) GetOutputValueByType(node *Node, outputType string, instance string) *iotc.OutputValue {
 	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
 	return outputValues.GetOutputValueByAddress(addr)
 }
@@ -89,7 +89,7 @@ func (outputValues *OutputHistory) UpdateOutputStringList(node *Node, outputType
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
 func (outputValues *OutputHistory) UpdateOutputValue(node *Node, outputType string, instance string, newValue string) bool {
-	var previous *messaging.OutputValue
+	var previous *iotc.OutputValue
 	var repeatDelay = 3600 // default repeat delay
 	var ageSeconds = -1
 	var hasUpdated = false
@@ -136,18 +136,18 @@ func (outputValues *OutputHistory) UpdateOutputValue(node *Node, outputType stri
 // newValue contains the value to include in the history along with the current timestamp
 // maxHistorySize is optional and limits the size in addition to the 24 hour limit
 // returns the history list with the new value at the front of the list
-func updateHistory(history messaging.OutputHistoryList, newValue string, maxHistorySize int) messaging.OutputHistoryList {
+func updateHistory(history iotc.OutputHistoryList, newValue string, maxHistorySize int) iotc.OutputHistoryList {
 
 	timeStamp := time.Now()
-	timeStampStr := timeStamp.Format(messaging.TimeFormat)
+	timeStampStr := timeStamp.Format(iotc.TimeFormat)
 
-	latest := messaging.OutputValue{
+	latest := iotc.OutputValue{
 		Timestamp: timeStampStr,
 		EpochTime: timeStamp.Unix(),
 		Value:     newValue,
 	}
 	if history == nil {
-		history = make(messaging.OutputHistoryList, 1)
+		history = make(iotc.OutputHistoryList, 1)
 	} else {
 		// make room at the front of the slice
 		history = append(history, latest)
@@ -174,7 +174,7 @@ func updateHistory(history messaging.OutputHistoryList, newValue string, maxHist
 // NewOutputValue creates a new instance for output value and history management
 func NewOutputValue() *OutputHistory {
 	outputs := OutputHistory{
-		historyLists: make(map[string]messaging.OutputHistoryList),
+		historyLists: make(map[string]iotc.OutputHistoryList),
 		updateMutex:  &sync.Mutex{},
 	}
 	return &outputs

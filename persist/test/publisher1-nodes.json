@@ -1,5 +1,5 @@
-{
-  "node1": {
+[
+  {
     "node": {
       "id": "node1",
       "address": "zone1/publisher1/node1/$node",
@@ -9,4 +9,4 @@
       "zone": "zone1"
     }
   }
-}
+]

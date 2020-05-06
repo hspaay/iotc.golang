@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/messenger"
 	"github.com/hspaay/iotc.golang/nodes"
 	"github.com/hspaay/iotc.golang/persist"
@@ -14,7 +14,7 @@ import (
 
 // GetForecast returns the output's forecast list
 // Returns nil if the type or instance is unknown or no forecast is available
-func (publisher *Publisher) GetForecast(output *nodes.Output) messaging.OutputHistoryList {
+func (publisher *Publisher) GetForecast(output *nodes.Output) iotc.OutputHistoryList {
 	publisher.updateMutex.Lock()
 	var forecastList = publisher.outputForecast[output.Address]
 	publisher.updateMutex.Unlock()
@@ -41,7 +41,7 @@ func (publisher *Publisher) PublishUpdates() {
 	}
 	if len(nodeList) > 0 && publisher.persistFolder != "" {
 		allNodes := publisher.Nodes.GetAllNodes()
-		persist.SaveNodes(publisher.persistFolder, publisher.publisherID, allNodes)
+		persist.SaveNodes(publisher.persistFolder, publisher.id, allNodes)
 	}
 	// publish updated input or output discovery
 	for _, input := range inputList {
@@ -51,7 +51,7 @@ func (publisher *Publisher) PublishUpdates() {
 	}
 	if len(inputList) > 0 && publisher.persistFolder != "" {
 		allInputs := publisher.Inputs.GetAllInputs()
-		persist.SaveInputs(publisher.persistFolder, publisher.publisherID, allInputs)
+		persist.SaveInputs(publisher.persistFolder, publisher.id, allInputs)
 	}
 	for _, output := range outputList {
 		aliasAddress := publisher.getOutputAliasAddress(output.Address)
@@ -60,12 +60,12 @@ func (publisher *Publisher) PublishUpdates() {
 	}
 	if len(outputList) > 0 && publisher.persistFolder != "" {
 		allOutputs := publisher.Outputs.GetAllOutputs()
-		persist.SaveOutputs(publisher.persistFolder, publisher.publisherID, allOutputs)
+		persist.SaveOutputs(publisher.persistFolder, publisher.id, allOutputs)
 	}
 }
 
 // UpdateForecast publishes the output forecast list of values"
-func (publisher *Publisher) UpdateForecast(node *nodes.Node, outputType string, outputInstance string, forecast messaging.OutputHistoryList) {
+func (publisher *Publisher) UpdateForecast(node *nodes.Node, outputType string, outputInstance string, forecast iotc.OutputHistoryList) {
 	addr := nodes.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, outputInstance)
 
 	publisher.updateMutex.Lock()
@@ -99,7 +99,7 @@ func (publisher *Publisher) getOutputAliasAddress(address string) string {
 // TODO: decide when to invoke this
 func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.MessageTypeEvent
+	aliasSegments[3] = iotc.MessageTypeEvent
 	addr := strings.Join(aliasSegments[:4], "/")
 	publisher.Logger.Infof("publish node event: %s", addr)
 
@@ -111,10 +111,10 @@ func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) 
 		attrID := output.OutputType + "/" + output.Instance
 		event[attrID] = latest.Value
 	}
-	eventMessage := &messaging.OutputEventMessage{
+	eventMessage := &iotc.OutputEventMessage{
 		Address:   addr,
 		Event:     event,
-		Sender:    publisher.PublisherNode.Address,
+		Sender:    publisher.publisherAddress,
 		Timestamp: timeStampStr,
 	}
 	publisher.publishMessage(addr, true, eventMessage)
@@ -124,7 +124,7 @@ func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) 
 // not thread-safe, using within a locked section
 func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.MessageTypeLatest
+	aliasSegments[3] = iotc.MessageTypeLatest
 	addr := strings.Join(aliasSegments, "/")
 
 	// zone/publisher/node/$latest/iotype/instance
@@ -134,9 +134,9 @@ func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Out
 		return
 	}
 	publisher.Logger.Infof("publish output latest: %s", addr)
-	latestMessage := &messaging.OutputLatestMessage{
+	latestMessage := &iotc.OutputLatestMessage{
 		Address:   addr,
-		Sender:    publisher.PublisherNode.Address,
+		Sender:    publisher.publisherAddress,
 		Timestamp: latest.Timestamp,
 		// Timestamp: latest.TimeStamp,
 		Unit:  output.Unit,
@@ -149,14 +149,14 @@ func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Out
 // not thread-safe, using within a locked section
 func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.MessageTypeForecast
+	aliasSegments[3] = iotc.MessageTypeForecast
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
-	forecastMessage := &messaging.OutputForecastMessage{
+	forecastMessage := &iotc.OutputForecastMessage{
 		Address:   addr,
 		Duration:  0, // tbd
-		Sender:    publisher.PublisherNode.Address,
+		Sender:    publisher.publisherAddress,
 		Timestamp: timeStampStr,
 		Unit:      output.Unit,
 		Forecast:  publisher.outputForecast[output.Address],
@@ -168,14 +168,14 @@ func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.O
 // not thread-safe, using within a locked section
 func (publisher *Publisher) publishHistory(aliasAddress string, output *nodes.Output) {
 	aliasSegments := strings.Split(aliasAddress, "/")
-	aliasSegments[3] = messaging.MessageTypeHistory
+	aliasSegments[3] = iotc.MessageTypeHistory
 	addr := strings.Join(aliasSegments, "/")
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 
-	historyMessage := &messaging.OutputHistoryMessage{
+	historyMessage := &iotc.OutputHistoryMessage{
 		Address:   addr,
 		Duration:  0, // tbd
-		Sender:    publisher.PublisherNode.Address,
+		Sender:    publisher.publisherAddress,
 		Timestamp: timeStampStr,
 		Unit:      output.Unit,
 		History:   publisher.OutputValues.GetHistory(output.Address),
@@ -195,7 +195,7 @@ func (publisher *Publisher) publishMessage(address string, retained bool, object
 	}
 	signature := messenger.CreateEcdsaSignature(buffer, publisher.signPrivateKey)
 
-	publication := &messaging.Publication{
+	publication := &iotc.Publication{
 		Message:   buffer,
 		Signature: signature,
 	}
@@ -214,7 +214,7 @@ func (publisher *Publisher) publishValueCommand(aliasAddress string, output *nod
 		publisher.Logger.Warningf("publishValue, no latest value. This is unexpected")
 		return
 	}
-	aliasSegments[3] = messaging.MessageTypeValue
+	aliasSegments[3] = iotc.MessageTypeValue
 	addr := strings.Join(aliasSegments, "/")
 	s := latest.Value
 	if len(s) > 30 {

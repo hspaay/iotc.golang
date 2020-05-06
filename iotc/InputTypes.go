@@ -1,5 +1,5 @@
-// Package messaging with input message type definitions and constants
-package messaging
+// Package iotc with IoTConnect input message type definitions and constants
+package iotc
 
 // DefaultInputInstance is the input instance identifier when only a single instance exists
 const DefaultInputInstance = "0"

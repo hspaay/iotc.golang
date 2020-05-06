@@ -13,8 +13,7 @@ import (
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/hspaay/iotc.golang/messaging"
-	"github.com/sirupsen/logrus"
+	"github.com/hspaay/iotc.golang/iotc"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,7 +38,7 @@ type MqttMessenger struct {
 // TopicSubscription holds subscriptions to restore after disconnect
 type TopicSubscription struct {
 	address string
-	handler func(address string, publication *messaging.Publication)
+	handler func(address string, publication *iotc.Publication)
 	token   pahomqtt.Token // for debugging
 	client  *MqttMessenger //
 	log     *log.Logger
@@ -171,11 +170,11 @@ func (messenger *MqttMessenger) Disconnect() {
 }
 
 // GetZone returns the zone in which this messenger operates
-// This is provided via the messenger config file or defaults to messaging.LocalZoneID
+// This is provided via the messenger config file or defaults to iotc.LocalZoneID
 func (messenger *MqttMessenger) GetZone() string {
 	zone := messenger.config.Zone
 	if zone == "" {
-		return messaging.LocalZoneID
+		return iotc.LocalZoneID
 	}
 	return zone
 }
@@ -184,7 +183,7 @@ func (messenger *MqttMessenger) GetZone() string {
 // address to publish on.
 // retained to have the broker retain the address value
 // payload is converted to string if it isn't a byte array, as Paho doesn't handle int and bool
-func (messenger *MqttMessenger) Publish(address string, retained bool, publication *messaging.Publication) error {
+func (messenger *MqttMessenger) Publish(address string, retained bool, publication *iotc.Publication) error {
 	var err error
 
 	//fullTopic := fmt.Sprintf("%s/%s/%s", messenger.config.Base, messenger.deviceId, addressLevels)
@@ -236,7 +235,7 @@ func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt
 	// NOTE: Scope in this callback is not always retained. Pipe notifications through a channel and handle in goroutine
 	address := msg.Topic()
 	rawPayload := msg.Payload()
-	var publication messaging.Publication
+	var publication iotc.Publication
 	err := json.Unmarshal(rawPayload, &publication)
 	if err != nil {
 		subscription.log.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
@@ -283,7 +282,7 @@ func (messenger *MqttMessenger) resubscribe() {
 // qos: Quality of service for subscription: 0, 1, 2
 // handler: callback handler.
 func (messenger *MqttMessenger) Subscribe(
-	address string, onMessage func(address string, publication *messaging.Publication)) {
+	address string, onMessage func(address string, publication *iotc.Publication)) {
 	subscription := TopicSubscription{
 		address: address,
 		handler: onMessage,
@@ -306,7 +305,7 @@ func (messenger *MqttMessenger) Subscribe(
 // NewMqttMessenger creates a new MQTT messenger instance
 func NewMqttMessenger(config *MessengerConfig, logger *log.Logger) *MqttMessenger {
 	if logger == nil {
-		logger = logrus.New()
+		logger = log.New()
 	}
 	messenger := &MqttMessenger{
 		pahoClient: nil,

@@ -6,15 +6,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/messaging"
-	"github.com/sirupsen/logrus"
+	"github.com/hspaay/iotc.golang/iotc"
 	log "github.com/sirupsen/logrus"
 )
 
 // DummyMessenger that implements IMessenger
 type DummyMessenger struct {
 	Logger        *log.Logger
-	Publications  map[string]*messaging.Publication
+	Publications  map[string]*iotc.Publication
 	config        *MessengerConfig // for zone configuration
 	subscriptions []Subscription
 	publishMutex  *sync.Mutex // mutex for concurrent publishing of messages
@@ -23,7 +22,7 @@ type DummyMessenger struct {
 // Subscription to messages
 type Subscription struct {
 	address string
-	handler func(address string, publication *messaging.Publication)
+	handler func(address string, publication *iotc.Publication)
 }
 
 // Connect the messenger
@@ -36,7 +35,7 @@ func (messenger *DummyMessenger) Disconnect() {
 }
 
 // FindLastPublication with the given address
-func (messenger *DummyMessenger) FindLastPublication(addr string) *messaging.Publication {
+func (messenger *DummyMessenger) FindLastPublication(addr string) *iotc.Publication {
 	messenger.publishMutex.Lock()
 	pub := messenger.Publications[addr]
 	messenger.publishMutex.Unlock()
@@ -44,11 +43,11 @@ func (messenger *DummyMessenger) FindLastPublication(addr string) *messaging.Pub
 }
 
 // GetZone returns the zone in which this messenger operates
-// This is provided via the messenger config file or defaults to messaging.LocalZoneID
+// This is provided via the messenger config file or defaults to iotc.LocalZoneID
 func (messenger *DummyMessenger) GetZone() string {
 	zone := messenger.config.Zone
 	if zone == "" {
-		return messaging.LocalZoneID
+		return iotc.LocalZoneID
 	}
 	return zone
 }
@@ -56,8 +55,8 @@ func (messenger *DummyMessenger) GetZone() string {
 // OnReceive function to simulate a received message
 func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 	messageParts := strings.Split(address, "/")
-	var payload messaging.Publication
-	var publication messaging.Publication
+	var payload iotc.Publication
+	var publication iotc.Publication
 	var rawStr = string(rawPayload)
 	_ = rawStr
 	err := json.Unmarshal(rawPayload, &payload)
@@ -102,7 +101,7 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 }
 
 // Publish a JSON encoded message
-func (messenger *DummyMessenger) Publish(address string, retained bool, publication *messaging.Publication) error {
+func (messenger *DummyMessenger) Publish(address string, retained bool, publication *iotc.Publication) error {
 	messenger.publishMutex.Lock()
 	messenger.Publications[address] = publication
 	messenger.publishMutex.Unlock()
@@ -119,7 +118,7 @@ func (messenger *DummyMessenger) Publish(address string, retained bool, publicat
 
 // PublishRaw message
 func (messenger *DummyMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
-	payload := messaging.Publication{
+	payload := iotc.Publication{
 		Message: message,
 	}
 	messenger.publishMutex.Lock()
@@ -130,7 +129,7 @@ func (messenger *DummyMessenger) PublishRaw(address string, retained bool, messa
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
-	address string, onMessage func(address string, publication *messaging.Publication)) {
+	address string, onMessage func(address string, publication *iotc.Publication)) {
 
 	messenger.Logger.Infof("mqtt.Subscribe: address %sd", address)
 	subscription := Subscription{address: address, handler: onMessage}
@@ -141,14 +140,14 @@ func (messenger *DummyMessenger) Subscribe(
 
 // NewDummyMessenger provides a messenger for messages that go no.where...
 // logger to use for debug messages
-func NewDummyMessenger(config *MessengerConfig, logger *logrus.Logger) *DummyMessenger {
+func NewDummyMessenger(config *MessengerConfig, logger *log.Logger) *DummyMessenger {
 	if logger == nil {
-		logger = logrus.New()
+		logger = log.New()
 	}
 	var messenger = &DummyMessenger{
 		config:        config,
 		Logger:        logger,
-		Publications:  make(map[string]*messaging.Publication, 0),
+		Publications:  make(map[string]*iotc.Publication, 0),
 		subscriptions: make([]Subscription, 0),
 		publishMutex:  &sync.Mutex{},
 	}

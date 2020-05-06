@@ -1,5 +1,5 @@
-// Package messaging with output message type definitions and constants
-package messaging
+// Package iotc with IoTConnect output message type definitions and constants
+package iotc
 
 // DefaultOutputInstance is the output instance identifier when only a single instance exists
 const DefaultOutputInstance = "0"
@@ -141,8 +141,8 @@ type OutputDiscoveryMessage struct {
 	Description string   `json:"description,omitempty"` // optional description
 	EnumValues  []string `json:"enum,omitempty"`        // enum valid values
 	Instance    string   `json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
+	NodeID      string   `json:"nodeID"`                // The node ID this output is part of
 	OutputType  string   `json:"type,omitempty"`        // type of input or output as per IOTypeXyz
-	NodeID      string   `json:"nodeID"`                // The node ID
 	Unit        Unit     `json:"unit,omitempty"`        // unit of output value
 }
 

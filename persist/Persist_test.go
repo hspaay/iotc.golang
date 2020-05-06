@@ -4,7 +4,7 @@ package persist
 import (
 	"testing"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/nodes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +51,7 @@ func TestSave(t *testing.T) {
 
 	nodeList := make([]*nodes.Node, 0)
 	nodeList2 := make([]*nodes.Node, 0)
-	nodeList = append(nodeList, nodes.NewNode("zone1", "publisher1", "node1", messaging.NodeTypeAdapter))
+	nodeList = append(nodeList, nodes.NewNode("zone1", "publisher1", "node1", iotc.NodeTypeAdapter))
 
 	err := SaveNodes(ConfigFolder, PublisherID, nodeList)
 	assert.NoError(t, err, "Failed saving config")

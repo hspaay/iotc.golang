@@ -4,7 +4,7 @@ package publisher
 import (
 	"encoding/json"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // handle an incoming a configuration command for one of our nodes. This:
@@ -13,7 +13,7 @@ import (
 // - pass the configuration update to the adapter's callback set in Start()
 // - save node configuration if persistence is set
 // TODO: support for authorization per node
-func (publisher *Publisher) handleNodeConfigCommand(address string, publication *messaging.Publication) {
+func (publisher *Publisher) handleNodeConfigCommand(address string, publication *iotc.Publication) {
 	publisher.Logger.Infof("handleNodeConfig on address %s", address)
 	// TODO: authorization check
 	node := publisher.Nodes.GetNodeByAddress(address)
@@ -21,7 +21,7 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, publication 
 		publisher.Logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
 		return
 	}
-	var configureMessage messaging.NodeConfigureMessage
+	var configureMessage iotc.NodeConfigureMessage
 	err := json.Unmarshal([]byte(publication.Message), &configureMessage)
 	if err != nil {
 		publisher.Logger.Infof("Unable to unmarshal ConfigureMessage in %s", address)

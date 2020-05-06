@@ -1,5 +1,5 @@
-// Package messaging with node messaging type definitions
-package messaging
+// Package iotc with IoTConnect node message type definitions
+package iotc
 
 // PublisherNodeID to use when node is a publisher
 const PublisherNodeID = "$publisher" // reserved node ID for publishers

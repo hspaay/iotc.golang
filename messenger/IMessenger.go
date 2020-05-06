@@ -4,7 +4,7 @@ package messenger
 import (
 	"encoding/json"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // MessengerConfig with configuration of a messenger
@@ -44,7 +44,7 @@ type IMessenger interface {
 	// Sign and Publish a message
 	// address to subscribe to as per IotConnect standard
 	// publication object to transmit, this is an object that will be converted into a JSON
-	Publish(address string, retained bool, publication *messaging.Publication) error
+	Publish(address string, retained bool, publication *iotc.Publication) error
 
 	// Publis raw data
 	// address to subscribe top as per IotConnect standard
@@ -54,5 +54,5 @@ type IMessenger interface {
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent
 	// onMessage callback is invoked when a message on this address is received
-	Subscribe(address string, onMessage func(address string, publication *messaging.Publication))
+	Subscribe(address string, onMessage func(address string, publication *iotc.Publication))
 }

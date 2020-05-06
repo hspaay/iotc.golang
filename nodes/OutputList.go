@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // OutputList with output management
@@ -36,7 +36,7 @@ func (outputs *OutputList) GetOutput(
 	// segments[3] = standard.CommandOutputDiscovery
 	// outputAddr := strings.Join(segments, "/")
 	outputAddr := fmt.Sprintf("%s/%s/%s/%s/%s/%s", node.Zone, node.PublisherID, node.ID,
-		messaging.MessageTypeOutputDiscovery, outputType, instance)
+		iotc.MessageTypeOutputDiscovery, outputType, instance)
 
 	outputs.updateMutex.Lock()
 	var output = outputs.outputMap[outputAddr]

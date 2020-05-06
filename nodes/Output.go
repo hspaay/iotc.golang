@@ -4,17 +4,17 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // Output contains logic for using the data from the input discovery message
 type Output struct {
-	messaging.OutputDiscoveryMessage
+	iotc.OutputDiscoveryMessage
 }
 
 // MakeOutputDiscoveryAddress for publishing or subscribing
 func MakeOutputDiscoveryAddress(zone string, publisherID string, nodeID string, ioType string, instance string) string {
-	address := fmt.Sprintf("%s/%s/%s/"+messaging.MessageTypeOutputDiscovery+"/%s/%s",
+	address := fmt.Sprintf("%s/%s/%s/"+iotc.MessageTypeOutputDiscovery+"/%s/%s",
 		zone, publisherID, nodeID, ioType, instance)
 	return address
 }
@@ -23,10 +23,12 @@ func MakeOutputDiscoveryAddress(zone string, publisherID string, nodeID string, 
 func NewOutput(node *Node, outputType string, instance string) *Output {
 	address := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
 	output := &Output{
-		messaging.OutputDiscoveryMessage{
+		iotc.OutputDiscoveryMessage{
 			Address:    address,
 			Instance:   instance,
 			OutputType: outputType,
+			NodeID:     node.ID,
+			// PublisherID: node.PublisherID,
 			// History:  make([]*HistoryValue, 1),
 		},
 	}

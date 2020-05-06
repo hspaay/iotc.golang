@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // InputList with input management
@@ -36,7 +36,7 @@ func (inputs *InputList) GetInput(
 	// segments[3] = standard.CommandInputDiscovery
 	// inputAddr := strings.Join(segments, "/")
 	inputAddr := fmt.Sprintf("%s/%s/%s/%s/%s/%s", node.Zone, node.PublisherID, node.ID,
-		messaging.MessageTypeInputDiscovery, outputType, instance)
+		iotc.MessageTypeInputDiscovery, outputType, instance)
 
 	inputs.updateMutex.Lock()
 	var input = inputs.inputMap[inputAddr]

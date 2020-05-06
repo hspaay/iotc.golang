@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/messenger"
 	"github.com/hspaay/iotc.golang/nodes"
 	log "github.com/sirupsen/logrus"
@@ -42,7 +42,7 @@ func (subscriber *Subscriber) Start() {
 		subscriber.messenger.Connect("", "")
 
 		// subscribe to receive any publisher node
-		pubAddr := fmt.Sprintf("+/+/%s/%s", messaging.PublisherNodeID, messaging.MessageTypeNodeDiscovery)
+		pubAddr := fmt.Sprintf("+/+/%s/%s", iotc.PublisherNodeID, iotc.MessageTypeNodeDiscovery)
 		subscriber.messenger.Subscribe(pubAddr, subscriber.handlePublisherDiscovery)
 
 		subscriber.Logger.Warningf("Subscriber started")
@@ -64,7 +64,7 @@ func (subscriber *Subscriber) Stop() {
 // Used to verify signatures of incoming configuration and input messages
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
 // publication contains a message with the publisher node info
-func (subscriber *Subscriber) handlePublisherDiscovery(address string, publication *messaging.Publication) {
+func (subscriber *Subscriber) handlePublisherDiscovery(address string, publication *iotc.Publication) {
 	var pubNode nodes.Node
 	err := json.Unmarshal([]byte(publication.Message), &pubNode)
 	if err != nil {

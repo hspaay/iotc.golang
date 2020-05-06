@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/messaging"
+	"github.com/hspaay/iotc.golang/iotc"
 )
 
 // NodeList for concurrency safe node management using Copy on Write.
@@ -47,7 +47,7 @@ func (nodes *NodeList) GetNodeByAddress(address string) *Node {
 // GetNodeByID returns a node by its zone, publisher and node ID
 // Returns nil if address has no known node
 func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID string) *Node {
-	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", zone, publisherID, nodeID, messaging.MessageTypeNodeDiscovery)
+	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", zone, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
@@ -80,18 +80,18 @@ func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*Node {
 func (nodes *NodeList) SetErrorStatus(node *Node, errorMsg string) (changed bool) {
 	if node != nil {
 		// newNode.SetErrorState(errorMsg)
-		statusUpdate := map[messaging.NodeStatus]string{
-			messaging.NodeStatusLastError: errorMsg,
+		statusUpdate := map[iotc.NodeStatus]string{
+			iotc.NodeStatusLastError: errorMsg,
 		}
 		changed = nodes.SetNodeStatus(node, statusUpdate)
 
-		if node.RunState != messaging.NodeRunStateError {
+		if node.RunState != iotc.NodeRunStateError {
 			nodes.updateMutex.Lock()
 			defer nodes.updateMutex.Unlock()
 			newNode := node.Clone()
 
 			changed = true
-			newNode.RunState = messaging.NodeRunStateError
+			newNode.RunState = iotc.NodeRunStateError
 			nodes.updateNode(newNode)
 		}
 	}
@@ -103,7 +103,7 @@ func (nodes *NodeList) SetErrorStatus(node *Node, errorMsg string) (changed bool
 // Use when additional node attributes has been discovered.
 // - address of the node to update
 // - param is the map with key-value pairs of attribute values to update
-func (nodes *NodeList) SetNodeAttr(address string, attrParams map[messaging.NodeAttr]string) {
+func (nodes *NodeList) SetNodeAttr(address string, attrParams map[iotc.NodeAttr]string) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 	node := nodes.getNode(address)
@@ -120,7 +120,7 @@ func (nodes *NodeList) SetNodeAttr(address string, attrParams map[messaging.Node
 // - node is the node to update
 // - config is the config struct with description and value
 // Returns a new node instance
-func (nodes *NodeList) SetNodeConfig(address string, configAttr *messaging.ConfigAttr) {
+func (nodes *NodeList) SetNodeConfig(address string, configAttr *iotc.ConfigAttr) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 	node := nodes.getNode(address)
@@ -133,7 +133,7 @@ func (nodes *NodeList) SetNodeConfig(address string, configAttr *messaging.Confi
 }
 
 // SetNodeRunState updates the node's runstate status
-func (nodes *NodeList) SetNodeRunState(node *Node, runState messaging.NodeRunState) {
+func (nodes *NodeList) SetNodeRunState(node *Node, runState iotc.NodeRunState) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 	// node := nodes.getNode(address)
@@ -153,7 +153,7 @@ func (nodes *NodeList) SetNodeRunState(node *Node, runState messaging.NodeRunSta
 // // published. The old node instance is discarded.
 // // - address of the node to update
 // // - param is the map with key-value pairs of node status
-// func (nodes *NodeList) SetNodeStatus(address string, attrParams map[messaging.NodeStatus]string) {
+// func (nodes *NodeList) SetNodeStatus(address string, attrParams map[iotc.NodeStatus]string) {
 // 	nodes.updateMutex.Lock()
 // 	defer nodes.updateMutex.Unlock()
 // 	node := nodes.getNode(address)
@@ -179,7 +179,7 @@ func (nodes *NodeList) SetNodeRunState(node *Node, runState messaging.NodeRunSta
 // published. The old node instance is discarded.
 // - address of the node to update
 // - statusAttr is the map with key-value pairs of updated node statusses
-func (nodes *NodeList) SetNodeStatus(node *Node, statusAttr map[messaging.NodeStatus]string) (changed bool) {
+func (nodes *NodeList) SetNodeStatus(node *Node, statusAttr map[iotc.NodeStatus]string) (changed bool) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 	// node := nodes.getNode(address)
@@ -206,7 +206,7 @@ func (nodes *NodeList) SetNodeStatus(node *Node, statusAttr map[messaging.NodeSt
 // published and the old node instance is discarded.
 // - address is the node discovery address
 // - param is the map with key-value pairs of configuration values to update
-func (nodes *NodeList) SetNodeConfigValues(address string, param map[messaging.NodeAttr]string) {
+func (nodes *NodeList) SetNodeConfigValues(address string, param map[iotc.NodeAttr]string) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 
@@ -240,13 +240,13 @@ func (nodes *NodeList) UpdateNodes(updates []*Node) {
 	for _, node := range updates {
 		// fill in missing fields
 		if node.Attr == nil {
-			node.Attr = map[messaging.NodeAttr]string{}
+			node.Attr = map[iotc.NodeAttr]string{}
 		}
 		if node.Config == nil {
-			node.Config = map[messaging.NodeAttr]messaging.ConfigAttr{}
+			node.Config = map[iotc.NodeAttr]iotc.ConfigAttr{}
 		}
 		if node.Status == nil {
-			node.Status = make(map[messaging.NodeStatus]string)
+			node.Status = make(map[iotc.NodeStatus]string)
 		}
 		nodes.updateNode(node)
 	}
@@ -261,7 +261,7 @@ func (nodes *NodeList) getNode(address string) *Node {
 	if len(segments) < 3 {
 		return nil
 	}
-	segments[3] = messaging.MessageTypeNodeDiscovery
+	segments[3] = iotc.MessageTypeNodeDiscovery
 	nodeAddr := strings.Join(segments[:4], "/")
 	var node = nodes.nodeMap[nodeAddr]
 	return node
