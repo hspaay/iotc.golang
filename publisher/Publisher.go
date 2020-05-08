@@ -43,6 +43,7 @@ type NodeInputHandler func(input *iotc.InputDiscoveryMessage, message *iotc.SetI
 
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
+	autosaveFolder      string                     // folder to save nodes after update
 	discoverCountdown   int                        // countdown each heartbeat
 	discoveryInterval   int                        // discovery polling interval
 	discoveryHandler    func(publisher *Publisher) // function that performs discovery
@@ -52,7 +53,6 @@ type Publisher struct {
 	onNodeConfigHandler NodeConfigHandler          // handle before applying configuration
 	onNodeInputHandler  NodeInputHandler           // handle to update device/service input
 
-	persistFolder    string                                // optional folder to persist nodes
 	pollHandler      func(publisher *Publisher)            // function that performs value polling
 	pollCountdown    int                                   // countdown each heartbeat
 	pollInterval     int                                   // value polling interval in seconds
@@ -96,6 +96,31 @@ func GetConfigValue(configMap map[string]iotc.ConfigAttr, attrName string) strin
 func (publisher *Publisher) GetNodeByID(id string) *iotc.NodeDiscoveryMessage {
 	node := publisher.Nodes.GetNodeByID(publisher.Zone, publisher.id, id)
 	return node
+}
+
+// PersistNodes loads this publisher's nodes from configuration from file.
+// If autosave is set then save this publisher's nodes and configs when updated.
+//
+// - folder of the configuration files.
+//     Use "" for default, which is persist.DefaultConfigFolder: <userhome>/.config/iotconnect
+// - autosave indicates to save updates to node configuration
+// returns error if folder doesn't exist
+func (publisher *Publisher) PersistNodes(folder string, autosave bool) error {
+	var err error = nil
+	if folder == "" {
+		folder = persist.DefaultConfigFolder
+	}
+	if autosave {
+		publisher.autosaveFolder = folder
+	}
+	if folder != "" {
+		nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
+		err = persist.LoadNodes(folder, publisher.id, &nodeList)
+		if err == nil {
+			publisher.Nodes.UpdateNodes(nodeList)
+		}
+	}
+	return err
 }
 
 // PublisherNode return this publisher's node
@@ -209,11 +234,6 @@ func (publisher *Publisher) Start() {
 		publisher.updateMutex.Lock()
 		publisher.isRunning = true
 		publisher.updateMutex.Unlock()
-		if publisher.persistFolder != "" {
-			nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
-			persist.LoadNodes(publisher.persistFolder, publisher.id, &nodeList)
-			publisher.Nodes.UpdateNodes(nodeList)
-		}
 
 		go publisher.heartbeatLoop()
 		// wait for the heartbeat to start
@@ -340,19 +360,15 @@ func (publisher *Publisher) VerifyMessageSignature(
 // zone the publisher uses to create addresses
 // publisherID of this publisher, unique within the zone
 // messenger for publishing onto the message bus
-// configFolder location of persistent nodes file. "" when not to persist.
-//      See persist.DefaultConfigFolder for default
 func NewPublisher(
 	zone string,
 	publisherID string,
 	sender messenger.IMessenger,
-	persistFolder string,
 ) *Publisher {
 	var pubNode = nodes.NewNode(zone, publisherID, iotc.PublisherNodeID, iotc.NodeTypeAdapter)
 
 	// IotConnect core running state of the publisher
 	var publisher = &Publisher{
-		persistFolder:     persistFolder,
 		discoveryInterval: DefaultDiscoveryInterval,
 		exitChannel:       make(chan bool),
 		id:                publisherID,

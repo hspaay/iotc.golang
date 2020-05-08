@@ -9,15 +9,15 @@ import (
 
 // MessengerConfig with configuration of a messenger
 type MessengerConfig struct {
-	ClientID string `yaml:"clientid,omitempty"` // optional connect ID, must be unique. Default is generated.
-	Login    string `yaml:"login"`              // messenger login name
-	Port     uint16 `yaml:"port,omitempty"`     // optional port, default is 8883 for TLS
-	Password string `yaml:"credentials"`        // messenger login credentials
-	PubQos   byte   `yaml:"pubqos,omitempty"`   // publishing QOS 0-2. Default=0
-	Server   string `yaml:"server"`             // Message bus server/broker hostname or ip address, required
-	SubQos   byte   `yaml:"subqos,omitempty"`   // Subscription QOS 0-2. Default=0
-	Type     string `yaml:"type,omitempty"`     // Messenger client type: "DummyMessenger" (default) or "MQTTMessenger"
-	Zone     string `yaml:"zone"`               // Zone in which this messenger publishes. Default is "local"
+	ClientID  string `yaml:"clientid,omitempty"`  // optional connect ID, must be unique. Default is generated.
+	Login     string `yaml:"login"`               // messenger login name
+	Port      uint16 `yaml:"port,omitempty"`      // optional port, default is 8883 for TLS
+	Password  string `yaml:"credentials"`         // messenger login credentials
+	PubQos    byte   `yaml:"pubqos,omitempty"`    // publishing QOS 0-2. Default=0
+	Server    string `yaml:"server"`              // Message bus server/broker hostname or ip address, required
+	SubQos    byte   `yaml:"subqos,omitempty"`    // Subscription QOS 0-2. Default=0
+	Messenger string `yaml:"messenger,omitempty"` // Messenger client type: "DummyMessenger" (default) or "MQTTMessenger"
+	Zone      string `yaml:"zone"`                // Zone in which this messenger publishes. Default is "local"
 }
 
 // IMessenger interface for messenger implementations

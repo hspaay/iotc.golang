@@ -39,9 +39,9 @@ func (publisher *Publisher) PublishUpdates() {
 		publisher.Logger.Infof("publish node discovery: %s", node.Address)
 		publisher.publishMessage(node.Address, true, node)
 	}
-	if len(nodeList) > 0 && publisher.persistFolder != "" {
+	if len(nodeList) > 0 && publisher.autosaveFolder != "" {
 		allNodes := publisher.Nodes.GetAllNodes()
-		persist.SaveNodes(publisher.persistFolder, publisher.id, allNodes)
+		persist.SaveNodes(publisher.autosaveFolder, publisher.id, allNodes)
 	}
 	// publish updated input or output discovery
 	for _, input := range inputList {
@@ -49,18 +49,18 @@ func (publisher *Publisher) PublishUpdates() {
 		publisher.Logger.Infof("publish input discovery: %s", aliasAddress)
 		publisher.publishMessage(aliasAddress, true, input)
 	}
-	if len(inputList) > 0 && publisher.persistFolder != "" {
+	if len(inputList) > 0 && publisher.autosaveFolder != "" {
 		allInputs := publisher.Inputs.GetAllInputs()
-		persist.SaveInputs(publisher.persistFolder, publisher.id, allInputs)
+		persist.SaveInputs(publisher.autosaveFolder, publisher.id, allInputs)
 	}
 	for _, output := range outputList {
 		aliasAddress := publisher.getOutputAliasAddress(output.Address)
 		publisher.Logger.Infof("publish output discovery: %s", aliasAddress)
 		publisher.publishMessage(aliasAddress, true, output)
 	}
-	if len(outputList) > 0 && publisher.persistFolder != "" {
+	if len(outputList) > 0 && publisher.autosaveFolder != "" {
 		allOutputs := publisher.Outputs.GetAllOutputs()
-		persist.SaveOutputs(publisher.persistFolder, publisher.id, allOutputs)
+		persist.SaveOutputs(publisher.autosaveFolder, publisher.id, allOutputs)
 	}
 }
 

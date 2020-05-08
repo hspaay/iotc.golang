@@ -18,7 +18,7 @@ func NewMessenger(messengerConfig *MessengerConfig, logger *logrus.Logger) IMess
 		logger = logrus.New()
 	}
 
-	if messengerConfig.Type == "MQTTMessenger" {
+	if messengerConfig.Messenger == "MQTTMessenger" {
 		m = NewMqttMessenger(messengerConfig, logger)
 	} else {
 		m = NewDummyMessenger(messengerConfig, logger)
