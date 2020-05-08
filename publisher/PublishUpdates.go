@@ -14,7 +14,7 @@ import (
 
 // GetForecast returns the output's forecast list
 // Returns nil if the type or instance is unknown or no forecast is available
-func (publisher *Publisher) GetForecast(output *nodes.Output) iotc.OutputHistoryList {
+func (publisher *Publisher) GetForecast(output *iotc.OutputDiscoveryMessage) iotc.OutputHistoryList {
 	publisher.updateMutex.Lock()
 	var forecastList = publisher.outputForecast[output.Address]
 	publisher.updateMutex.Unlock()
@@ -65,7 +65,7 @@ func (publisher *Publisher) PublishUpdates() {
 }
 
 // UpdateForecast publishes the output forecast list of values"
-func (publisher *Publisher) UpdateForecast(node *nodes.Node, outputType string, outputInstance string, forecast iotc.OutputHistoryList) {
+func (publisher *Publisher) UpdateForecast(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, forecast iotc.OutputHistoryList) {
 	addr := nodes.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, outputInstance)
 
 	publisher.updateMutex.Lock()
@@ -84,7 +84,8 @@ func (publisher *Publisher) getOutputAliasAddress(address string) string {
 	if node == nil {
 		return address
 	}
-	alias, hasAlias := node.GetAlias()
+	alias, hasAlias := nodes.GetNodeConfigValue(node, iotc.NodeAttrAlias)
+	// alias, hasAlias := nodes.GetNodeAlias(node)
 	if !hasAlias {
 		return address
 	}
@@ -97,7 +98,7 @@ func (publisher *Publisher) getOutputAliasAddress(address string) string {
 // publish all node output values in the $event command
 // zone/publisher/node/$event
 // TODO: decide when to invoke this
-func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) {
+func (publisher *Publisher) publishEvent(aliasAddress string, node *iotc.NodeDiscoveryMessage) {
 	aliasSegments := strings.Split(aliasAddress, "/")
 	aliasSegments[3] = iotc.MessageTypeEvent
 	addr := strings.Join(aliasSegments[:4], "/")
@@ -122,7 +123,7 @@ func (publisher *Publisher) publishEvent(aliasAddress string, node *nodes.Node) 
 
 // publish the $latest output value
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishLatest(aliasAddress string, output *iotc.OutputDiscoveryMessage) {
 	aliasSegments := strings.Split(aliasAddress, "/")
 	aliasSegments[3] = iotc.MessageTypeLatest
 	addr := strings.Join(aliasSegments, "/")
@@ -147,7 +148,7 @@ func (publisher *Publisher) publishLatest(aliasAddress string, output *nodes.Out
 
 // publish the $forecast output values retained=true
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishForecast(aliasAddress string, output *iotc.OutputDiscoveryMessage) {
 	aliasSegments := strings.Split(aliasAddress, "/")
 	aliasSegments[3] = iotc.MessageTypeForecast
 	addr := strings.Join(aliasSegments, "/")
@@ -166,7 +167,7 @@ func (publisher *Publisher) publishForecast(aliasAddress string, output *nodes.O
 
 // publish the $history output values retained=true
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishHistory(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishHistory(aliasAddress string, output *iotc.OutputDiscoveryMessage) {
 	aliasSegments := strings.Split(aliasAddress, "/")
 	aliasSegments[3] = iotc.MessageTypeHistory
 	addr := strings.Join(aliasSegments, "/")
@@ -204,7 +205,7 @@ func (publisher *Publisher) publishMessage(address string, retained bool, object
 
 // publish the raw output $value (retained)
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishValueCommand(aliasAddress string, output *nodes.Output) {
+func (publisher *Publisher) publishValueCommand(aliasAddress string, output *iotc.OutputDiscoveryMessage) {
 	aliasSegments := strings.Split(aliasAddress, "/")
 
 	// publish raw value with the $value command

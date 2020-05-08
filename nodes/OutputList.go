@@ -10,17 +10,17 @@ import (
 
 // OutputList with output management
 type OutputList struct {
-	outputMap      map[string]*Output
-	updateMutex    *sync.Mutex        // mutex for async updating of outputs
-	updatedOutputs map[string]*Output // address of outputs that have been rediscovered/updated since last publication
+	outputMap      map[string]*iotc.OutputDiscoveryMessage
+	updateMutex    *sync.Mutex                             // mutex for async updating of outputs
+	updatedOutputs map[string]*iotc.OutputDiscoveryMessage // address of outputs that have been rediscovered/updated since last publication
 }
 
 // GetAllOutputs returns the list of outputs
-func (outputs *OutputList) GetAllOutputs() []*Output {
+func (outputs *OutputList) GetAllOutputs() []*iotc.OutputDiscoveryMessage {
 	outputs.updateMutex.Lock()
 	defer outputs.updateMutex.Unlock()
 
-	var outputList = make([]*Output, 0)
+	var outputList = make([]*iotc.OutputDiscoveryMessage, 0)
 	for _, output := range outputs.outputMap {
 		outputList = append(outputList, output)
 	}
@@ -31,7 +31,7 @@ func (outputs *OutputList) GetAllOutputs() []*Output {
 // This method is concurrent safe
 // Returns nil if address has no known output
 func (outputs *OutputList) GetOutput(
-	node *Node, outputType string, instance string) *Output {
+	node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputDiscoveryMessage {
 	// segments := strings.Split(address, "/")
 	// segments[3] = standard.CommandOutputDiscovery
 	// outputAddr := strings.Join(segments, "/")
@@ -46,8 +46,8 @@ func (outputs *OutputList) GetOutput(
 
 // GetNodeOutputs returns a list of all outputs for the given node
 // This method is concurrent safe
-func (outputs *OutputList) GetNodeOutputs(node *Node) []*Output {
-	nodeOutputs := []*Output{}
+func (outputs *OutputList) GetNodeOutputs(node *iotc.NodeDiscoveryMessage) []*iotc.OutputDiscoveryMessage {
+	nodeOutputs := []*iotc.OutputDiscoveryMessage{}
 	for _, output := range outputs.outputMap {
 		if output.NodeID == node.ID {
 			nodeOutputs = append(nodeOutputs, output)
@@ -60,7 +60,7 @@ func (outputs *OutputList) GetNodeOutputs(node *Node) []*Output {
 // outputAddr must contain the full output address, eg <zone>/<publisher>/<node>/"$output"/<type>/<instance>
 // Returns nil if address has no known output
 // This method is concurrent safe
-func (outputs *OutputList) GetOutputByAddress(outputAddr string) *Output {
+func (outputs *OutputList) GetOutputByAddress(outputAddr string) *iotc.OutputDiscoveryMessage {
 	outputs.updateMutex.Lock()
 	var output = outputs.outputMap[outputAddr]
 	outputs.updateMutex.Unlock()
@@ -69,8 +69,8 @@ func (outputs *OutputList) GetOutputByAddress(outputAddr string) *Output {
 
 // GetUpdatedOutputs returns the list of discovered outputs that have been updated
 // clear the update on return
-func (outputs *OutputList) GetUpdatedOutputs(clearUpdates bool) []*Output {
-	var updateList []*Output = make([]*Output, 0)
+func (outputs *OutputList) GetUpdatedOutputs(clearUpdates bool) []*iotc.OutputDiscoveryMessage {
+	var updateList []*iotc.OutputDiscoveryMessage = make([]*iotc.OutputDiscoveryMessage, 0)
 
 	outputs.updateMutex.Lock()
 	if outputs.updatedOutputs != nil {
@@ -87,31 +87,62 @@ func (outputs *OutputList) GetUpdatedOutputs(clearUpdates bool) []*Output {
 
 // UpdateOutput replaces the output using the node.Address
 // This method is concurrent safe
-func (outputs *OutputList) UpdateOutput(output *Output) {
+func (outputs *OutputList) UpdateOutput(output *iotc.OutputDiscoveryMessage) {
 	outputs.updateMutex.Lock()
 	outputs.outputMap[output.Address] = output
 	if outputs.updatedOutputs == nil {
-		outputs.updatedOutputs = make(map[string]*Output)
+		outputs.updatedOutputs = make(map[string]*iotc.OutputDiscoveryMessage)
 	}
 	outputs.updatedOutputs[output.Address] = output
 	outputs.updateMutex.Unlock()
 }
 
-// NewOutput creates a new output for the given node and adds it to the output list
-// If an output of the same type and instance exists, it will be replaced
+// NewOutput creates a new output for the given node
+// To add it to the list use 'UpdateOutput'
 // node is the node that contains the output
 // outputType is one of the predefined output types. See constants in the standard
 // instance is the output instance in case of multiple instances of the same type. Use
-func (outputs *OutputList) NewOutput(node *Node, outputType string, instance string) *Output {
-	output := NewOutput(node, outputType, instance)
-	outputs.UpdateOutput(output)
+func NewOutput(node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputDiscoveryMessage {
+	// output := NewOutput(node, outputType, instance)
+	address := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
+	output := &iotc.OutputDiscoveryMessage{
+		Address:    address,
+		Instance:   instance,
+		OutputType: outputType,
+		NodeID:     node.ID,
+		// PublisherID: node.PublisherID,
+		// History:  make([]*HistoryValue, 1),
+	}
 	return output
 }
+
+// MakeOutputDiscoveryAddress for publishing or subscribing
+func MakeOutputDiscoveryAddress(zone string, publisherID string, nodeID string, ioType string, instance string) string {
+	address := fmt.Sprintf("%s/%s/%s/"+iotc.MessageTypeOutputDiscovery+"/%s/%s",
+		zone, publisherID, nodeID, ioType, instance)
+	return address
+}
+
+// NewOutput instance
+// func NewOutput(node *Node, outputType string, instance string) *Output {
+// 	address := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
+// 	output := &Output{
+// 		iotc.OutputDiscoveryMessage{
+// 			Address:    address,
+// 			Instance:   instance,
+// 			OutputType: outputType,
+// 			NodeID:     node.ID,
+// 			// PublisherID: node.PublisherID,
+// 			// History:  make([]*HistoryValue, 1),
+// 		},
+// 	}
+// 	return output
+// }
 
 // NewOutputList creates a new instance for output management
 func NewOutputList() *OutputList {
 	outputs := OutputList{
-		outputMap:   make(map[string]*Output),
+		outputMap:   make(map[string]*iotc.OutputDiscoveryMessage),
 		updateMutex: &sync.Mutex{},
 	}
 	return &outputs

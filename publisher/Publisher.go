@@ -36,10 +36,10 @@ const (
 )
 
 // NodeConfigHandler callback when command to update node config is received
-type NodeConfigHandler func(node *nodes.Node, config iotc.NodeAttrMap) iotc.NodeAttrMap
+type NodeConfigHandler func(node *iotc.NodeDiscoveryMessage, config iotc.NodeAttrMap) iotc.NodeAttrMap
 
 // NodeInputHandler callback when command to update node input is received
-type NodeInputHandler func(input *nodes.Input, message *iotc.SetInputMessage)
+type NodeInputHandler func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage)
 
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
@@ -52,14 +52,14 @@ type Publisher struct {
 	onNodeConfigHandler NodeConfigHandler          // handle before applying configuration
 	onNodeInputHandler  NodeInputHandler           // handle to update device/service input
 
-	persistFolder    string                     // optional folder to persist nodes
-	pollHandler      func(publisher *Publisher) // function that performs value polling
-	pollCountdown    int                        // countdown each heartbeat
-	pollInterval     int                        // value polling interval in seconds
-	publisherAddress string                     // for easy access to the publisher
-	zonePublishers   map[string]*nodes.Node     // publishers on the network
-	signPrivateKey   *ecdsa.PrivateKey          // key for singing published messages
-	Zone             string                     // The zone this publisher lives in
+	persistFolder    string                                // optional folder to persist nodes
+	pollHandler      func(publisher *Publisher)            // function that performs value polling
+	pollCountdown    int                                   // countdown each heartbeat
+	pollInterval     int                                   // value polling interval in seconds
+	publisherAddress string                                // for easy access to the publisher
+	zonePublishers   map[string]*iotc.NodeDiscoveryMessage // publishers on the network
+	signPrivateKey   *ecdsa.PrivateKey                     // key for singing published messages
+	Zone             string                                // The zone this publisher lives in
 
 	// background publications require a mutex to prevent concurrent access
 	exitChannel chan bool
@@ -73,7 +73,7 @@ type Publisher struct {
 	OutputValues   *nodes.OutputHistory              // output values and history published by this publisher
 }
 
-// Get the publisher ID
+// ID Get the publisher ID
 func (publisher *Publisher) ID() string {
 	return publisher.id
 }
@@ -93,13 +93,13 @@ func GetConfigValue(configMap map[string]iotc.ConfigAttr, attrName string) strin
 
 // GetNodeByID returns a node from this publisher or nil if the id isn't found in this publisher
 // This is a convenience function as publishers tend to do this quite often
-func (publisher *Publisher) GetNodeByID(id string) *nodes.Node {
+func (publisher *Publisher) GetNodeByID(id string) *iotc.NodeDiscoveryMessage {
 	node := publisher.Nodes.GetNodeByID(publisher.Zone, publisher.id, id)
 	return node
 }
 
 // PublisherNode return this publisher's node
-func (publisher *Publisher) PublisherNode() *nodes.Node {
+func (publisher *Publisher) PublisherNode() *iotc.NodeDiscoveryMessage {
 	node := publisher.Nodes.GetNodeByID(publisher.Zone, publisher.id, iotc.PublisherNodeID)
 	return node
 }
@@ -185,12 +185,12 @@ func (publisher *Publisher) SetPollInterval(seconds int,
 
 // SetNodeConfigHandler set the handler for updating node configuration
 func (publisher *Publisher) SetNodeConfigHandler(
-	handler func(node *nodes.Node, config iotc.NodeAttrMap) iotc.NodeAttrMap) {
+	handler func(node *iotc.NodeDiscoveryMessage, config iotc.NodeAttrMap) iotc.NodeAttrMap) {
 	publisher.onNodeConfigHandler = handler
 }
 
 // SetNodeInputHandler set the handler for updating node inputs
-func (publisher *Publisher) SetNodeInputHandler(handler func(input *nodes.Input, message *iotc.SetInputMessage)) {
+func (publisher *Publisher) SetNodeInputHandler(handler func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage)) {
 	publisher.onNodeInputHandler = handler
 }
 
@@ -210,7 +210,7 @@ func (publisher *Publisher) Start() {
 		publisher.isRunning = true
 		publisher.updateMutex.Unlock()
 		if publisher.persistFolder != "" {
-			nodeList := make([]*nodes.Node, 0)
+			nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
 			persist.LoadNodes(publisher.persistFolder, publisher.id, &nodeList)
 			publisher.Nodes.UpdateNodes(nodeList)
 		}
@@ -337,6 +337,7 @@ func (publisher *Publisher) VerifyMessageSignature(
 // messenger to use fo publications and for the zone to publish in
 // logger is the optional logger to use.
 //
+// zone the publisher uses to create addresses
 // publisherID of this publisher, unique within the zone
 // messenger for publishing onto the message bus
 // configFolder location of persistent nodes file. "" when not to persist.
@@ -366,7 +367,7 @@ func NewPublisher(
 		publisherAddress:  pubNode.Address,
 		updateMutex:       &sync.Mutex{},
 		Zone:              zone,
-		zonePublishers:    make(map[string]*nodes.Node),
+		zonePublishers:    make(map[string]*iotc.NodeDiscoveryMessage),
 	}
 	publisher.SetLogging("debug", "")
 

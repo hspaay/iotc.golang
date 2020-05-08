@@ -107,7 +107,7 @@ func TestNodePublication(t *testing.T) {
 	p0 := testMessenger.FindLastPublication(node1Addr)
 	assert.NotNilf(t, p0, "Publication for publisher %s not found", pubAddr)
 	assert.NotEmpty(t, p0.Signature, "Missing signature in publication")
-	var p0Node nodes.Node
+	var p0Node iotc.NodeDiscoveryMessage
 	err := json.Unmarshal([]byte(p0.Message), &p0Node)
 	assert.NoError(t, err, "Failed parsing node message publication")
 	assert.Equal(t, node1Addr, p0Node.Address, "published node doesn't match address")
@@ -150,7 +150,7 @@ func TestAlias(t *testing.T) {
 		return
 	}
 
-	var out nodes.Output
+	var out iotc.OutputDiscoveryMessage
 	err := json.Unmarshal([]byte(p3.Message), &out)
 	if !assert.NoError(t, err, "Failed to unmarshal published message") {
 		return
@@ -250,7 +250,7 @@ func TestReceiveInput(t *testing.T) {
 	pub1 := NewPublisher(msgConfig.Zone, publisher1ID, testMessenger, "")
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.SetNodeInputHandler(func(input *nodes.Input, message *iotc.SetInputMessage) {
+	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
 		pub1.OutputValues.UpdateOutputValue(node1, input.InputType, input.Instance, message.Value)
 	})

@@ -9,59 +9,60 @@ import (
 )
 
 // Node contains logic for using the data from the node discovery message
-type Node struct {
-	iotc.NodeDiscoveryMessage `json:"node"`
-}
+// type Node struct {
+// 	iotc.NodeDiscoveryMessage `json:"node"`
+// }
 
 // type Node = iotc.NodeDiscoveryMessage
 
-// Clone returns a copy of the node with new Attr, Config and Status maps
-// Intended for updating the node in a concurrent safe manner in combination with UpdateNode()
-// This does clones map values. Any updates to the map must use new instances of the values
-func (node *Node) Clone() *Node {
-	newNode := *node
+// // Clone returns a copy of the node with new Attr, Config and Status maps
+// // Intended for updating the node in a concurrent safe manner in combination with UpdateNode()
+// // This does clones map values. Any updates to the map must use new instances of the values
+// func (node *Node) Clone() *iotc.NodeDiscoveryMessage {
+// 	newNode := *node
 
-	newNode.Attr = make(map[iotc.NodeAttr]string)
-	for key, value := range node.Attr {
-		newNode.Attr[key] = value
-	}
-	newNode.Config = make(map[iotc.NodeAttr]iotc.ConfigAttr)
-	for key, value := range node.Config {
-		newNode.Config[key] = value
-	}
-	newNode.Status = make(map[iotc.NodeStatus]string)
-	for key, value := range node.Status {
-		newNode.Status[key] = value
-	}
-	return &newNode
-}
+// 	newNode.Attr = make(map[iotc.NodeAttr]string)
+// 	for key, value := range node.Attr {
+// 		newNode.Attr[key] = value
+// 	}
+// 	newNode.Config = make(map[iotc.NodeAttr]iotc.ConfigAttr)
+// 	for key, value := range node.Config {
+// 		newNode.Config[key] = value
+// 	}
+// 	newNode.Status = make(map[iotc.NodeStatus]string)
+// 	for key, value := range node.Status {
+// 		newNode.Status[key] = value
+// 	}
+// 	return &newNode
+// }
 
-// GetAlias returns the node alias, or node ID if no alias is set
-func (node *Node) GetAlias() (alias string, hasAlias bool) {
-	hasAlias = false
-	alias = node.ID
-	aliasConfig, attrExists := node.Config[iotc.NodeAttrAlias]
-	if attrExists && aliasConfig.Value != "" {
-		alias = aliasConfig.Value
-		hasAlias = true
+// GetNodeAlias returns the node alias, or node ID if no alias is set
+// This is a convenience function to
+// func GetNodeAlias(node *iotc.NodeDiscoveryMessage) (alias string, hasAlias bool) {
+// 	hasAlias = false
+// 	alias = node.ID
+// 	aliasConfig, attrExists := node.Config[iotc.NodeAttrAlias]
+// 	if attrExists && aliasConfig.Value != "" {
+// 		alias = aliasConfig.Value
+// 		hasAlias = true
 
-	}
-	return alias, hasAlias
-}
+// 	}
+// 	return alias, hasAlias
+// }
 
-// GetConfigInt returns the node configuration value as an integer
+// GetNodeConfigInt returns the node configuration value as an integer
 // This retuns the 'default' value if no value is set
-func (node *Node) GetConfigInt(attrName iotc.NodeAttr) (value int, err error) {
-	valueStr, configExists := node.GetConfigValue(attrName)
+func GetNodeConfigInt(node *iotc.NodeDiscoveryMessage, attrName iotc.NodeAttr) (value int, err error) {
+	valueStr, configExists := GetNodeConfigValue(node, attrName)
 	if !configExists {
 		return 0, errors.New("Configuration does not exist")
 	}
 	return strconv.Atoi(valueStr)
 }
 
-// GetConfigValue returns the node configuration value
+// GetNodeConfigValue returns the node configuration value
 // This retuns the 'default' value if no value is set
-func (node *Node) GetConfigValue(attrName iotc.NodeAttr) (value string, configExists bool) {
+func GetNodeConfigValue(node *iotc.NodeDiscoveryMessage, attrName iotc.NodeAttr) (value string, configExists bool) {
 	config, configExists := node.Config[attrName]
 	if !configExists {
 		return "", configExists
@@ -75,7 +76,7 @@ func (node *Node) GetConfigValue(attrName iotc.NodeAttr) (value string, configEx
 // SetNodeAttr is a convenience function to update multiple attributes of a configuration
 // Intended to update read-only attributes that describe the node.
 // Returns true if one or more attributes have changed
-func (node *Node) SetNodeAttr(attrParams map[iotc.NodeAttr]string) (changed bool) {
+func SetNodeAttr(node *iotc.NodeDiscoveryMessage, attrParams map[iotc.NodeAttr]string) (changed bool) {
 	changed = false
 	for key, value := range attrParams {
 		if node.Attr[key] != value {
@@ -89,7 +90,7 @@ func (node *Node) SetNodeAttr(attrParams map[iotc.NodeAttr]string) (changed bool
 // SetNodeConfigValues applies an update to a node's configuration values
 // - param is the map with key-value pairs of configuration values to update
 // Returns true if one or more attributes have changed
-func (node *Node) SetNodeConfigValues(params map[iotc.NodeAttr]string) (changed bool) {
+func SetNodeConfigValues(node *iotc.NodeDiscoveryMessage, params map[iotc.NodeAttr]string) (changed bool) {
 	changed = false
 	for key, newValue := range params {
 		config, configExists := node.Config[key]
@@ -135,18 +136,16 @@ func NewConfigAttr(id iotc.NodeAttr, dataType iotc.DataType, description string,
 
 // NewNode create a node instance.
 // Use UpdateNode to add it to the publisher
-func NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.NodeType) *Node {
+func NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.NodeType) *iotc.NodeDiscoveryMessage {
 	address := MakeNodeDiscoveryAddress(zoneID, publisherID, nodeID)
-	return &Node{
-		iotc.NodeDiscoveryMessage{
-			Address:     address,
-			Attr:        map[iotc.NodeAttr]string{},
-			Config:      map[iotc.NodeAttr]iotc.ConfigAttr{},
-			ID:          nodeID,
-			PublisherID: publisherID,
-			Status:      make(map[iotc.NodeStatus]string),
-			Type:        nodeType,
-			Zone:        zoneID,
-		},
+	return &iotc.NodeDiscoveryMessage{
+		Address:     address,
+		Attr:        map[iotc.NodeAttr]string{},
+		Config:      map[iotc.NodeAttr]iotc.ConfigAttr{},
+		ID:          nodeID,
+		PublisherID: publisherID,
+		Status:      make(map[iotc.NodeStatus]string),
+		Type:        nodeType,
+		Zone:        zoneID,
 	}
 }

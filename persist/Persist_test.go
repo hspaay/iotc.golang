@@ -49,8 +49,8 @@ func TestSave(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	nodeList := make([]*nodes.Node, 0)
-	nodeList2 := make([]*nodes.Node, 0)
+	nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
+	nodeList2 := make([]*iotc.NodeDiscoveryMessage, 0)
 	nodeList = append(nodeList, nodes.NewNode("zone1", "publisher1", "node1", iotc.NodeTypeAdapter))
 
 	err := SaveNodes(ConfigFolder, PublisherID, nodeList)

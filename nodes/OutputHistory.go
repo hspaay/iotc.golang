@@ -42,7 +42,7 @@ func (outputValues *OutputHistory) GetOutputValueByAddress(address string) *iotc
 }
 
 // GetOutputValueByType returns the current output value by output type and instance
-func (outputValues *OutputHistory) GetOutputValueByType(node *Node, outputType string, instance string) *iotc.OutputValue {
+func (outputValues *OutputHistory) GetOutputValueByType(node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputValue {
 	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
 	return outputValues.GetOutputValueByAddress(addr)
 }
@@ -66,19 +66,19 @@ func (outputValues *OutputHistory) GetUpdatedOutputs(clearUpdates bool) []string
 }
 
 // UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputHistory) UpdateOutputFloatList(node *Node, outputType string, outputInstance string, values []float32) bool {
+func (outputValues *OutputHistory) UpdateOutputFloatList(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, values []float32) bool {
 	valuesAsString, _ := json.Marshal(values)
 	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputHistory) UpdateOutputIntList(node *Node, outputType string, outputInstance string, values []int) bool {
+func (outputValues *OutputHistory) UpdateOutputIntList(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, values []int) bool {
 	valuesAsString, _ := json.Marshal(values)
 	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputHistory) UpdateOutputStringList(node *Node, outputType string, outputInstance string, values []string) bool {
+func (outputValues *OutputHistory) UpdateOutputStringList(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, values []string) bool {
 	valuesAsString, _ := json.Marshal(values)
 	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
 }
@@ -88,7 +88,7 @@ func (outputValues *OutputHistory) UpdateOutputStringList(node *Node, outputType
 //  it has changed or the previous update was older than the repeatDelay.
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
-func (outputValues *OutputHistory) UpdateOutputValue(node *Node, outputType string, instance string, newValue string) bool {
+func (outputValues *OutputHistory) UpdateOutputValue(node *iotc.NodeDiscoveryMessage, outputType string, instance string, newValue string) bool {
 	var previous *iotc.OutputValue
 	var repeatDelay = 3600 // default repeat delay
 	var ageSeconds = -1

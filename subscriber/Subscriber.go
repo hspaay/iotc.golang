@@ -65,7 +65,7 @@ func (subscriber *Subscriber) Stop() {
 // address contains the publisher's discovery address: zone/publisher/$publisher/$node
 // publication contains a message with the publisher node info
 func (subscriber *Subscriber) handlePublisherDiscovery(address string, publication *iotc.Publication) {
-	var pubNode nodes.Node
+	var pubNode iotc.NodeDiscoveryMessage
 	err := json.Unmarshal([]byte(publication.Message), &pubNode)
 	if err != nil {
 		subscriber.Logger.Warningf("Unable to unmarshal Publisher Node in %s", address)
