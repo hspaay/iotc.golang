@@ -9,8 +9,8 @@ import (
 	"github.com/hspaay/iotc.golang/iotc"
 )
 
-// OutputHistory with output history value management
-type OutputHistory struct {
+// OutputValueList with output values for all outputs
+type OutputValueList struct {
 	historyLists   map[string]iotc.OutputHistoryList // history lists by output address
 	updatedOutputs map[string]string                 // addresses of updated outputs
 	updateMutex    *sync.Mutex                       // mutex for async updating of outputs
@@ -18,7 +18,7 @@ type OutputHistory struct {
 
 // GetHistory returns the history list
 // Returns nil if the type or instance is unknown
-func (outputValues *OutputHistory) GetHistory(address string) iotc.OutputHistoryList {
+func (outputValues *OutputValueList) GetHistory(address string) iotc.OutputHistoryList {
 	outputValues.updateMutex.Lock()
 	var historyList = outputValues.historyLists[address]
 	outputValues.updateMutex.Unlock()
@@ -27,7 +27,7 @@ func (outputValues *OutputHistory) GetHistory(address string) iotc.OutputHistory
 
 // GetOutputValueByAddress returns the most recent output value by output discovery address
 // This returns a HistoryValue object with the latest value and timestamp it was updated
-func (outputValues *OutputHistory) GetOutputValueByAddress(address string) *iotc.OutputValue {
+func (outputValues *OutputValueList) GetOutputValueByAddress(address string) *iotc.OutputValue {
 	var latest *iotc.OutputValue
 
 	outputValues.updateMutex.Lock()
@@ -42,14 +42,14 @@ func (outputValues *OutputHistory) GetOutputValueByAddress(address string) *iotc
 }
 
 // GetOutputValueByType returns the current output value by output type and instance
-func (outputValues *OutputHistory) GetOutputValueByType(node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputValue {
-	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
+func (outputValues *OutputValueList) GetOutputValueByType(node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputValue {
+	addr := MakeOutputDiscoveryAddress(node.Address, outputType, instance)
 	return outputValues.GetOutputValueByAddress(addr)
 }
 
 // GetUpdatedOutputs returns a list of output addresses that have updated values
 // clear the update outputs list on return
-func (outputValues *OutputHistory) GetUpdatedOutputs(clearUpdates bool) []string {
+func (outputValues *OutputValueList) GetUpdatedOutputs(clearUpdates bool) []string {
 	var addrList []string = make([]string, 0)
 
 	outputValues.updateMutex.Lock()
@@ -66,35 +66,35 @@ func (outputValues *OutputHistory) GetUpdatedOutputs(clearUpdates bool) []string
 }
 
 // UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputHistory) UpdateOutputFloatList(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, values []float32) bool {
+func (outputValues *OutputValueList) UpdateOutputFloatList(nodeAddress string, outputType string, outputInstance string, values []float32) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+	return outputValues.UpdateOutputValue(nodeAddress, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputHistory) UpdateOutputIntList(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, values []int) bool {
+func (outputValues *OutputValueList) UpdateOutputIntList(nodeAddress string, outputType string, outputInstance string, values []int) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+	return outputValues.UpdateOutputValue(nodeAddress, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputHistory) UpdateOutputStringList(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, values []string) bool {
+func (outputValues *OutputValueList) UpdateOutputStringList(nodeAddress string, outputType string, outputInstance string, values []string) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(node, outputType, outputInstance, string(valuesAsString))
+	return outputValues.UpdateOutputValue(nodeAddress, outputType, outputInstance, string(valuesAsString))
 }
 
 // UpdateOutputValue adds the new node output value to the front of the history
 // If the node has a repeatDelay configured, then the value is only added if
-//  it has changed or the previous update was older than the repeatDelay.
+//  it has changed, or if the previous update was older than the repeatDelay.
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
-func (outputValues *OutputHistory) UpdateOutputValue(node *iotc.NodeDiscoveryMessage, outputType string, instance string, newValue string) bool {
+func (outputValues *OutputValueList) UpdateOutputValue(nodeAddress string, outputType string, instance string, newValue string) bool {
 	var previous *iotc.OutputValue
-	var repeatDelay = 3600 // default repeat delay
+	var repeatDelay = 3600 // default repeat delay is 1 hour
 	var ageSeconds = -1
 	var hasUpdated = false
 
-	addr := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
+	addr := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 
 	outputValues.updateMutex.Lock()
 	// auto create the output if it hasn't been discovered yet
@@ -102,9 +102,10 @@ func (outputValues *OutputHistory) UpdateOutputValue(node *iotc.NodeDiscoveryMes
 	history := outputValues.historyLists[addr]
 
 	// only update output if value changes or delay has passed
-	if node.RepeatDelay != 0 {
-		repeatDelay = node.RepeatDelay
-	}
+	// for now use 1 hour repeat delay. Need to get the config from somewhere
+	// if history.RepeatDelay != 0 {
+	// 	repeatDelay = history.RepeatDelay
+	// }
 	if len(history) > 0 {
 		previous = &history[0]
 		prevTime := time.Unix(previous.EpochTime, 0)
@@ -113,8 +114,8 @@ func (outputValues *OutputHistory) UpdateOutputValue(node *iotc.NodeDiscoveryMes
 	}
 	doUpdate := ageSeconds < 0 || ageSeconds > repeatDelay || newValue != previous.Value
 	if doUpdate {
-		//
-		newHistory := updateHistory(history, newValue, node.HistorySize)
+		// 24 hour history
+		newHistory := updateHistory(history, newValue, 0)
 
 		outputValues.historyLists[addr] = newHistory
 		hasUpdated = true
@@ -172,8 +173,8 @@ func updateHistory(history iotc.OutputHistoryList, newValue string, maxHistorySi
 }
 
 // NewOutputValue creates a new instance for output value and history management
-func NewOutputValue() *OutputHistory {
-	outputs := OutputHistory{
+func NewOutputValue() *OutputValueList {
+	outputs := OutputValueList{
 		historyLists: make(map[string]iotc.OutputHistoryList),
 		updateMutex:  &sync.Mutex{},
 	}

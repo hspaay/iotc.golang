@@ -66,7 +66,7 @@ func (publisher *Publisher) PublishUpdates() {
 
 // UpdateForecast publishes the output forecast list of values"
 func (publisher *Publisher) UpdateForecast(node *iotc.NodeDiscoveryMessage, outputType string, outputInstance string, forecast iotc.OutputHistoryList) {
-	addr := nodes.MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, outputInstance)
+	addr := nodes.MakeOutputDiscoveryAddress(node.Address, outputType, outputInstance)
 
 	publisher.updateMutex.Lock()
 	publisher.outputForecast[addr] = forecast
@@ -84,7 +84,7 @@ func (publisher *Publisher) getOutputAliasAddress(address string) string {
 	if node == nil {
 		return address
 	}
-	alias, hasAlias := nodes.GetNodeConfigValue(node, iotc.NodeAttrAlias)
+	alias, hasAlias := publisher.Nodes.GetNodeConfigValue(address, iotc.NodeAttrAlias)
 	// alias, hasAlias := nodes.GetNodeAlias(node)
 	if !hasAlias {
 		return address
@@ -115,7 +115,7 @@ func (publisher *Publisher) publishEvent(aliasAddress string, node *iotc.NodeDis
 	eventMessage := &iotc.OutputEventMessage{
 		Address:   addr,
 		Event:     event,
-		Sender:    publisher.publisherAddress,
+		Sender:    publisher.address,
 		Timestamp: timeStampStr,
 	}
 	publisher.publishMessage(addr, true, eventMessage)
@@ -137,7 +137,7 @@ func (publisher *Publisher) publishLatest(aliasAddress string, output *iotc.Outp
 	publisher.Logger.Infof("publish output latest: %s", addr)
 	latestMessage := &iotc.OutputLatestMessage{
 		Address:   addr,
-		Sender:    publisher.publisherAddress,
+		Sender:    publisher.address,
 		Timestamp: latest.Timestamp,
 		// Timestamp: latest.TimeStamp,
 		Unit:  output.Unit,
@@ -157,7 +157,7 @@ func (publisher *Publisher) publishForecast(aliasAddress string, output *iotc.Ou
 	forecastMessage := &iotc.OutputForecastMessage{
 		Address:   addr,
 		Duration:  0, // tbd
-		Sender:    publisher.publisherAddress,
+		Sender:    publisher.address,
 		Timestamp: timeStampStr,
 		Unit:      output.Unit,
 		Forecast:  publisher.outputForecast[output.Address],
@@ -176,7 +176,7 @@ func (publisher *Publisher) publishHistory(aliasAddress string, output *iotc.Out
 	historyMessage := &iotc.OutputHistoryMessage{
 		Address:   addr,
 		Duration:  0, // tbd
-		Sender:    publisher.publisherAddress,
+		Sender:    publisher.address,
 		Timestamp: timeStampStr,
 		Unit:      output.Unit,
 		History:   publisher.OutputValues.GetHistory(output.Address),

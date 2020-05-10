@@ -3,6 +3,7 @@ package nodes
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/hspaay/iotc.golang/iotc"
@@ -31,12 +32,9 @@ func (outputs *OutputList) GetAllOutputs() []*iotc.OutputDiscoveryMessage {
 // This method is concurrent safe
 // Returns nil if address has no known output
 func (outputs *OutputList) GetOutput(
-	node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputDiscoveryMessage {
-	// segments := strings.Split(address, "/")
-	// segments[3] = standard.CommandOutputDiscovery
-	// outputAddr := strings.Join(segments, "/")
-	outputAddr := fmt.Sprintf("%s/%s/%s/%s/%s/%s", node.Zone, node.PublisherID, node.ID,
-		iotc.MessageTypeOutputDiscovery, outputType, instance)
+	nodeAddress string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
+
+	outputAddr := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 
 	outputs.updateMutex.Lock()
 	var output = outputs.outputMap[outputAddr]
@@ -44,7 +42,7 @@ func (outputs *OutputList) GetOutput(
 	return output
 }
 
-// GetNodeOutputs returns a list of all outputs for the given node
+// GetNodeOutputs returns all outputs for the given node in this list
 // This method is concurrent safe
 func (outputs *OutputList) GetNodeOutputs(node *iotc.NodeDiscoveryMessage) []*iotc.OutputDiscoveryMessage {
 	nodeOutputs := []*iotc.OutputDiscoveryMessage{}
@@ -85,8 +83,8 @@ func (outputs *OutputList) GetUpdatedOutputs(clearUpdates bool) []*iotc.OutputDi
 	return updateList
 }
 
-// UpdateOutput replaces the output using the node.Address
-// This method is concurrent safe
+// UpdateOutput replaces the output
+// The output will be added to the list of updated outputs
 func (outputs *OutputList) UpdateOutput(output *iotc.OutputDiscoveryMessage) {
 	outputs.updateMutex.Lock()
 	outputs.outputMap[output.Address] = output
@@ -97,19 +95,22 @@ func (outputs *OutputList) UpdateOutput(output *iotc.OutputDiscoveryMessage) {
 	outputs.updateMutex.Unlock()
 }
 
-// NewOutput creates a new output for the given node
+// NewOutput creates a new output for the given node.
+// It is not immediately added to allow for further updates of the ouput definition.
 // To add it to the list use 'UpdateOutput'
 // node is the node that contains the output
 // outputType is one of the predefined output types. See constants in the standard
 // instance is the output instance in case of multiple instances of the same type. Use
-func NewOutput(node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputDiscoveryMessage {
+func NewOutput(nodeAddress string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
 	// output := NewOutput(node, outputType, instance)
-	address := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
+	address := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
+	segments := strings.Split(nodeAddress, "/")
+
 	output := &iotc.OutputDiscoveryMessage{
 		Address:    address,
 		Instance:   instance,
 		OutputType: outputType,
-		NodeID:     node.ID,
+		NodeID:     segments[2],
 		// PublisherID: node.PublisherID,
 		// History:  make([]*HistoryValue, 1),
 	}
@@ -117,7 +118,12 @@ func NewOutput(node *iotc.NodeDiscoveryMessage, outputType string, instance stri
 }
 
 // MakeOutputDiscoveryAddress for publishing or subscribing
-func MakeOutputDiscoveryAddress(zone string, publisherID string, nodeID string, ioType string, instance string) string {
+func MakeOutputDiscoveryAddress(nodeAddress string, ioType string, instance string) string {
+	segments := strings.Split(nodeAddress, "/")
+	zone := segments[0]
+	publisherID := segments[1]
+	nodeID := segments[2]
+
 	address := fmt.Sprintf("%s/%s/%s/"+iotc.MessageTypeOutputDiscovery+"/%s/%s",
 		zone, publisherID, nodeID, ioType, instance)
 	return address

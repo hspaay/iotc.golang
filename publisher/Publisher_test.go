@@ -35,8 +35,8 @@ var node1valueAddr = node1Base + "/$value/switch/0"
 var node1latestAddr = node1Base + "/$latest/switch/0"
 var node1historyAddr = node1Base + "/$history/switch/0"
 
-var node1Input1 = nodes.NewInput(node1, "switch", "0")
-var node1Output1 = nodes.NewOutput(node1, "switch", "0")
+var node1Input1 = nodes.NewInput(node1Addr, "switch", "0")
+var node1Output1 = nodes.NewOutput(node1Addr, "switch", "0")
 var pubAddr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher1ID, iotc.PublisherNodeID)
 
 var pub2Addr = fmt.Sprintf("%s/%s/%s/$node", zone1ID, publisher2ID, iotc.PublisherNodeID)
@@ -70,7 +70,7 @@ func TestDiscover(t *testing.T) {
 	}
 
 	pub1.Inputs.UpdateInput(node1Input1)
-	tmpIn := pub1.Inputs.GetInput(node1, "switch", "0")
+	tmpIn := pub1.Inputs.GetInput(node1Addr, "switch", "0")
 	if !(assert.NotNil(t, tmpIn, "Failed getting discovered input") &&
 		assert.Equal(t, node1Input1.Address, tmpIn.Address, "Retrieved input 1 not equal to discovered input 1") &&
 		assert.Equal(t, node1InputAddr, tmpIn.Address, "Input address incorrect")) {
@@ -78,7 +78,7 @@ func TestDiscover(t *testing.T) {
 	}
 
 	pub1.Outputs.UpdateOutput(node1Output1)
-	tmpOut := pub1.Outputs.GetOutput(node1, "switch", "0")
+	tmpOut := pub1.Outputs.GetOutput(node1Addr, "switch", "0")
 	if !(assert.NotNil(t, tmpOut, "Failed getting discovered output") &&
 		assert.Equal(t, node1Output1.Address, tmpOut.Address, "Retrieved output 1 not equal to discovered output 1")) {
 		return
@@ -167,8 +167,8 @@ func TestConfigure(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
 	pub1.Nodes.UpdateNode(node1)
-	config := nodes.NewConfigAttr("name", iotc.DataTypeString, "Friendly Name", "")
-	pub1.Nodes.SetNodeConfig(node1Addr, config)
+	config := nodes.NewNodeConfig("name", iotc.DataTypeString, "Friendly Name", "")
+	pub1.Nodes.UpdateNodeConfig(node1Addr, config)
 
 	// time.Sleep(time.Second * 1) // receive publications
 
@@ -206,7 +206,7 @@ func TestOutputValue(t *testing.T) {
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1)
 	pub1.Outputs.UpdateOutput(node1Output1)
-	pub1.OutputValues.UpdateOutputValue(node1, node1Output1Type, node1Output1Instance, "true")
+	pub1.OutputValues.UpdateOutputValue(node1Addr, node1Output1Type, node1Output1Instance, "true")
 
 	pub1.PublishUpdates()
 	// time.Sleep(time.Second * 1) // receive publications
@@ -237,11 +237,11 @@ func TestOutputValue(t *testing.T) {
 
 	// test int, float, string list publication
 	intList := []int{1, 2, 3}
-	pub1.OutputValues.UpdateOutputIntList(node1, node1Output1Type, node1Output1Instance, intList)
+	pub1.OutputValues.UpdateOutputIntList(node1Addr, node1Output1Type, node1Output1Instance, intList)
 	floatList := []float32{1.3, 2.5, 3.09}
-	pub1.OutputValues.UpdateOutputFloatList(node1, node1Output1Type, node1Output1Instance, floatList)
+	pub1.OutputValues.UpdateOutputFloatList(node1Addr, node1Output1Type, node1Output1Instance, floatList)
 	stringList := []string{"hello", "world"}
-	pub1.OutputValues.UpdateOutputStringList(node1, node1Output1Type, node1Output1Instance, stringList)
+	pub1.OutputValues.UpdateOutputStringList(node1Addr, node1Output1Type, node1Output1Instance, stringList)
 }
 
 // TestReceiveInput tests receiving input control commands
@@ -252,7 +252,7 @@ func TestReceiveInput(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
-		pub1.OutputValues.UpdateOutputValue(node1, input.InputType, input.Instance, message.Value)
+		pub1.OutputValues.UpdateOutputValue(node1Addr, input.InputType, input.Instance, message.Value)
 	})
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1) // p1

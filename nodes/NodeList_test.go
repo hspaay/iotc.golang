@@ -36,8 +36,7 @@ var node1historyAddr = node1Base + "/$history/switch/0"
 // TestNewNode instance
 func TestNewNode(t *testing.T) {
 	nodeList := NewNodeList()
-	node := NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
-	nodeList.UpdateNode(node)
+	node := nodeList.NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 
 	if !assert.NotNil(t, node, "Failed creating node") {
 		return
@@ -51,14 +50,13 @@ func TestNewNode(t *testing.T) {
 // Test updating of node atributes and status
 func TestAttrStatus(t *testing.T) {
 	nodeList := NewNodeList()
-	node := NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
-	nodeList.UpdateNode(node)
+	nodeList.NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 
 	newAttr := map[iotc.NodeAttr]string{"Manufacturer": "Bob"}
 	nodeList.SetNodeAttr(node1Addr, newAttr)
 
 	newStatus := map[iotc.NodeStatus]string{"LastUpdated": "now"}
-	nodeList.SetNodeStatus(node, newStatus)
+	nodeList.SetNodeStatus(node1Addr, newStatus)
 
 	node1 := nodeList.GetNodeByAddress(node1Addr)
 	val, hasAttr := node1.Attr["Manufacturer"]
@@ -76,16 +74,15 @@ func TestAttrStatus(t *testing.T) {
 // TestConfigure tests if the node configuration is handled
 func TestConfigure(t *testing.T) {
 	nodeList := NewNodeList()
-	node := NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
-	nodeList.UpdateNode(node)
+	nodeAddr := nodeList.NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 
-	config := NewConfigAttr(iotc.NodeAttrName, iotc.DataTypeString, "Friendly Name", "")
-	nodeList.SetNodeConfig(node1Addr, config)
+	config := NewNodeConfig(iotc.NodeAttrName, iotc.DataTypeString, "Friendly Name", "")
+	nodeList.UpdateNodeConfig(nodeAddr, config)
 
 	newValues := map[iotc.NodeAttr]string{iotc.NodeAttrName: "NewName"}
-	nodeList.SetNodeConfigValues(node1Addr, newValues)
-
-	node = nodeList.GetNodeByAddress(node1Addr)
+	nodeList.SetNodeConfigValues(nodeAddr, newValues)
+	// node1 must match the newly added node
+	node := nodeList.GetNodeByAddress(node1Addr)
 	c := node.Config[iotc.NodeAttrName]
 	if !assert.NotNil(t, c, "Can't find configuration for name") {
 		return
