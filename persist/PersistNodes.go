@@ -11,7 +11,11 @@ import (
 
 // NodesFileSuffix to append to name of the file containing saved nodes
 const NodesFileSuffix = "-nodes.json"
+
+// InputsFileSuffix to append to name of the file containing saved inputs
 const InputsFileSuffix = "-inputs.json"
+
+// OutputsFileSuffix to append to name of the file containing saved output
 const OutputsFileSuffix = "-outputs.json"
 
 // LoadNodes loads previously saved publisher node messages from JSON file.

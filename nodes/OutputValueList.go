@@ -9,18 +9,21 @@ import (
 	"github.com/hspaay/iotc.golang/iotc"
 )
 
+// OutputHistory with history values
+type OutputHistory []iotc.OutputValue
+
 // OutputValueList with output values for all outputs
 type OutputValueList struct {
-	historyLists   map[string]iotc.OutputHistoryList // history lists by output address
-	updatedOutputs map[string]string                 // addresses of updated outputs
-	updateMutex    *sync.Mutex                       // mutex for async updating of outputs
+	historyMap     map[string]OutputHistory // history lists by output address
+	updateMutex    *sync.Mutex              // mutex for async updating of outputs
+	updatedOutputs map[string]string        // addresses of updated outputs
 }
 
 // GetHistory returns the history list
 // Returns nil if the type or instance is unknown
-func (outputValues *OutputValueList) GetHistory(address string) iotc.OutputHistoryList {
+func (outputValues *OutputValueList) GetHistory(address string) OutputHistory {
 	outputValues.updateMutex.Lock()
-	var historyList = outputValues.historyLists[address]
+	var historyList = outputValues.historyMap[address]
 	outputValues.updateMutex.Unlock()
 	return historyList
 }
@@ -31,8 +34,9 @@ func (outputValues *OutputValueList) GetOutputValueByAddress(address string) *io
 	var latest *iotc.OutputValue
 
 	outputValues.updateMutex.Lock()
-	history := outputValues.historyLists[address]
-	outputValues.updateMutex.Unlock()
+	defer outputValues.updateMutex.Unlock()
+
+	history := outputValues.historyMap[address]
 
 	if history == nil || len(history) == 0 {
 		return nil
@@ -47,12 +51,14 @@ func (outputValues *OutputValueList) GetOutputValueByType(node *iotc.NodeDiscove
 	return outputValues.GetOutputValueByAddress(addr)
 }
 
-// GetUpdatedOutputs returns a list of output addresses that have updated values
+// GetUpdatedOutputs returns a list of output discovery addresses that have updated values
 // clear the update outputs list on return
 func (outputValues *OutputValueList) GetUpdatedOutputs(clearUpdates bool) []string {
 	var addrList []string = make([]string, 0)
 
 	outputValues.updateMutex.Lock()
+	defer outputValues.updateMutex.Unlock()
+
 	if outputValues.updatedOutputs != nil {
 		for _, addr := range outputValues.updatedOutputs {
 			addrList = append(addrList, addr)
@@ -61,7 +67,6 @@ func (outputValues *OutputValueList) GetUpdatedOutputs(clearUpdates bool) []stri
 			outputValues.updatedOutputs = nil
 		}
 	}
-	outputValues.updateMutex.Unlock()
 	return addrList
 }
 
@@ -97,9 +102,11 @@ func (outputValues *OutputValueList) UpdateOutputValue(nodeAddress string, outpu
 	addr := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 
 	outputValues.updateMutex.Lock()
+	defer outputValues.updateMutex.Unlock()
+
 	// auto create the output if it hasn't been discovered yet
 	// output := outputvalue.Outputs.GetOutputByAddress(addr)
-	history := outputValues.historyLists[addr]
+	history := outputValues.historyMap[addr]
 
 	// only update output if value changes or delay has passed
 	// for now use 1 hour repeat delay. Need to get the config from somewhere
@@ -117,7 +124,7 @@ func (outputValues *OutputValueList) UpdateOutputValue(nodeAddress string, outpu
 		// 24 hour history
 		newHistory := updateHistory(history, newValue, 0)
 
-		outputValues.historyLists[addr] = newHistory
+		outputValues.historyMap[addr] = newHistory
 		hasUpdated = true
 
 		if outputValues.updatedOutputs == nil {
@@ -126,7 +133,6 @@ func (outputValues *OutputValueList) UpdateOutputValue(nodeAddress string, outpu
 		outputValues.updatedOutputs[addr] = addr
 
 	}
-	outputValues.updateMutex.Unlock()
 	return hasUpdated
 }
 
@@ -137,7 +143,7 @@ func (outputValues *OutputValueList) UpdateOutputValue(nodeAddress string, outpu
 // newValue contains the value to include in the history along with the current timestamp
 // maxHistorySize is optional and limits the size in addition to the 24 hour limit
 // returns the history list with the new value at the front of the list
-func updateHistory(history iotc.OutputHistoryList, newValue string, maxHistorySize int) iotc.OutputHistoryList {
+func updateHistory(history OutputHistory, newValue string, maxHistorySize int) OutputHistory {
 
 	timeStamp := time.Now()
 	timeStampStr := timeStamp.Format(iotc.TimeFormat)
@@ -148,7 +154,7 @@ func updateHistory(history iotc.OutputHistoryList, newValue string, maxHistorySi
 		Value:     newValue,
 	}
 	if history == nil {
-		history = make(iotc.OutputHistoryList, 1)
+		history = make(OutputHistory, 1)
 	} else {
 		// make room at the front of the slice
 		history = append(history, latest)
@@ -172,11 +178,11 @@ func updateHistory(history iotc.OutputHistoryList, newValue string, maxHistorySi
 	return history
 }
 
-// NewOutputValue creates a new instance for output value and history management
-func NewOutputValue() *OutputValueList {
+// NewOutputValueList creates a new instance for output value and history management
+func NewOutputValueList() *OutputValueList {
 	outputs := OutputValueList{
-		historyLists: make(map[string]iotc.OutputHistoryList),
-		updateMutex:  &sync.Mutex{},
+		historyMap:  make(map[string]OutputHistory),
+		updateMutex: &sync.Mutex{},
 	}
 	return &outputs
 }

@@ -33,21 +33,23 @@ const (
 // InputDiscoveryMessage with node input description
 type InputDiscoveryMessage struct {
 	Address string `json:"address"` // Address of the input
-	// Config      ConfigAttrMap `json:"config,omitempty"`      // Configuration of input or output
-	DataType    DataType `json:"datatype,omitempty"`    //
+	// Config      ConfigAttrMap `json:"config,omitempty"`      // Configuration of input
+	DataType    DataType `json:"datatype,omitempty"`    // input value data type
 	Description string   `json:"description,omitempty"` // optional description
-	EnumValues  []string `json:"enum,omitempty"`        // enum valid values
+	EnumValues  []string `json:"enumValues,omitempty"`  // enum valid input values for enum datatypes
 	Instance    string   `json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
-	InputType   string   `json:"type,omitempty"`        // type of input or output as per IOTypeXyz
-	NodeID      string   `json:"nodeID"`                // The node ID
-	Unit        Unit     `json:"unit,omitempty"`        // unit of value
+	Max         float32  `json:"max,omitempty"`         // optional max value of input for numeric data types
+	Min         float32  `json:"min,omitempty"`         // optional min value of input for numeric data types
+	Type        string   `json:"type,omitempty"`        // type of input or output as per IOTypeXyz
+	// NodeID      string   `json:"nodeID"`                // The node ID
+	Unit Unit `json:"unit,omitempty"` // unit of value
 }
 
 // SetInputMessage to control an input
 type SetInputMessage struct {
 	Address   string `json:"address"` // zone/publisher/node/$set/type/instance
-	Sender    string `json:"sender"`
 	Timestamp string `json:"timestamp"`
+	Sender    string `json:"sender"`
 	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
 }
 

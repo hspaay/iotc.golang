@@ -62,7 +62,7 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 	err := json.Unmarshal(rawPayload, &payload)
 	// messageStr := string(publication.Message)
 	if err != nil {
-		messenger.Logger.Infof("Unable to unmarshal payload on address %s. Error: %s", address, err)
+		messenger.Logger.Infof("DummyMessenger.OnReceive: Unable to unmarshal payload on address %s. Error: %s", address, err)
 		return
 	}
 	publication.Signature = payload.Signature
@@ -108,7 +108,7 @@ func (messenger *DummyMessenger) Publish(address string, retained bool, publicat
 	//
 	payload, err := json.Marshal(publication)
 	if err != nil {
-		messenger.Logger.Errorf("Failed marshalling publication for address %s", address)
+		messenger.Logger.Errorf("DummyMessenger.Publish: Failed marshalling publication for address %s", address)
 		return err
 	}
 	// go messenger.OnReceive(address, payload)
@@ -131,7 +131,7 @@ func (messenger *DummyMessenger) PublishRaw(address string, retained bool, messa
 func (messenger *DummyMessenger) Subscribe(
 	address string, onMessage func(address string, publication *iotc.Publication)) {
 
-	messenger.Logger.Infof("mqtt.Subscribe: address %sd", address)
+	messenger.Logger.Infof("DummyMessenger.Subscribe: address %s", address)
 	subscription := Subscription{address: address, handler: onMessage}
 	messenger.publishMutex.Lock()
 	messenger.subscriptions = append(messenger.subscriptions, subscription)

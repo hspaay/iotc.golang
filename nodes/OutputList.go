@@ -46,8 +46,11 @@ func (outputs *OutputList) GetOutput(
 // This method is concurrent safe
 func (outputs *OutputList) GetNodeOutputs(node *iotc.NodeDiscoveryMessage) []*iotc.OutputDiscoveryMessage {
 	nodeOutputs := []*iotc.OutputDiscoveryMessage{}
+	segments := strings.Split(node.Address, "/")
+	prefix := strings.Join(segments[:3], "/")
+
 	for _, output := range outputs.outputMap {
-		if output.NodeID == node.ID {
+		if strings.HasPrefix(output.Address, prefix) {
 			nodeOutputs = append(nodeOutputs, output)
 		}
 	}
@@ -104,13 +107,13 @@ func (outputs *OutputList) UpdateOutput(output *iotc.OutputDiscoveryMessage) {
 func NewOutput(nodeAddress string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
 	// output := NewOutput(node, outputType, instance)
 	address := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
-	segments := strings.Split(nodeAddress, "/")
+	// segments := strings.Split(nodeAddress, "/")
 
 	output := &iotc.OutputDiscoveryMessage{
-		Address:    address,
-		Instance:   instance,
-		OutputType: outputType,
-		NodeID:     segments[2],
+		Address:  address,
+		Instance: instance,
+		Type:     outputType,
+		// NodeID:     segments[2],
 		// PublisherID: node.PublisherID,
 		// History:  make([]*HistoryValue, 1),
 	}
@@ -128,22 +131,6 @@ func MakeOutputDiscoveryAddress(nodeAddress string, ioType string, instance stri
 		zone, publisherID, nodeID, ioType, instance)
 	return address
 }
-
-// NewOutput instance
-// func NewOutput(node *Node, outputType string, instance string) *Output {
-// 	address := MakeOutputDiscoveryAddress(node.Zone, node.PublisherID, node.ID, outputType, instance)
-// 	output := &Output{
-// 		iotc.OutputDiscoveryMessage{
-// 			Address:    address,
-// 			Instance:   instance,
-// 			OutputType: outputType,
-// 			NodeID:     node.ID,
-// 			// PublisherID: node.PublisherID,
-// 			// History:  make([]*HistoryValue, 1),
-// 		},
-// 	}
-// 	return output
-// }
 
 // NewOutputList creates a new instance for output management
 func NewOutputList() *OutputList {

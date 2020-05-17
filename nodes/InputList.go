@@ -113,10 +113,12 @@ func MakeInputSetAddress(nodeAddress string, ioType string, instance string) str
 // To add it to the inputlist use 'UpdateInput'
 func NewInput(nodeAddr string, inputType string, instance string) *iotc.InputDiscoveryMessage {
 	address := MakeInputDiscoveryAddress(nodeAddr, inputType, instance)
+	// segments := strings.Split(nodeAddress, "/")
 	input := &iotc.InputDiscoveryMessage{
-		Address:   address,
-		Instance:  instance,
-		InputType: inputType,
+		Address:  address,
+		Instance: instance,
+		Type:     inputType,
+		// NodeID:     segments[2],
 	}
 	return input
 }

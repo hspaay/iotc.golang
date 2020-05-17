@@ -43,34 +43,34 @@ type NodeInputHandler func(input *iotc.InputDiscoveryMessage, message *iotc.SetI
 
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
+	Logger          *log.Logger               // logger for all publisher's logging
+	Nodes           *nodes.NodeList           // discovered nodes published by this publisher
+	Inputs          *nodes.InputList          // discovered inputs published by this publisher
+	Outputs         *nodes.OutputList         // discovered outputs published by this publisher
+	OutputForecasts *nodes.OutputForecastList // output forecasts values published by this publisher
+	OutputValues    *nodes.OutputValueList    // output values published by this publisher
+	Zone            string                    // The zone this publisher lives in
+
 	address             string                     // the publisher node address
 	autosaveFolder      string                     // folder to save nodes after update
 	discoverCountdown   int                        // countdown each heartbeat
 	discoveryInterval   int                        // discovery polling interval
 	discoveryHandler    func(publisher *Publisher) // function that performs discovery
 	id                  string                     // publisher ID
-	Logger              *log.Logger                //
+	isRunning           bool                       // publisher was started and is running
 	messenger           messenger.IMessenger       // Message bus messenger to use
 	onNodeConfigHandler NodeConfigHandler          // handle before applying configuration
 	onNodeInputHandler  NodeInputHandler           // handle to update device/service input
+	pollHandler         func(publisher *Publisher) // function that performs value polling
+	pollCountdown       int                        // countdown each heartbeat
+	pollInterval        int                        // value polling interval in seconds
+	signPrivateKey      *ecdsa.PrivateKey          // key for singing published messages
 
-	pollHandler    func(publisher *Publisher)            // function that performs value polling
-	pollCountdown  int                                   // countdown each heartbeat
-	pollInterval   int                                   // value polling interval in seconds
 	zonePublishers map[string]*iotc.NodeDiscoveryMessage // publishers on the network
-	signPrivateKey *ecdsa.PrivateKey                     // key for singing published messages
-	Zone           string                                // The zone this publisher lives in
 
 	// background publications require a mutex to prevent concurrent access
 	exitChannel chan bool
 	updateMutex *sync.Mutex // mutex for async updating and publishing
-
-	Nodes          *nodes.NodeList                   // nodes published by this publisher
-	isRunning      bool                              // publisher was started and is running
-	Inputs         *nodes.InputList                  // inputs published by this publisher
-	Outputs        *nodes.OutputList                 // outputs published by this publisher
-	outputForecast map[string]iotc.OutputHistoryList // output forecast by address
-	OutputValues   *nodes.OutputValueList            // output values and history published by this publisher
 }
 
 // Address  returns the publisher's node address
@@ -116,7 +116,7 @@ func (publisher *Publisher) PublisherNode() *iotc.NodeDiscoveryMessage {
 // handler is the callback with the publisher for publishing discovery
 func (publisher *Publisher) SetDiscoveryInterval(interval int, handler func(publisher *Publisher)) {
 
-	publisher.Logger.Infof("discovery interval = %d seconds", interval)
+	publisher.Logger.Infof("Publisher.SetDiscoveryInterval: discovery interval = %d seconds", interval)
 	if interval > 0 {
 		publisher.discoveryInterval = interval
 	}
@@ -147,9 +147,9 @@ func (publisher *Publisher) SetLogging(levelName string, filename string) {
 	if filename != "" {
 		logFileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 		if err != nil {
-			publisher.Logger.Errorf("MyZoneService.SetLogging: Unable to open logfile: %s", err)
+			publisher.Logger.Errorf("Publisher.SetLogging: Unable to open logfile: %s", err)
 		} else {
-			publisher.Logger.Warnf("MyZoneService.SetLogging: Send logging output to %s", filename)
+			publisher.Logger.Warnf("Publisher.SetLogging: Send logging output to %s", filename)
 			logOut = logFileHandle
 		}
 	}
@@ -201,7 +201,7 @@ func (publisher *Publisher) SetPersistNodes(folder string, autosave bool) error 
 // interval in seconds to perform another poll. Default is DefaultPollInterval
 // intended for publishers that need to poll for values
 func (publisher *Publisher) SetPollingInterval(interval int, handler func(publisher *Publisher)) {
-	publisher.Logger.Infof("polling interval = %d seconds", interval)
+	publisher.Logger.Infof("Publisher.SetPollingInterval: interval = %d seconds", interval)
 	if interval > 0 {
 		publisher.pollInterval = interval
 	}
@@ -233,11 +233,11 @@ func (publisher *Publisher) SetNodeInputHandler(handler func(input *iotc.InputDi
 func (publisher *Publisher) Start() {
 
 	if publisher.messenger == nil {
-		publisher.Logger.Errorf("Can't start publisher %s without a messenger. See SetMessenger()", publisher.id)
+		publisher.Logger.Errorf("Publisher.Start: Can't start publisher %s without a messenger. See SetMessenger()", publisher.id)
 		return
 	}
 	if !publisher.isRunning {
-		publisher.Logger.Warningf("Starting publisher %s", publisher.id)
+		publisher.Logger.Warningf("Publisher.Start: Starting publisher %s", publisher.id)
 		publisher.updateMutex.Lock()
 		publisher.isRunning = true
 		publisher.updateMutex.Unlock()
@@ -261,16 +261,16 @@ func (publisher *Publisher) Start() {
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher
-		publisher.PublishUpdates()
+		publisher.PublishUpdatedDiscoveries()
 
-		publisher.Logger.Warningf("Publisher %s started", publisher.id)
+		publisher.Logger.Warningf("Publisher.Start: Publisher %s started", publisher.id)
 	}
 }
 
 // Stop publishing
 // Wait until the heartbeat loop has finished processing messages
 func (publisher *Publisher) Stop() {
-	publisher.Logger.Warningf("Stopping publisher %s", publisher.id)
+	publisher.Logger.Warningf("Publisher.Stop: Stopping publisher %s", publisher.id)
 	publisher.updateMutex.Lock()
 	if publisher.isRunning {
 		publisher.isRunning = false
@@ -301,7 +301,7 @@ func (publisher *Publisher) WaitForSignal() {
 
 // Main heartbeat loop to publish, discove and poll value updates
 func (publisher *Publisher) heartbeatLoop() {
-	publisher.Logger.Warningf("starting heartbeat loop")
+	publisher.Logger.Warningf("Publisher.heartbeatLoop: starting heartbeat loop")
 	publisher.exitChannel <- false
 
 	for {
@@ -310,8 +310,8 @@ func (publisher *Publisher) heartbeatLoop() {
 		// FIXME: the publishUpdates duration adds to the heartbeat. This can also take a
 		//  while unless the messenger unloads using channels (which it should)
 		//  we want to be sure it has completed when the heartbeat ends
-		publisher.PublishUpdates()
-		publisher.publishOutputValues()
+		publisher.PublishUpdatedDiscoveries()
+		publisher.PublishUpdatedOutputValues()
 
 		// discover new nodes
 		if (publisher.discoverCountdown <= 0) && (publisher.discoveryHandler != nil) {
@@ -335,7 +335,7 @@ func (publisher *Publisher) heartbeatLoop() {
 		}
 	}
 	publisher.exitChannel <- true
-	publisher.Logger.Warningf("Ending loop of publisher %s", publisher.id)
+	publisher.Logger.Warningf("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.id)
 }
 
 // VerifyMessageSignature Verify a received message is signed by the sender
@@ -348,7 +348,7 @@ func (publisher *Publisher) VerifyMessageSignature(
 	publisher.updateMutex.Unlock()
 
 	if node == nil {
-		publisher.Logger.Warningf("VerifyMessageSignature unknown sender %s", sender)
+		publisher.Logger.Warningf("Publisher.VerifyMessageSignature: unknown sender %s", sender)
 		return false
 	}
 	var pubKey *ecdsa.PublicKey = messenger.DecodePublicKey(node.Identity.PublicKeySigning)
@@ -383,8 +383,8 @@ func NewPublisher(
 		messenger:         sender,
 		Nodes:             nodes.NewNodeList(),
 		Outputs:           nodes.NewOutputList(),
-		OutputValues:      nodes.NewOutputValue(),
-		outputForecast:    make(map[string]iotc.OutputHistoryList),
+		OutputValues:      nodes.NewOutputValueList(),
+		OutputForecasts:   nodes.NewOutputForecastList(),
 		pollCountdown:     1, // run discovery before poll
 		pollInterval:      DefaultPollInterval,
 		address:           pubNode.Address,
@@ -401,7 +401,7 @@ func NewPublisher(
 	privKey, err := ecdsa.GenerateKey(curve, rng)
 	publisher.signPrivateKey = privKey
 	if err != nil {
-		publisher.Logger.Errorf("Failed to create keys for signing: %s", err)
+		publisher.Logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
 	}
 	privStr, pubStr := messenger.EncodeKeys(privKey, &privKey.PublicKey)
 	_ = privStr

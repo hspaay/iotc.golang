@@ -21,7 +21,6 @@ const (
 	OutputTypeColor                  string = "color"
 	OutputTypeColorTemperature       string = "colortemperature"
 	OutputTypeConnections            string = "connections"
-	OutputTypeContact                string = "contact"
 	OutputTypeCPULevel               string = "cpulevel"
 	OutputTypeDewpoint               string = "dewpoint"
 	OutputTypeDimmer                 string = "dimmer"
@@ -46,6 +45,7 @@ const (
 	OutputTypePlay                   string = "avplay"
 	OutputTypePushButton             string = "pushbutton" // with nr of pushes
 	OutputTypeRain                   string = "rain"
+	OutputTypeRelay                  string = "relay"
 	OutputTypeSaturation             string = "saturation"
 	OutputTypeScale                  string = "scale"
 	OutputTypeSignalStrength         string = "signalstrength"
@@ -126,62 +126,69 @@ const (
 // 	OutputTypeWindSpeed:              {DataType: DataTypeNumber, DefaultUnit: UnitSpeed, UnitValues: UnitValuesSpeed},
 // }
 
-// OutputValue of node output
-type OutputValue struct {
-	// Timestamp of the value is ISO 8601
-	Timestamp string `json:"timestamp"`
-	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
-	EpochTime int64  `json:"epoch"` // seconds since jan 1st, 1970,
+// OutputBatchMessage message with multiple output events
+type OutputBatchMessage struct {
+	Address string `json:"address"` // Address of the publication: zone/publisher/node/$output/type/instance
+	Batch   []struct {
+		Timestasmp string            // Tunestamp if event
+		Event      map[string]string // event values
+	} `json:"batch"` // time ordered list of events
+	Timestamp string `json:"timestamp"` // timestamp the batch is created
 }
 
 // OutputDiscoveryMessage with node output description
 type OutputDiscoveryMessage struct {
-	Address     string   `json:"address"`               // I/O address
-	DataType    string   `json:"datatype,omitempty"`    //
-	Description string   `json:"description,omitempty"` // optional description
-	EnumValues  []string `json:"enum,omitempty"`        // enum valid values
-	Instance    string   `json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
-	NodeID      string   `json:"nodeID"`                // The node ID this output is part of (redundant?)
-	OutputType  string   `json:"type,omitempty"`        // type of input or output as per IOTypeXyz
+	Address     string   `json:"address"`               // Address of the publication: zone/publisher/node/$output/type/instance
+	DataType    DataType `json:"datatype,omitempty"`    // output value data type (DataType)
+	Description string   `json:"description,omitempty"` // optional description for humans
+	EnumValues  []string `json:"enumValues,omitempty"`  // possible enum output values for enum datatype
+	Instance    string   `json:"instance"`              // instance identifier for multi-I/O nodes
+	Max         float32  `json:"max,omitempty"`         // optional max value of output for numeric data types
+	Min         float32  `json:"min,omitempty"`         // optional min value of output for numeric data types
+	Timestamp   string   `json:"timestamp"`             // time the record is created
+	Type        string   `json:"type"`                  // type of output as per OutputTypeXyz
 	Unit        Unit     `json:"unit,omitempty"`        // unit of output value
 }
 
 // OutputEventMessage message with multiple output values
 type OutputEventMessage struct {
-	Address   string            `json:"address"`
+	Address   string            `json:"address"` // Address of the publication: zone/publisher/node/$output/type/instance
 	Event     map[string]string `json:"event"`
-	Sender    string            `json:"sender"`
 	Timestamp string            `json:"timestamp"`
 }
 
-// OutputHistoryList List of history values
-type OutputHistoryList []OutputValue
+// OutputForecast with forecasted values
+// type OutputForecast []OutputValue
 
 // OutputForecastMessage with prediction output values
 type OutputForecastMessage struct {
-	Address   string            `json:"address"`
-	Duration  int               `json:"duration,omitempty"`
-	Forecast  OutputHistoryList `json:"forecast"`
-	Sender    string            `json:"sender"`
-	Timestamp string            `json:"timestamp"`
-	Unit      Unit              `json:"unit,omitempty"`
+	Address   string        `json:"address"` // Address of the publication: zone/publisher/node/$output/type/instance
+	Duration  int           `json:"duration,omitempty"`
+	Forecast  []OutputValue `json:"forecast"`  // list of timestamp and value pairs
+	Timestamp string        `json:"timestamp"` // timestamp the forecast was created
+	Unit      Unit          `json:"unit,omitempty"`
 }
 
 // OutputHistoryMessage with historical output value
 type OutputHistoryMessage struct {
-	Address   string            `json:"address"`
-	Duration  int               `json:"duration,omitempty"`
-	History   OutputHistoryList `json:"history"`
-	Sender    string            `json:"sender"`
-	Timestamp string            `json:"timestamp"`
-	Unit      Unit              `json:"unit,omitempty"`
+	Address   string        `json:"address"` // Address of the publication: zone/publisher/node/$output/type/instance
+	Duration  int           `json:"duration,omitempty"`
+	History   []OutputValue `json:"history"`
+	Timestamp string        `json:"timestamp"`
+	Unit      Unit          `json:"unit,omitempty"`
 }
 
 // OutputLatestMessage struct to send/receive the '$latest' command
 type OutputLatestMessage struct {
-	Address   string `json:"address"`
-	Sender    string `json:"sender"`
+	Address   string `json:"address"`   // Address of the publication: zone/publisher/node/$output/type/instance
 	Timestamp string `json:"timestamp"` // timestamp of value
 	Unit      Unit   `json:"unit,omitempty"`
 	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
+}
+
+// OutputValue struct for history and forecast
+type OutputValue struct {
+	Timestamp string `json:"timestamp"` // Timestamp of the value is ISO 8601
+	Value     string `json:"value"`     // this can also be a string containing a list, eg "[ a, b, c ]""
+	EpochTime int64  `json:"epoch"`     // seconds since jan 1st, 1970,
 }

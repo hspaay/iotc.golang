@@ -73,13 +73,14 @@ func (nodes *NodeList) GetNodeByAddress(address string) *iotc.NodeDiscoveryMessa
 func (nodes *NodeList) GetNodeConfigInt(address string, attrName iotc.NodeAttr) (value int, err error) {
 	valueStr, configExists := nodes.GetNodeConfigValue(address, attrName)
 	if !configExists {
-		return 0, errors.New("Configuration does not exist")
+		return 0, errors.New("NodeList.GetNodeConfigInt: Configuration does not exist")
 	}
 	return strconv.Atoi(valueStr)
 }
 
 // GetNodeConfigValue returns the configuration value of a node in this list
-// address starts with the node's address
+// address must starts with the node's address: zone/publisher/nodeid. Any suffix is ignored.
+// attrName is the name of the configuration attribute to look up
 // This retuns the 'default' value if no value is set
 func (nodes *NodeList) GetNodeConfigValue(address string, attrName iotc.NodeAttr) (value string, configExists bool) {
 	nodes.updateMutex.Lock()

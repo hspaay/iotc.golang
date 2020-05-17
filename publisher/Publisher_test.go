@@ -84,7 +84,7 @@ func TestDiscover(t *testing.T) {
 		return
 	}
 	assert.NotEqual(t, tmpIn.Address, tmpOut.Address, "Input and output addresses should not be equal")
-	assert.Equal(t, tmpIn.InputType, tmpOut.OutputType, "Input and output type should be equal")
+	assert.Equal(t, tmpIn.Type, tmpOut.Type, "Input and output type should be equal")
 	assert.Equal(t, tmpIn.Instance, tmpOut.Instance, "Input and output instance should be equal")
 }
 
@@ -130,7 +130,7 @@ func TestAlias(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1)
-	pub1.PublishUpdates()
+	pub1.PublishUpdatedDiscoveries()
 	// time.Sleep(1)
 
 	// Stress concurrency, run test with -race
@@ -156,7 +156,7 @@ func TestAlias(t *testing.T) {
 		return
 	}
 	assert.Equal(t, node1Output1Addr, out.Address, "published output has unexpected address")
-	assert.Equal(t, iotc.OutputTypeOnOffSwitch, out.OutputType, "published output has unexpected iotype")
+	assert.Equal(t, iotc.OutputTypeOnOffSwitch, out.Type, "published output has unexpected iotype")
 }
 
 // TestConfigure tests if the node configuration is handled
@@ -208,7 +208,7 @@ func TestOutputValue(t *testing.T) {
 	pub1.Outputs.UpdateOutput(node1Output1)
 	pub1.OutputValues.UpdateOutputValue(node1Addr, node1Output1Type, node1Output1Instance, "true")
 
-	pub1.PublishUpdates()
+	pub1.PublishUpdatedDiscoveries()
 	// time.Sleep(time.Second * 1) // receive publications
 	pub1.Stop()
 
@@ -252,13 +252,13 @@ func TestReceiveInput(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
-		pub1.OutputValues.UpdateOutputValue(node1Addr, input.InputType, input.Instance, message.Value)
+		pub1.OutputValues.UpdateOutputValue(node1Addr, input.Type, input.Instance, message.Value)
 	})
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1) // p1
 	pub1.Inputs.UpdateInput(node1Input1)
 	pub1.Outputs.UpdateOutput(node1Output1)
-	pub1.PublishUpdates()
+	pub1.PublishUpdatedDiscoveries()
 	// process background messages
 	// time.Sleep(time.Second * 1) // receive publications
 

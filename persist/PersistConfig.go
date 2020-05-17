@@ -20,8 +20,8 @@ const MessengerConfigFile = "messenger.yaml"
 // UserHomeDir is the user's home folder for default config
 var UserHomeDir, _ = os.UserHomeDir()
 
-// DefaultConfigFolder for IoTConnect publisher configuration files: ~/.config/iotconnect
-var DefaultConfigFolder = path.Join(UserHomeDir, ".config", "iotconnect")
+// DefaultConfigFolder for IoTConnect publisher configuration files: ~/.config/iotc
+var DefaultConfigFolder = path.Join(UserHomeDir, ".config", "iotc")
 
 // LoadAppConfig loads the application configuration from a configuration file
 //
