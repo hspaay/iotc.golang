@@ -146,7 +146,7 @@ type OutputDiscoveryMessage struct {
 	Max         float32  `json:"max,omitempty"`         // optional max value of output for numeric data types
 	Min         float32  `json:"min,omitempty"`         // optional min value of output for numeric data types
 	Timestamp   string   `json:"timestamp"`             // time the record is created
-	Type        string   `json:"type"`                  // type of output as per OutputTypeXyz
+	OutputType  string   `json:"outputtype"`            // type of output as per OutputTypeXyz
 	Unit        Unit     `json:"unit,omitempty"`        // unit of output value
 }
 

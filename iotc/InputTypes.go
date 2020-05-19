@@ -40,17 +40,16 @@ type InputDiscoveryMessage struct {
 	Instance    string   `json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
 	Max         float32  `json:"max,omitempty"`         // optional max value of input for numeric data types
 	Min         float32  `json:"min,omitempty"`         // optional min value of input for numeric data types
-	Type        string   `json:"type,omitempty"`        // type of input or output as per IOTypeXyz
-	// NodeID      string   `json:"nodeID"`                // The node ID
-	Unit Unit `json:"unit,omitempty"` // unit of value
+	InputType   string   `json:"inputtype,omitempty"`   // type of input or output as per IOTypeXyz
+	Unit        Unit     `json:"unit,omitempty"`        // unit of value
 }
 
 // SetInputMessage to control an input
 type SetInputMessage struct {
 	Address   string `json:"address"` // zone/publisher/node/$set/type/instance
 	Timestamp string `json:"timestamp"`
-	Sender    string `json:"sender"`
-	Value     string `json:"value"` // this can also be a string containing a list, eg "[ a, b, c ]""
+	Sender    string `json:"sender"` // sending node: zone/publisher/nodeId
+	Value     string `json:"value"`  // this can also be a string containing a list, eg "[ a, b, c ]""
 }
 
 // UpgradeFirmwareMessage with node firmware
@@ -59,6 +58,6 @@ type UpgradeFirmwareMessage struct {
 	MD5       string `json:"md5"`       // firmware MD5
 	Firmware  []byte `json:"firmware"`  // firmware code
 	FWVersion string `json:"fwversion"` // firmware version
-	Sender    string `json:"sender"`
+	Sender    string `json:"sender"`    // sending node: zone/publisher/nodeId
 	Timestamp string `json:"timestamp"`
 }

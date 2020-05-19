@@ -54,7 +54,6 @@ func (messenger *DummyMessenger) GetZone() string {
 
 // OnReceive function to simulate a received message
 func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
-	messageParts := strings.Split(address, "/")
 	var payload iotc.Publication
 	var publication iotc.Publication
 	var rawStr = string(rawPayload)
@@ -73,27 +72,8 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 	messenger.publishMutex.Unlock()
 
 	for _, subscription := range subs {
-		subscriptionSegments := strings.Split(subscription.address, "/")
-		// Match the address accepting wildcards. Rather crude but only intended for testing.
-		match := true
-		for index, addrSegment := range messageParts {
-			if index >= len(subscriptionSegments) {
-				match = false
-				break // no match, message address is longer
-			}
-			subscriptionSegment := subscriptionSegments[index]
-			if subscriptionSegment == "#" {
-				match = true
-				break
-			} else if subscriptionSegment == "+" {
-				// match, continue
-			} else if addrSegment == subscriptionSegment {
-				// match continue
-			} else {
-				match = false
-				break // no match
-			}
-		}
+		match := messenger.matchAddress(address, subscription.address)
+
 		if match {
 			subscription.handler(address, &publication)
 		}
@@ -136,6 +116,36 @@ func (messenger *DummyMessenger) Subscribe(
 	messenger.publishMutex.Lock()
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
 	messenger.publishMutex.Unlock()
+}
+
+// test if a given address matches a subscription address with wildcards
+func (messenger *DummyMessenger) matchAddress(address string, subscription string) (match bool) {
+	subscriptionSegments := strings.Split(subscription, "/")
+	addressSegments := strings.Split(address, "/")
+
+	// no match subscription is longer than address
+	if len(subscriptionSegments) > len(addressSegments) {
+		return false
+	}
+
+	// Match the segments accepting wildcards. Rather crude but only intended for testing.
+	match = true
+	for index, addrSegment := range addressSegments {
+		subscriptionSegment := subscriptionSegments[index]
+
+		if subscriptionSegment == "#" {
+			match = true
+			break
+		} else if subscriptionSegment == "+" {
+			// match, continue
+		} else if addrSegment == subscriptionSegment {
+			// match continue
+		} else {
+			match = false
+			break // no match
+		}
+	}
+	return match
 }
 
 // NewDummyMessenger provides a messenger for messages that go no.where...

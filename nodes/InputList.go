@@ -92,19 +92,20 @@ func MakeInputDiscoveryAddress(nodeAddress string, inputType string, instance st
 	publisherID := segments[1]
 	nodeID := segments[2]
 
-	address := fmt.Sprintf("%s/%s/%s/"+iotc.MessageTypeInputDiscovery+"/%s/%s",
+	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+iotc.MessageTypeInputDiscovery,
 		zone, publisherID, nodeID, inputType, instance)
 	return address
 }
 
-// MakeInputSetAddress creates the address used to update an input value
+// MakeInputSetAddress creates the address used to update a node input value
+// nodeAddress is an address containing the node.
 func MakeInputSetAddress(nodeAddress string, ioType string, instance string) string {
 	segments := strings.Split(nodeAddress, "/")
 	zone := segments[0]
 	publisherID := segments[1]
 	nodeID := segments[2]
 
-	address := fmt.Sprintf("%s/%s/%s/"+iotc.MessageTypeSet+"/%s/%s",
+	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+iotc.MessageTypeSet,
 		zone, publisherID, nodeID, ioType, instance)
 	return address
 }
@@ -115,9 +116,9 @@ func NewInput(nodeAddr string, inputType string, instance string) *iotc.InputDis
 	address := MakeInputDiscoveryAddress(nodeAddr, inputType, instance)
 	// segments := strings.Split(nodeAddress, "/")
 	input := &iotc.InputDiscoveryMessage{
-		Address:  address,
-		Instance: instance,
-		Type:     inputType,
+		Address:   address,
+		Instance:  instance,
+		InputType: inputType,
 		// NodeID:     segments[2],
 	}
 	return input

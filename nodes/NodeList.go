@@ -18,7 +18,7 @@ import (
 // To make changes to a node directly, always Clone the node first and use UpdateNode to apply the change.
 type NodeList struct {
 	// don't access directly. This is only accessible for serialization
-	nodeMap      map[string]*iotc.NodeDiscoveryMessage
+	nodeMap      map[string]*iotc.NodeDiscoveryMessage // node discovery address
 	updateMutex  *sync.Mutex                           // mutex for async updating of nodes
 	updatedNodes map[string]*iotc.NodeDiscoveryMessage // nodes by address that have been rediscovered/updated since last publication
 }
@@ -162,11 +162,11 @@ func (nodes *NodeList) SetErrorStatus(address string, errorMsg string) (changed 
 
 // NewNode creates a node instance and adds it to the list.
 // If the node exists it will remain unchanged
-// This returns the node address
+// This returns the node discovery address
 func (nodes *NodeList) NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.NodeType) string {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
-	addr := MakeNodeAddress(zoneID, publisherID, nodeID)
+	addr := MakeNodeAddress(zoneID, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	existingNode := nodes.getNode(addr)
 	if existingNode == nil {
 		newNode := NewNode(zoneID, publisherID, nodeID, nodeType)
@@ -368,12 +368,26 @@ func (nodes *NodeList) updateNode(node *iotc.NodeDiscoveryMessage) {
 	nodes.updatedNodes[node.Address] = node
 }
 
-// MakeNodeAddress generates the discovery address of a node
+// MakeNodeAddress generates the address of a node: zone/publisherID/nodeID[/messageType]
 // zoneID of the zone the node lives in.
 // publisherID of the publisher for this node, unique for the zone
 // nodeID of the node itself, unique for the publisher
-func MakeNodeAddress(zoneID string, publisherID string, nodeID string) string {
-	address := fmt.Sprintf("%s/%s/%s/"+iotc.MessageTypeNodeDiscovery, zoneID, publisherID, nodeID)
+// messageType is optional
+func MakeNodeAddress(zoneID string, publisherID string, nodeID string, messageType string) string {
+	address := fmt.Sprintf("%s/%s/%s", zoneID, publisherID, nodeID)
+	if messageType != "" {
+		address = address + "/" + messageType
+	}
+	return address
+}
+
+// MakeNodeDiscoveryAddress generates the address of a node: zone/publisherID/nodeID/$node
+// Intended for lookup of nodes in the node list.
+// zoneID of the zone the node lives in.
+// publisherID of the publisher for this node, unique for the zone
+// nodeID of the node itself, unique for the publisher
+func MakeNodeDiscoveryAddress(zoneID string, publisherID string, nodeID string) string {
+	address := fmt.Sprintf("%s/%s/%s/%s", zoneID, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	return address
 }
 
@@ -397,16 +411,16 @@ func NewNodeConfig(id iotc.NodeAttr, dataType iotc.DataType, description string,
 
 // NewNode returns a new instance of a node
 func NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.NodeType) *iotc.NodeDiscoveryMessage {
-	address := MakeNodeAddress(zoneID, publisherID, nodeID)
+	address := MakeNodeAddress(zoneID, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	newNode := &iotc.NodeDiscoveryMessage{
-		Address:     address,
-		Attr:        map[iotc.NodeAttr]string{},
-		Config:      map[iotc.NodeAttr]iotc.ConfigAttr{},
-		ID:          nodeID,
-		PublisherID: publisherID,
-		Status:      make(map[iotc.NodeStatus]string),
-		Type:        nodeType,
-		Zone:        zoneID,
+		Address: address,
+		Attr:    map[iotc.NodeAttr]string{},
+		Config:  map[iotc.NodeAttr]iotc.ConfigAttr{},
+		// ID:          nodeID,
+		// PublisherID: publisherID,
+		Status: make(map[iotc.NodeStatus]string),
+		Type:   nodeType,
+		// Zone:        zoneID,
 	}
 	return newNode
 }
@@ -419,3 +433,25 @@ func NewNodeList() *NodeList {
 	}
 	return &nodes
 }
+
+// // SplitNodeAddress splits any given address into a node part, messageType, in/output type and instance
+// // address is the address to split
+// // returns address parts, returns empty string if
+// func SplitNodeAddress(address string) (nodeAddress string, messageType iotc.MessageType, ioType string, instance string) {
+// 	// zone/publisher/node[/mtype[/iotype/instance]]
+// 	segments := strings.Split(address, "/")
+// 	if len(segments) < 3 {
+// 		return
+// 	}
+// 	nodeAddress = strings.Join(segments[:3], "/")
+// 	if len(segments) > 3 {
+// 		messageType = iotc.MessageType(segments[3])
+// 	}
+// 	if len(segments) > 4 {
+// 		ioType = segments[4]
+// 	}
+// 	if len(segments) > 5 {
+// 		instance = segments[5]
+// 	}
+// 	return
+// }

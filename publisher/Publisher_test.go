@@ -23,17 +23,17 @@ var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
 var node1 = nodes.NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 var node1ConfigureAddr = node1Base + "/$configure"
-var node1InputAddr = node1Base + "/$input/switch/0"
-var node1InputSetAddr = node1Base + "/$set/switch/0"
+var node1InputAddr = node1Base + "/switch/0/$input"
+var node1InputSetAddr = node1Base + "/switch/0/$set"
 
-var node1Output1Addr = node1Base + "/$output/switch/0"
+var node1Output1Addr = node1Base + "/switch/0/$output"
 var node1Output1Type = "switch"
 var node1Output1Instance = "0"
 
-var node1AliasOutput1Addr = node1Alias + "/$output/switch/0"
-var node1valueAddr = node1Base + "/$value/switch/0"
-var node1latestAddr = node1Base + "/$latest/switch/0"
-var node1historyAddr = node1Base + "/$history/switch/0"
+var node1AliasOutput1Addr = node1Alias + "/switch/0/$output"
+var node1valueAddr = node1Base + "/switch/0/$value"
+var node1latestAddr = node1Base + "/switch/0/$latest"
+var node1historyAddr = node1Base + "/switch/0/$history"
 
 var node1Input1 = nodes.NewInput(node1Addr, "switch", "0")
 var node1Output1 = nodes.NewOutput(node1Addr, "switch", "0")
@@ -56,6 +56,7 @@ func TestNewPublisher(t *testing.T) {
 		assert.Equal(t, pubAddr, tmpNode.Address, "Retrieved publisher node not equal to expected node")) {
 		return
 	}
+	assert.NotEmpty(t, tmpNode.Address, "Missing node address")
 }
 
 // TestDiscover tests if discovered nodes, input and output are propery accessible via the publisher
@@ -68,6 +69,7 @@ func TestDiscover(t *testing.T) {
 		assert.Equal(t, node1Addr, tmpNode.Address, "Retrieved node not equal to expected node")) {
 		return
 	}
+	assert.Equalf(t, node1Addr, tmpNode.Address, "Node address doesn't match")
 
 	pub1.Inputs.UpdateInput(node1Input1)
 	tmpIn := pub1.Inputs.GetInput(node1Addr, "switch", "0")
@@ -76,6 +78,9 @@ func TestDiscover(t *testing.T) {
 		assert.Equal(t, node1InputAddr, tmpIn.Address, "Input address incorrect")) {
 		return
 	}
+	assert.Equalf(t, node1InputAddr, tmpIn.Address, "Input address doesn't match")
+	assert.Equalf(t, "switch", tmpIn.InputType, "Input Type doesn't match")
+	assert.Equalf(t, "0", tmpIn.Instance, "Input Instance doesn't match")
 
 	pub1.Outputs.UpdateOutput(node1Output1)
 	tmpOut := pub1.Outputs.GetOutput(node1Addr, "switch", "0")
@@ -83,9 +88,7 @@ func TestDiscover(t *testing.T) {
 		assert.Equal(t, node1Output1.Address, tmpOut.Address, "Retrieved output 1 not equal to discovered output 1")) {
 		return
 	}
-	assert.NotEqual(t, tmpIn.Address, tmpOut.Address, "Input and output addresses should not be equal")
-	assert.Equal(t, tmpIn.Type, tmpOut.Type, "Input and output type should be equal")
-	assert.Equal(t, tmpIn.Instance, tmpOut.Instance, "Input and output instance should be equal")
+	assert.Equalf(t, node1Output1Addr, tmpOut.Address, "Output address doesn't match")
 }
 
 // TestNodePublication tests if discoveries are published.
@@ -156,7 +159,7 @@ func TestAlias(t *testing.T) {
 		return
 	}
 	assert.Equal(t, node1Output1Addr, out.Address, "published output has unexpected address")
-	assert.Equal(t, iotc.OutputTypeOnOffSwitch, out.Type, "published output has unexpected iotype")
+	assert.Equal(t, iotc.OutputTypeOnOffSwitch, out.OutputType, "published output has unexpected iotype")
 }
 
 // TestConfigure tests if the node configuration is handled
@@ -252,7 +255,7 @@ func TestReceiveInput(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
-		pub1.OutputValues.UpdateOutputValue(node1Addr, input.Type, input.Instance, message.Value)
+		pub1.OutputValues.UpdateOutputValue(node1Addr, input.InputType, input.Instance, message.Value)
 	})
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1) // p1

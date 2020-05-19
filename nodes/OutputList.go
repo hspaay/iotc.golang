@@ -11,7 +11,7 @@ import (
 
 // OutputList with output management
 type OutputList struct {
-	outputMap      map[string]*iotc.OutputDiscoveryMessage
+	outputMap      map[string]*iotc.OutputDiscoveryMessage // output discovery address - object map
 	updateMutex    *sync.Mutex                             // mutex for async updating of outputs
 	updatedOutputs map[string]*iotc.OutputDiscoveryMessage // address of outputs that have been rediscovered/updated since last publication
 }
@@ -98,6 +98,19 @@ func (outputs *OutputList) UpdateOutput(output *iotc.OutputDiscoveryMessage) {
 	outputs.updateMutex.Unlock()
 }
 
+// MakeOutputDiscoveryAddress for publishing or subscribing
+// nodeAddress is the address containing the node. Any node, input or output address will do
+func MakeOutputDiscoveryAddress(nodeAddress string, ioType string, instance string) string {
+	segments := strings.Split(nodeAddress, "/")
+	zone := segments[0]
+	publisherID := segments[1]
+	nodeID := segments[2]
+
+	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+iotc.MessageTypeOutputDiscovery,
+		zone, publisherID, nodeID, ioType, instance)
+	return address
+}
+
 // NewOutput creates a new output for the given node.
 // It is not immediately added to allow for further updates of the ouput definition.
 // To add it to the list use 'UpdateOutput'
@@ -110,26 +123,14 @@ func NewOutput(nodeAddress string, outputType string, instance string) *iotc.Out
 	// segments := strings.Split(nodeAddress, "/")
 
 	output := &iotc.OutputDiscoveryMessage{
-		Address:  address,
-		Instance: instance,
-		Type:     outputType,
+		Address:    address,
+		Instance:   instance,
+		OutputType: outputType,
 		// NodeID:     segments[2],
 		// PublisherID: node.PublisherID,
 		// History:  make([]*HistoryValue, 1),
 	}
 	return output
-}
-
-// MakeOutputDiscoveryAddress for publishing or subscribing
-func MakeOutputDiscoveryAddress(nodeAddress string, ioType string, instance string) string {
-	segments := strings.Split(nodeAddress, "/")
-	zone := segments[0]
-	publisherID := segments[1]
-	nodeID := segments[2]
-
-	address := fmt.Sprintf("%s/%s/%s/"+iotc.MessageTypeOutputDiscovery+"/%s/%s",
-		zone, publisherID, nodeID, ioType, instance)
-	return address
 }
 
 // NewOutputList creates a new instance for output management

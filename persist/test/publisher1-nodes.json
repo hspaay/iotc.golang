@@ -1,6 +1,5 @@
 [
   {
-    "id": "node1",
     "address": "zone1/publisher1/node1/$node",
     "publisher": "publisher1",
     "runstate": "",

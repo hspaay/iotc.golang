@@ -90,20 +90,21 @@ func (publisher *Publisher) getOutputAliasAddress(address string, messageType io
 	}
 	alias, hasAlias := publisher.Nodes.GetNodeConfigValue(address, iotc.NodeAttrAlias)
 	// alias, hasAlias := nodes.GetNodeAlias(node)
+	// zone/pub/node/outtype/instance/messagetype
 	parts := strings.Split(address, "/")
 	if !hasAlias {
 		alias = parts[2]
 	}
 	parts[2] = alias
 	if messageType != "" {
-		parts[3] = string(messageType)
+		parts[5] = string(messageType)
 	}
 	aliasAddr := strings.Join(parts, "/")
 	return aliasAddr
 }
 
 // publish all node output values in the $event command
-// zone/publisher/node/$event
+// zone/publisher/nodealias/$event
 // TODO: decide when to invoke this
 func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 	// output values are published using their alias address, if any
@@ -115,7 +116,7 @@ func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	for _, output := range outputs {
 		latest := publisher.OutputValues.GetOutputValueByAddress(output.Address)
-		attrID := output.Type + "/" + output.Instance
+		attrID := output.OutputType + "/" + output.Instance
 		event[attrID] = latest.Value
 	}
 	eventMessage := &iotc.OutputEventMessage{
@@ -132,7 +133,7 @@ func (publisher *Publisher) publishLatest(outputAddress string, unit iotc.Unit) 
 	// output values are published using their alias address, if any
 	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeLatest)
 
-	// zone/publisher/node/$latest/iotype/instance
+	// zone/publisher/node/iotype/instance/$latest
 	latest := publisher.OutputValues.GetOutputValueByAddress(outputAddress)
 	if latest == nil {
 		publisher.Logger.Warningf("Publisher.publishLatest: no latest value. This is unexpected")

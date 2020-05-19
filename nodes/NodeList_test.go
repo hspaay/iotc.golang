@@ -19,17 +19,17 @@ var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
 
 var node1ConfigureAddr = node1Base + "/$configure"
-var node1InputAddr = node1Base + "/$input/switch/0"
-var node1InputSetAddr = node1Base + "/$set/switch/0"
+var node1InputAddr = node1Base + "/switch/0/$input"
+var node1InputSetAddr = node1Base + "/switch/0/$set"
 
-var node1Output1Addr = node1Base + "/$output/switch/0"
+var node1Output1Addr = node1Base + "/switch/0/$output"
 var node1Output1Type = "switch"
 var node1Output1Instance = "0"
 
-var node1AliasOutput1Addr = node1Alias + "/$output/switch/0"
-var node1valueAddr = node1Base + "/$value/switch/0"
-var node1latestAddr = node1Base + "/$latest/switch/0"
-var node1historyAddr = node1Base + "/$history/switch/0"
+var node1AliasOutput1Addr = node1Alias + "/switch/0/$output"
+var node1valueAddr = node1Base + "/switch/0/$value"
+var node1latestAddr = node1Base + "/switch/0/$latest"
+var node1historyAddr = node1Base + "/switch/0/$history"
 
 // const node2 = new node.Node{}
 

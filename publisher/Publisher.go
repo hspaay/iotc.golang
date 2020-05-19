@@ -66,7 +66,7 @@ type Publisher struct {
 	pollInterval        int                        // value polling interval in seconds
 	signPrivateKey      *ecdsa.PrivateKey          // key for singing published messages
 
-	zonePublishers map[string]*iotc.NodeDiscoveryMessage // publishers on the network
+	zonePublishers map[string]*iotc.NodeDiscoveryMessage // publishers on the network by discovery address
 
 	// background publications require a mutex to prevent concurrent access
 	exitChannel chan bool
@@ -250,14 +250,14 @@ func (publisher *Publisher) Start() {
 		publisher.messenger.Connect("", "")
 
 		// Subscribe to receive configuration and set messages for any of our nodes
-		configAddr := fmt.Sprintf("%s/%s/+/%s", publisher.Zone, publisher.id, iotc.MessageTypeConfigure)
+		configAddr := nodes.MakeNodeAddress(publisher.Zone, publisher.id, "+", iotc.MessageTypeConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
-		inputAddr := fmt.Sprintf("%s/%s/+/%s/+/+", publisher.Zone, publisher.id, iotc.MessageTypeSet)
+		inputAddr := nodes.MakeInputSetAddress(configAddr, "+", "+")
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := fmt.Sprintf("%s/+/%s/%s", publisher.Zone, iotc.PublisherNodeID, iotc.MessageTypeNodeDiscovery)
+		pubAddr := nodes.MakeNodeAddress(publisher.Zone, "+", iotc.PublisherNodeID, iotc.MessageTypeNodeDiscovery)
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher

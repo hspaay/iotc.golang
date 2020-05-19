@@ -8,14 +8,19 @@ import (
 	"github.com/hspaay/iotc.golang/iotc"
 )
 
-// handle an incoming a set command for one of our nodes. This:
+// handle an incoming a set command for input of one of our nodes. This:
 // - check if the signature is valid
 // - check if the node is valid
 // - pass the input value update to the adapter's onNodeInputHandler callback
 func (publisher *Publisher) handleNodeInput(address string, publication *iotc.Publication) {
 	// Check that address is one of our inputs
 	segments := strings.Split(address, "/")
-	segments[3] = iotc.MessageTypeInputDiscovery
+	// a full address is required
+	if len(segments) < 6 {
+		return
+	}
+	// zone/pub/node/inputtype/instance/$input
+	segments[5] = iotc.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
 
 	input := publisher.Inputs.GetInputByAddress(inputAddr)

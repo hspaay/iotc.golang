@@ -45,15 +45,14 @@ const (
 	NodeStatusNeighbors     NodeStatus = "neighbors"     // mesh network device neighbors ID list [id,id,...]
 	NodeStatusRxCount       NodeStatus = "received"      // Nr of messages received from device
 	NodeStatusTxCount       NodeStatus = "sent"          // Nr of messages send to device
+	NodeStatusRunState      NodeStatus = "runstate"      // Node runstate as per below
 )
 
 // Various Running States
 const (
 	NodeRunStateError        NodeRunState = "error"        // Node needs servicing
-	NodeRunStateDisconnected NodeRunState = "disconnected" // Node has cleanly disconnected
 	NodeRunStateFailed       NodeRunState = "failed"       // Node failed to start
 	NodeRunStateInitializing NodeRunState = "initializing" // Node is initializing
-	NodeRunStateLost         NodeRunState = "lost"         // Node connection unexpectedly lost
 	NodeRunStateReady        NodeRunState = "ready"        // Node is ready for use
 	NodeRunStateSleeping     NodeRunState = "sleeping"     // Node has gone into sleep mode, often a battery powered devie
 )
@@ -128,7 +127,7 @@ type ConfigAttr struct {
 type NodeConfigureMessage struct {
 	Address   string      `json:"address"` // zone/publisher/node/$configure
 	Attr      NodeAttrMap `json:"attr"`    // configuration attributes
-	Sender    string      `json:"sender"`
+	Sender    string      `json:"sender"`  // sending node: zone/publisher/node
 	Timestamp string      `json:"timestamp"`
 }
 
@@ -148,17 +147,18 @@ type PublisherIdentity struct {
 
 // NodeDiscoveryMessage definition published in node discovery
 type NodeDiscoveryMessage struct {
-	ID                string                  `json:"id"`                          // Node's immutable ID
+	// ID                string                  `json:"id"`                          // Node's immutable ID
 	Address           string                  `json:"address"`                     // Node discovery address
 	Attr              NodeAttrMap             `json:"attr,omitempty"`              // Node/service info attributes
 	Config            map[NodeAttr]ConfigAttr `json:"config,omitempty"`            // Node/service configuration.
 	Identity          *PublisherIdentity      `json:"identity,omitempty"`          // Identity if node is a publisher
 	IdentitySignature string                  `json:"identitySignature,omitempty"` // optional signature of the identity by the ZSAS
-	PublisherID       string                  `json:"publisher"`                   // publisher ID
-	RunState          NodeRunState            `json:"runstate"`                    // node runtime status
-	Status            map[NodeStatus]string   `json:"status,omitempty"`            // additional node status details
-	Type              NodeType                `json:"type"`                        // node type
-	Zone              string                  `json:"zone"`                        // Zone in which node lives
+	NodeID            string                  `json:"nodeId"`                      // The node ID
+	// PublisherID       string                  `json:"publisher"`                   // publisher ID
+	RunState NodeRunState          `json:"runstate"`         // node runtime status
+	Status   map[NodeStatus]string `json:"status,omitempty"` // additional node status details
+	Type     NodeType              `json:"type"`             // node type
+	// Zone              string                  `json:"zone"`                        // Zone in which node lives
 	// HistorySize       int                     `json:"historySize,omitempty"`       // size of history for inputs and outputs, default automatically for 24 hours
 	// RepeatDelay       int                     `json:"repeatDelay,omitempty"`       // delay in seconds before republishing this node's outputs when their value doesn't change. Default 1 hour
 }
