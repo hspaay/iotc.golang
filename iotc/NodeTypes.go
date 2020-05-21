@@ -40,7 +40,7 @@ const (
 	NodeStatusHealth        NodeStatus = "health"        // health status of the device 0-100%
 	NodeStatusLastError     NodeStatus = "lasterror"     // most recent error message
 	NodeStatusLastSeen      NodeStatus = "lastseen"      // ISO time the device was last seen
-	NodeStatusLatencyMSec   NodeStatus = "latency"       // duration connect to sensor in milliseconds
+	NodeStatusLatencyMSec   NodeStatus = "latency-msec"  // duration connect to sensor in milliseconds
 	NodeStatusNeighborCount NodeStatus = "neighborcount" // mesh network nr of neighbors
 	NodeStatusNeighbors     NodeStatus = "neighbors"     // mesh network device neighbors ID list [id,id,...]
 	NodeStatusRxCount       NodeStatus = "received"      // Nr of messages received from device
@@ -50,11 +50,11 @@ const (
 
 // Various Running States
 const (
-	NodeRunStateError        NodeRunState = "error"        // Node needs servicing
-	NodeRunStateFailed       NodeRunState = "failed"       // Node failed to start
-	NodeRunStateInitializing NodeRunState = "initializing" // Node is initializing
-	NodeRunStateReady        NodeRunState = "ready"        // Node is ready for use
-	NodeRunStateSleeping     NodeRunState = "sleeping"     // Node has gone into sleep mode, often a battery powered devie
+	NodeRunStateError        NodeStatus = "error"        // Node needs servicing
+	NodeRunStateFailed       NodeStatus = "failed"       // Node failed to start
+	NodeRunStateInitializing NodeStatus = "initializing" // Node is initializing
+	NodeRunStateReady        NodeStatus = "ready"        // Node is ready for use
+	NodeRunStateSleeping     NodeStatus = "sleeping"     // Node has gone into sleep mode, often a battery powered devie
 )
 
 // NodeType identifying  the purpose of the node
@@ -100,9 +100,6 @@ type NodeAttr string
 
 // NodeAttrMap for storing node attributes
 type NodeAttrMap map[NodeAttr]string
-
-// NodeRunState running state options
-type NodeRunState string
 
 // NodeStatus various node status attributes
 type NodeStatus string
@@ -155,10 +152,7 @@ type NodeDiscoveryMessage struct {
 	IdentitySignature string                  `json:"identitySignature,omitempty"` // optional signature of the identity by the ZSAS
 	NodeID            string                  `json:"nodeId"`                      // The node ID
 	// PublisherID       string                  `json:"publisher"`                   // publisher ID
-	RunState NodeRunState          `json:"runstate"`         // node runtime status
-	Status   map[NodeStatus]string `json:"status,omitempty"` // additional node status details
-	Type     NodeType              `json:"type"`             // node type
+	Status map[NodeStatus]string `json:"status,omitempty"` // additional node status details
+	Type   NodeType              `json:"type"`             // node type
 	// Zone              string                  `json:"zone"`                        // Zone in which node lives
-	// HistorySize       int                     `json:"historySize,omitempty"`       // size of history for inputs and outputs, default automatically for 24 hours
-	// RepeatDelay       int                     `json:"repeatDelay,omitempty"`       // delay in seconds before republishing this node's outputs when their value doesn't change. Default 1 hour
 }

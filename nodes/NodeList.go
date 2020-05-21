@@ -145,13 +145,13 @@ func (nodes *NodeList) SetErrorStatus(address string, errorMsg string) (changed 
 		newNode := nodes.Clone(node)
 		changed = false
 		if node.Status[iotc.NodeStatusLastError] != errorMsg {
-			node.Status[iotc.NodeStatusLastError] = errorMsg
+			newNode.Status[iotc.NodeStatusLastError] = errorMsg
 			changed = true
 		}
 
-		if node.RunState != iotc.NodeRunStateError {
+		if node.Status[iotc.NodeStatusRunState] != string(iotc.NodeRunStateError) {
 			changed = true
-			newNode.RunState = iotc.NodeRunStateError
+			newNode.Status[iotc.NodeStatusRunState] = string(iotc.NodeRunStateError)
 		}
 		if changed {
 			nodes.updateNode(newNode)
@@ -242,24 +242,24 @@ func (nodes *NodeList) SetNodeConfigValues(address string, params map[iotc.NodeA
 	return changed
 }
 
-// SetNodeRunState updates the node's runstate status
-func (nodes *NodeList) SetNodeRunState(address string, runState iotc.NodeRunState) (changed bool) {
-	nodes.updateMutex.Lock()
-	defer nodes.updateMutex.Unlock()
+// // SetNodeRunState updates the node's runstate status
+// func (nodes *NodeList) SetNodeRunState(address string, runState iotc.NodeRunState) (changed bool) {
+// 	nodes.updateMutex.Lock()
+// 	defer nodes.updateMutex.Unlock()
 
-	node := nodes.getNode(address)
-	if node == nil {
-		return false
-	}
+// 	node := nodes.getNode(address)
+// 	if node == nil {
+// 		return false
+// 	}
 
-	changed = (node.RunState != runState)
-	if changed {
-		newNode := nodes.Clone(node)
-		newNode.RunState = runState
-		nodes.updateNode(newNode)
-	}
-	return changed
-}
+// 	changed = (node.RunState != runState)
+// 	if changed {
+// 		newNode := nodes.Clone(node)
+// 		newNode.RunState = runState
+// 		nodes.updateNode(newNode)
+// 	}
+// 	return changed
+// }
 
 // SetNodeStatus updates one or more node's status attributes
 // Nodes are immutable. If one or more status values have changed then a new node is created and
@@ -416,7 +416,7 @@ func NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.Nod
 		Address: address,
 		Attr:    map[iotc.NodeAttr]string{},
 		Config:  map[iotc.NodeAttr]iotc.ConfigAttr{},
-		// ID:          nodeID,
+		NodeID:  nodeID,
 		// PublisherID: publisherID,
 		Status: make(map[iotc.NodeStatus]string),
 		Type:   nodeType,
