@@ -169,16 +169,6 @@ func (messenger *MqttMessenger) Disconnect() {
 	}
 }
 
-// GetZone returns the zone in which this messenger operates
-// This is provided via the messenger config file or defaults to iotc.LocalZoneID
-func (messenger *MqttMessenger) GetZone() string {
-	zone := messenger.config.Zone
-	if zone == "" {
-		return iotc.LocalZoneID
-	}
-	return zone
-}
-
 // Publish value using the device address as base
 // address to publish on.
 // retained to have the broker retain the address value

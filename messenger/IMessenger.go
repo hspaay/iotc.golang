@@ -17,7 +17,7 @@ type MessengerConfig struct {
 	Server    string `yaml:"server"`              // Message bus server/broker hostname or ip address, required
 	SubQos    byte   `yaml:"subqos,omitempty"`    // Subscription QOS 0-2. Default=0
 	Messenger string `yaml:"messenger,omitempty"` // Messenger client type: "DummyMessenger" (default) or "MQTTMessenger"
-	Zone      string `yaml:"zone"`                // Zone in which this messenger publishes. Default is "local"
+	Zone      string `yaml:"zone,omitempty"`      // Default zone used in NewAppPublisher on startup
 }
 
 // IMessenger interface for messenger implementations
@@ -37,9 +37,6 @@ type IMessenger interface {
 	// This will prevent the LWT publication so publishers must publish a graceful disconnect
 	// message.
 	Disconnect()
-
-	// Return the zone the messenger publishes in
-	GetZone() string
 
 	// Sign and Publish a message
 	// address to subscribe to as per IotConnect standard

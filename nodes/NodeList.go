@@ -131,9 +131,10 @@ func (nodes *NodeList) GetUpdatedNodes(clearUpdates bool) []*iotc.NodeDiscoveryM
 	return updateList
 }
 
-// SetErrorStatus sets the node RunState to error with a message in the node status NodeStateLastError
-// Use SetRunState to clear the runstate.
-func (nodes *NodeList) SetErrorStatus(address string, errorMsg string) (changed bool) {
+// SetErrorStatus sets the node RunState to the given status with a lasterror message
+// Use NodeRunStateError for errors and NodeRunStateReady to clear error
+// This only updates the node if the status or lastError message changes
+func (nodes *NodeList) SetErrorStatus(address string, runState string, errorMsg string) (changed bool) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 
@@ -149,10 +150,11 @@ func (nodes *NodeList) SetErrorStatus(address string, errorMsg string) (changed 
 			changed = true
 		}
 
-		if node.Status[iotc.NodeStatusRunState] != string(iotc.NodeRunStateError) {
+		if node.Status[iotc.NodeStatusRunState] != runState {
 			changed = true
-			newNode.Status[iotc.NodeStatusRunState] = string(iotc.NodeRunStateError)
+			newNode.Status[iotc.NodeStatusRunState] = runState
 		}
+		// Don't unnecesarily republish the node if the status doesnt change
 		if changed {
 			nodes.updateNode(newNode)
 		}
@@ -163,16 +165,52 @@ func (nodes *NodeList) SetErrorStatus(address string, errorMsg string) (changed 
 // NewNode creates a node instance and adds it to the list.
 // If the node exists it will remain unchanged
 // This returns the node discovery address
-func (nodes *NodeList) NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.NodeType) string {
+func (nodes *NodeList) NewNode(zone string, publisherID string, nodeID string, nodeType iotc.NodeType) string {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
-	addr := MakeNodeAddress(zoneID, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
+	addr := MakeNodeAddress(zone, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	existingNode := nodes.getNode(addr)
 	if existingNode == nil {
-		newNode := NewNode(zoneID, publisherID, nodeID, nodeType)
+		newNode := NewNode(zone, publisherID, nodeID, nodeType)
 		nodes.updateNode(newNode)
 	}
 	return addr
+}
+
+// NewNodeConfig creates a new node configuration instance and adds it to the node.
+// If the configuration already exists, its dataType, description and defaultValue are updated
+// nodeAddr is the address of the node to update
+// attrName is the configuration attribute name. See also iotc.NodeAttr for standard IDs
+// dataType of the value. See also iotc.DataType for standard types.
+// description of the value for humans
+// defaultValue to use as default configuration value
+// returns a new Configuration Attribute instance.
+func (nodes *NodeList) NewNodeConfig(nodeAddr string, attrName iotc.NodeAttr, dataType iotc.DataType, description string, defaultValue string) *iotc.ConfigAttr {
+	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+
+	node := nodes.getNode(nodeAddr)
+	if node != nil {
+		config, configExists := node.Config[attrName]
+		// update existing config or create a new one
+		if !configExists {
+			config = iotc.ConfigAttr{
+				ID:          attrName,
+				Datatype:    dataType,
+				Description: description,
+				Default:     defaultValue,
+			}
+		} else {
+			config.Datatype = dataType
+			config.Default = defaultValue
+			config.Description = description
+		}
+		newNode := nodes.Clone(node)
+		newNode.Config[attrName] = config
+		nodes.updateNode(newNode)
+		return &config
+	}
+	return nil
 }
 
 // SetNodeAttr updates node's attributes and publishes the updated node.
@@ -392,17 +430,18 @@ func MakeNodeDiscoveryAddress(zoneID string, publisherID string, nodeID string) 
 }
 
 // NewNodeConfig creates a new node configuration instance.
-// Use SetNodeConfig to update the node with this configuration
+// Intended for updating additional attributes before updating the actual configuration
+// Use UpdateNodeConfig to update the node with this configuration
 //
-// id is the configuration attribute ID. See also iotc.NodeAttr for standard IDs
+// attrName is the configuration attribute ID. See also iotc.NodeAttr for standard IDs
 // dataType of the value. See also iotc.DataType for standard types.
 // description of the value for humans
 // defaultValue to use as default configuration value
 // returns a new Configuration Attribute instance.
-func NewNodeConfig(id iotc.NodeAttr, dataType iotc.DataType, description string, defaultValue string) *iotc.ConfigAttr {
+func NewNodeConfig(attrName iotc.NodeAttr, dataType iotc.DataType, description string, defaultValue string) *iotc.ConfigAttr {
 	config := iotc.ConfigAttr{
-		ID:          id,
-		DataType:    dataType,
+		ID:          attrName,
+		Datatype:    dataType,
 		Description: description,
 		Default:     defaultValue,
 	}

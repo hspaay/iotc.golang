@@ -8,53 +8,57 @@ const PublisherNodeID = "$publisher" // reserved node ID for publishers
 // When they are configurable they also appear in Node Config section.
 // See also NodeStatusXxx below for attributes that describe the state of the node
 const (
-	NodeAttrAddress      NodeAttr = "address"      // the node's internal address
-	NodeAttrAlias        NodeAttr = "alias"        // node alias for publishing inputs and outputs
-	NodeAttrColor        NodeAttr = "color"        // color in hex notation
-	NodeAttrDescription  NodeAttr = "description"  // device description
-	NodeAttrDisabled     NodeAttr = "disabled"     // device or sensor is disabled
-	NodeAttrFilename     NodeAttr = "filename"     // filename to write images or other values to
-	NodeAttrFirmware     NodeAttr = "version"      // device/service firmware name/version
-	NodeAttrHostname     NodeAttr = "hostname"     // network device hostname
-	NodeAttrLocalIP      NodeAttr = "localip"      // for IP nodes
-	NodeAttrLatLon       NodeAttr = "latlon"       // latitude, longitude of the device for display on a map r/w
-	NodeAttrLocationName NodeAttr = "locationame"  // name of the location
-	NodeAttrLoginName    NodeAttr = "loginname"    // login name to connect to the device. Value is not published
-	NodeAttrMAC          NodeAttr = "mac"          // for IP nodes
-	NodeAttrManufacturer NodeAttr = "manufacturer" // device manufacturer
-	NodeAttrMax          NodeAttr = "max"          // maximum value of sensor or config
-	NodeAttrMin          NodeAttr = "min"          // minimum value of sensor or config
-	NodeAttrModel        NodeAttr = "model"        // device model
-	NodeAttrName         NodeAttr = "name"         // name of device, sensor
-	NodeAttrPassword     NodeAttr = "password"     // password to connect. Value is not published.
-	NodeAttrPollInterval NodeAttr = "pollinterval" // polling interval in seconds
-	NodeAttrPowerSource  NodeAttr = "powersource"  // battery, usb, mains
-	NodeAttrProduct      NodeAttr = "product"      // device product or model name
-	NodeAttrPublicKey    NodeAttr = "publickey"    // public key for encrypting sensitive configuration settings
-	NodeAttrSubnet       NodeAttr = "subnet"       // IP subnets configuration
+	NodeAttrAddress         NodeAttr = "address"         // the node's internal address. Can be used as the nodeID
+	NodeAttrAlias           NodeAttr = "alias"           // node alias for publishing inputs and outputs
+	NodeAttrColor           NodeAttr = "color"           // color in hex notation
+	NodeAttrDescription     NodeAttr = "description"     // device description
+	NodeAttrDisabled        NodeAttr = "disabled"        // device or sensor is disabled
+	NodeAttrFilename        NodeAttr = "filename"        // filename to write images or other values to
+	NodeAttrGatewayAddress  NodeAttr = "gatewayAddress"  // the node gateway address
+	NodeAttrHostname        NodeAttr = "hostname"        // network device hostname
+	NodeAttrIotcVersion     NodeAttr = "iotcVersion"     // IotConnect version
+	NodeAttrLocalIP         NodeAttr = "localIP"         // for IP nodes
+	NodeAttrLatLon          NodeAttr = "latlon"          // latitude, longitude of the device for display on a map r/w
+	NodeAttrLocationName    NodeAttr = "locationName"    // name of a location
+	NodeAttrLoginName       NodeAttr = "loginName"       // login name to connect to the device. Value is not published
+	NodeAttrMAC             NodeAttr = "mac"             // MAC address for IP nodes
+	NodeAttrManufacturer    NodeAttr = "manufacturer"    // device manufacturer
+	NodeAttrMax             NodeAttr = "max"             // maximum value of sensor or config
+	NodeAttrMin             NodeAttr = "min"             // minimum value of sensor or config
+	NodeAttrModel           NodeAttr = "model"           // device model
+	NodeAttrName            NodeAttr = "name"            // name of device, sensor
+	NodeAttrNetmask         NodeAttr = "netmask"         // IP network mask
+	NodeAttrPassword        NodeAttr = "password"        // password to connect. Value is not published.
+	NodeAttrPollInterval    NodeAttr = "pollInterval"    // polling interval in seconds
+	NodeAttrPowerSource     NodeAttr = "powerSource"     // battery, usb, mains
+	NodeAttrProduct         NodeAttr = "product"         // device product or model name
+	NodeAttrPublicKey       NodeAttr = "publicKey"       // public key for encrypting sensitive configuration settings
+	NodeAttrSoftwareVersion NodeAttr = "softwareVersion" // version of the software running the node
+	NodeAttrSubnet          NodeAttr = "subnet"          // IP subnets configuration
 )
 
 // Various NodeStatus attributes
 const (
-	NodeStatusErrorCount    NodeStatus = "errors"        // nr of errors reported on this device
+	NodeStatusErrorCount    NodeStatus = "errorCount"    // nr of errors reported on this device
 	NodeStatusHealth        NodeStatus = "health"        // health status of the device 0-100%
-	NodeStatusLastError     NodeStatus = "lasterror"     // most recent error message
-	NodeStatusLastSeen      NodeStatus = "lastseen"      // ISO time the device was last seen
-	NodeStatusLatencyMSec   NodeStatus = "latency-msec"  // duration connect to sensor in milliseconds
-	NodeStatusNeighborCount NodeStatus = "neighborcount" // mesh network nr of neighbors
-	NodeStatusNeighbors     NodeStatus = "neighbors"     // mesh network device neighbors ID list [id,id,...]
-	NodeStatusRxCount       NodeStatus = "received"      // Nr of messages received from device
-	NodeStatusTxCount       NodeStatus = "sent"          // Nr of messages send to device
-	NodeStatusRunState      NodeStatus = "runstate"      // Node runstate as per below
+	NodeStatusLastError     NodeStatus = "lastError"     // most recent error message
+	NodeStatusLastSeen      NodeStatus = "lastSeen"      // ISO time the device was last seen
+	NodeStatusLatencyMSec   NodeStatus = "latencyMSec"   // duration connect to sensor in milliseconds
+	NodeStatusNeighborCount NodeStatus = "neighborCount" // mesh network nr of neighbors
+	NodeStatusNeighborIDs   NodeStatus = "neighborIDs"   // mesh network device neighbors ID list [id,id,...]
+	NodeStatusRxCount       NodeStatus = "rxCount"       // Nr of messages received from device
+	NodeStatusTxCount       NodeStatus = "txCount"       // Nr of messages send to device
+	NodeStatusRunState      NodeStatus = "runState"      // Node runstate as per below
 )
 
 // Various Running States
 const (
-	NodeRunStateError        NodeStatus = "error"        // Node needs servicing
-	NodeRunStateFailed       NodeStatus = "failed"       // Node failed to start
-	NodeRunStateInitializing NodeStatus = "initializing" // Node is initializing
-	NodeRunStateReady        NodeStatus = "ready"        // Node is ready for use
-	NodeRunStateSleeping     NodeStatus = "sleeping"     // Node has gone into sleep mode, often a battery powered devie
+	NodeRunStateError        string = "error"        // Node needs servicing
+	NodeRunStateDisconnected string = "disconnected" // Node has cleanly disconnected
+	NodeRunStateFailed       string = "failed"       // Node failed to start
+	NodeRunStateInitializing string = "initializing" // Node is initializing
+	NodeRunStateReady        string = "ready"        // Node is ready for use
+	NodeRunStateSleeping     string = "sleeping"     // Node has gone into sleep mode, often a battery powered devie
 )
 
 // NodeType identifying  the purpose of the node
@@ -63,36 +67,38 @@ type NodeType string
 
 // Various Types of Nodes
 const (
-	NodeTypeAlarm           NodeType = "alarm"           // an alarm emitter
-	NodeTypeAVControl       NodeType = "avcontrol"       // Audio/Video controller
-	NodeTypeBeacon          NodeType = "beacon"          // device is a location beacon
-	NodeTypeButton          NodeType = "button"          // device is a physical button device with one or more buttons
-	NodeTypeAdapter         NodeType = "adapter"         // software adapter or service, eg virtual device
-	NodeTypePhone           NodeType = "phone"           // device is a phone
-	NodeTypeCamera          NodeType = "camera"          // Node with camera
-	NodeTypeComputer        NodeType = "computer"        // General purpose computer
-	NodeTypeDimmer          NodeType = "dimmer"          // light dimmer
-	NodeTypeGateway         NodeType = "gateway"         // Node is a gateway for other nodes (onewire, zwave, etc)
-	NodeTypeKeyPad          NodeType = "keypad"          // Entry key pad
-	NodeTypeLock            NodeType = "lock"            // Electronic door lock
-	NodeTypeMultiSensor     NodeType = "multisensor"     // Node with multiple sensors
-	NodeTypeNetRouter       NodeType = "networkrouter"   // Node is a network router
-	NodeTypeNetSwitch       NodeType = "networkswitch"   // Node is a network switch
-	NodeTypeNetWifiAP       NodeType = "wifiap"          // Node is a wireless access point
-	NodeTypePowerMeter      NodeType = "powermeter"      // Node is a power meter
-	NodeTypeRepeater        NodeType = "repeater"        // Node is a zwave or other signal repeater
-	NodeTypeReceiver        NodeType = "receiver"        // Node is a (not so) smart radio/receiver/amp (eg, denon)
-	NodeTypeSensor          NodeType = "sensor"          // Node is a single sensor (volt,...)
-	NodeTypeSmartLight      NodeType = "smartlight"      // Node is a smart light, eg philips hue
-	NodeTypeSwitch          NodeType = "switch"          // Node is a physical on/off switch
-	NodeTypeThermometer     NodeType = "thermometer"     // Node is a temperature meter
-	NodeTypeThermostat      NodeType = "thermostat"      // Node is a thermostat control unit
-	NodeTypeTV              NodeType = "tv"              // Node is a (not so) smart TV
-	NodeTypeUnknown         NodeType = "unknown"         // type not identified
-	NodeTypeWallpaper       NodeType = "wallpaper"       // Node is a wallpaper montage of multiple images
-	NodeTypeWaterValve      NodeType = "watervalve"      // Water valve control unit
-	NodeTypeWeatherForecast NodeType = "weatherforecast" // Node provides current and forecasted weather
-	NodeTypeWeatherStation  NodeType = "weatherstation"  // Node is a weatherstation device
+	NodeTypeAlarm          NodeType = "alarm"          // an alarm emitter
+	NodeTypeAVControl      NodeType = "avControl"      // Audio/Video controller
+	NodeTypeAVReceiver     NodeType = "avReceiver"     // Node is a (not so) smart radio/receiver/amp (eg, denon)
+	NodeTypeBeacon         NodeType = "beacon"         // device is a location beacon
+	NodeTypeButton         NodeType = "button"         // device is a physical button device with one or more buttons
+	NodeTypeAdapter        NodeType = "adapter"        // software adapter or service, eg virtual device
+	NodeTypePhone          NodeType = "phone"          // device is a phone
+	NodeTypeCamera         NodeType = "camera"         // Node with camera
+	NodeTypeComputer       NodeType = "computer"       // General purpose computer
+	NodeTypeDimmer         NodeType = "dimmer"         // light dimmer
+	NodeTypeGateway        NodeType = "gateway"        // Node is a gateway for other nodes (onewire, zwave, etc)
+	NodeTypeKeypad         NodeType = "keypad"         // Entry key pad
+	NodeTypeLock           NodeType = "lock"           // Electronic door lock
+	NodeTypeMultisensor    NodeType = "multisensor"    // Node with multiple sensors
+	NodeTypePublisher      NodeType = "publisher"      // Node is a zwave or other network repeater
+	NodeTypeNetRepeater    NodeType = "netRepeater"    // Node is a zwave or other network repeater
+	NodeTypeNetRouter      NodeType = "netRouter"      // Node is a network router
+	NodeTypeNetSwitch      NodeType = "netSwitch"      // Node is a network switch
+	NodeTypeNetWifiAP      NodeType = "wifiAP"         // Node is a wifi access point
+	NodeTypeOnOffSwitch    NodeType = "onOffSwitch"    // Node is a physical on/off switch
+	NodeTypePowerMeter     NodeType = "powerMeter"     // Node is a power meter
+	NodeTypeSensor         NodeType = "sensor"         // Node is a single sensor (volt,...)
+	NodeTypeSmartlight     NodeType = "smartlight"     // Node is a smart light, eg philips hue
+	NodeTypeThermometer    NodeType = "thermometer"    // Node is a temperature meter
+	NodeTypeThermostat     NodeType = "thermostat"     // Node is a thermostat control unit
+	NodeTypeTV             NodeType = "tv"             // Node is a (not so) smart TV
+	NodeTypeUnknown        NodeType = "unknown"        // type not identified
+	NodeTypeWallpaper      NodeType = "wallpaper"      // Node is a wallpaper montage of multiple images
+	NodeTypeWaterValve     NodeType = "waterValve"     // Water valve control unit
+	NodeTypeWeatherService NodeType = "weatherService" // Node is a service providing current and forecasted weather
+	NodeTypeWeatherStation NodeType = "weatherStation" // Node is a weatherstation device
+	NodeTypeWeighScale     NodeType = "weighScale"     // Node is an electronic weight scale
 )
 
 // NodeAttr with predefined names of node attributes and configuration
@@ -109,7 +115,7 @@ type ConfigAttrMap map[string]ConfigAttr
 
 // ConfigAttr describing the configuration of the device/service or sensor
 type ConfigAttr struct {
-	DataType    DataType `json:"datatype,omitempty"`    // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
+	Datatype    DataType `json:"datatype,omitempty"`    // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
 	Default     string   `json:"default,omitempty"`     // Default value
 	Description string   `json:"description,omitempty"` // Description of the attribute
 	Enum        []string `json:"enum,omitempty"`        // Possible valid enum values

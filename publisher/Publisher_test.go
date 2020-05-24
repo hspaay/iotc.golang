@@ -209,7 +209,7 @@ func TestOutputValue(t *testing.T) {
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1)
 	pub1.Outputs.UpdateOutput(node1Output1)
-	pub1.OutputValues.UpdateOutputValue(node1Addr, node1Output1Type, node1Output1Instance, "true")
+	pub1.OutputValues.UpdateOutputValue(node1Output1Addr, "true")
 
 	pub1.PublishUpdatedDiscoveries()
 	// time.Sleep(time.Second * 1) // receive publications
@@ -240,11 +240,11 @@ func TestOutputValue(t *testing.T) {
 
 	// test int, float, string list publication
 	intList := []int{1, 2, 3}
-	pub1.OutputValues.UpdateOutputIntList(node1Addr, node1Output1Type, node1Output1Instance, intList)
+	pub1.OutputValues.UpdateOutputIntList(node1Output1Addr, intList)
 	floatList := []float32{1.3, 2.5, 3.09}
-	pub1.OutputValues.UpdateOutputFloatList(node1Addr, node1Output1Type, node1Output1Instance, floatList)
+	pub1.OutputValues.UpdateOutputFloatList(node1Output1Addr, floatList)
 	stringList := []string{"hello", "world"}
-	pub1.OutputValues.UpdateOutputStringList(node1Addr, node1Output1Type, node1Output1Instance, stringList)
+	pub1.OutputValues.UpdateOutputStringList(node1Output1Addr, stringList)
 }
 
 // TestReceiveInput tests receiving input control commands
@@ -255,7 +255,7 @@ func TestReceiveInput(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
 		pub1.Logger.Infof("Received message: '%s'", message.Value)
-		pub1.OutputValues.UpdateOutputValue(node1Addr, input.InputType, input.Instance, message.Value)
+		pub1.OutputValues.UpdateOutputValue(node1Output1Addr, message.Value)
 	})
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1) // p1
@@ -275,8 +275,8 @@ func TestReceiveInput(t *testing.T) {
 	payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	testMessenger.OnReceive(node1InputSetAddr, []byte(payload))
 
-	val := pub1.OutputValues.GetOutputValueByType(node1, node1Output1Type, node1Output1Instance)
-	if !assert.NotNilf(t, val, "Unable to find output value for output %s/%s/%s", node1.Address, node1Output1Type, node1Output1Instance) {
+	val := pub1.OutputValues.GetOutputValueByAddress(node1Output1Addr)
+	if !assert.NotNilf(t, val, "Unable to find output value for output %s", node1Output1Addr) {
 		return
 	}
 	assert.Equal(t, "true", val.Value, "Input value didn't update the output")
@@ -304,4 +304,16 @@ func TestDiscoverPublishers(t *testing.T) {
 	// publisher 1 and 2 should have been discovered
 	assert.Len(t, pub1.zonePublishers, 2, "Should have discovered 2 publishers")
 
+}
+
+// TestDiscoverPublishers tests receiving other publishers
+func TestSetInput(t *testing.T) {
+	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
+	pub1 := NewPublisher(msgConfig.Zone, publisher1ID, testMessenger)
+
+	// update the node alias and see if its output is published with alias' as node id
+	pub1.Start()
+	// todo add input
+	pub1.PublishSetInput(node1InputSetAddr, "true")
+	pub1.Stop()
 }

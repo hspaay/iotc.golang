@@ -71,21 +71,21 @@ func (outputValues *OutputValueList) GetUpdatedOutputs(clearUpdates bool) []stri
 }
 
 // UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputValueList) UpdateOutputFloatList(nodeAddress string, outputType string, outputInstance string, values []float32) bool {
+func (outputValues *OutputValueList) UpdateOutputFloatList(address string, values []float32) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(nodeAddress, outputType, outputInstance, string(valuesAsString))
+	return outputValues.UpdateOutputValue(address, string(valuesAsString))
 }
 
 // UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputValueList) UpdateOutputIntList(nodeAddress string, outputType string, outputInstance string, values []int) bool {
+func (outputValues *OutputValueList) UpdateOutputIntList(address string, values []int) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(nodeAddress, outputType, outputInstance, string(valuesAsString))
+	return outputValues.UpdateOutputValue(address, string(valuesAsString))
 }
 
 // UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
-func (outputValues *OutputValueList) UpdateOutputStringList(nodeAddress string, outputType string, outputInstance string, values []string) bool {
+func (outputValues *OutputValueList) UpdateOutputStringList(address string, values []string) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(nodeAddress, outputType, outputInstance, string(valuesAsString))
+	return outputValues.UpdateOutputValue(address, string(valuesAsString))
 }
 
 // UpdateOutputValue adds the new node output value to the front of the history
@@ -93,20 +93,18 @@ func (outputValues *OutputValueList) UpdateOutputStringList(nodeAddress string, 
 //  it has changed, or if the previous update was older than the repeatDelay.
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
-func (outputValues *OutputValueList) UpdateOutputValue(nodeAddress string, outputType string, instance string, newValue string) bool {
+func (outputValues *OutputValueList) UpdateOutputValue(address string, newValue string) bool {
 	var previous *iotc.OutputValue
 	var repeatDelay = 3600 // default repeat delay is 1 hour
 	var ageSeconds = -1
 	var hasUpdated = false
-
-	addr := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 
 	outputValues.updateMutex.Lock()
 	defer outputValues.updateMutex.Unlock()
 
 	// auto create the output if it hasn't been discovered yet
 	// output := outputvalue.Outputs.GetOutputByAddress(addr)
-	history := outputValues.historyMap[addr]
+	history := outputValues.historyMap[address]
 
 	// only update output if value changes or delay has passed
 	// for now use 1 hour repeat delay. Need to get the config from somewhere
@@ -124,13 +122,13 @@ func (outputValues *OutputValueList) UpdateOutputValue(nodeAddress string, outpu
 		// 24 hour history
 		newHistory := updateHistory(history, newValue, 0)
 
-		outputValues.historyMap[addr] = newHistory
+		outputValues.historyMap[address] = newHistory
 		hasUpdated = true
 
 		if outputValues.updatedOutputs == nil {
 			outputValues.updatedOutputs = make(map[string]string)
 		}
-		outputValues.updatedOutputs[addr] = addr
+		outputValues.updatedOutputs[address] = address
 
 	}
 	return hasUpdated

@@ -139,7 +139,7 @@ type OutputBatchMessage struct {
 // OutputDiscoveryMessage with node output description
 type OutputDiscoveryMessage struct {
 	Address     string   `json:"address"`               // Address of the publication: zone/publisher/node/$output/type/instance
-	DataType    DataType `json:"datatype,omitempty"`    // output value data type (DataType)
+	DataType    DataType `json:"datatype,omitempty"`    // output value data type, default is string
 	Description string   `json:"description,omitempty"` // optional description for humans
 	EnumValues  []string `json:"enumValues,omitempty"`  // possible enum output values for enum datatype
 	Instance    string   `json:"instance"`              // instance identifier for multi-I/O nodes

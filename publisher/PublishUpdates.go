@@ -31,7 +31,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	}
 	if len(nodeList) > 0 && publisher.autosaveFolder != "" {
 		allNodes := publisher.Nodes.GetAllNodes()
-		persist.SaveNodes(publisher.autosaveFolder, publisher.id, allNodes)
+		persist.SaveNodes(publisher.autosaveFolder, publisher.publisherID, allNodes)
 	}
 
 	// publish updated input discovery
@@ -42,7 +42,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	}
 	if len(inputList) > 0 && publisher.autosaveFolder != "" {
 		allInputs := publisher.Inputs.GetAllInputs()
-		persist.SaveInputs(publisher.autosaveFolder, publisher.id, allInputs)
+		persist.SaveInputs(publisher.autosaveFolder, publisher.publisherID, allInputs)
 	}
 
 	// publish updated output discovery
@@ -53,7 +53,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	}
 	if len(outputList) > 0 && publisher.autosaveFolder != "" {
 		allOutputs := publisher.Outputs.GetAllOutputs()
-		persist.SaveOutputs(publisher.autosaveFolder, publisher.id, allOutputs)
+		persist.SaveOutputs(publisher.autosaveFolder, publisher.publisherID, allOutputs)
 	}
 }
 
@@ -66,7 +66,6 @@ func (publisher *Publisher) PublishUpdatedOutputValues() {
 	for _, outputAddress := range addressesOfUpdatedOutputs {
 		output := publisher.Outputs.GetOutputByAddress(outputAddress)
 		unit := output.Unit
-
 		publisher.publishValueCommand(outputAddress)
 		publisher.publishLatest(outputAddress, unit)
 		publisher.publishHistory(outputAddress, unit)

@@ -49,14 +49,12 @@ type Publisher struct {
 	Outputs         *nodes.OutputList         // discovered outputs published by this publisher
 	OutputForecasts *nodes.OutputForecastList // output forecasts values published by this publisher
 	OutputValues    *nodes.OutputValueList    // output values published by this publisher
-	Zone            string                    // The zone this publisher lives in
 
-	address             string                     // the publisher node address
+	// address             string                     // the publisher node address
 	autosaveFolder      string                     // folder to save nodes after update
 	discoverCountdown   int                        // countdown each heartbeat
 	discoveryInterval   int                        // discovery polling interval
 	discoveryHandler    func(publisher *Publisher) // function that performs discovery
-	id                  string                     // publisher ID
 	isRunning           bool                       // publisher was started and is running
 	messenger           messenger.IMessenger       // Message bus messenger to use
 	onNodeConfigHandler NodeConfigHandler          // handle before applying configuration
@@ -64,8 +62,10 @@ type Publisher struct {
 	pollHandler         func(publisher *Publisher) // function that performs value polling
 	pollCountdown       int                        // countdown each heartbeat
 	pollInterval        int                        // value polling interval in seconds
+	publisherID         string                     // publisher ID
 	signPrivateKey      *ecdsa.PrivateKey          // key for singing published messages
 
+	zone           string                                // The zone this publisher lives in
 	zonePublishers map[string]*iotc.NodeDiscoveryMessage // publishers on the network by discovery address
 
 	// background publications require a mutex to prevent concurrent access
@@ -75,37 +75,23 @@ type Publisher struct {
 
 // Address  returns the publisher's node address
 func (publisher *Publisher) Address() string {
-	return publisher.address
+	pubNode := publisher.GetNodeByID(iotc.PublisherNodeID)
+	return pubNode.Address
 }
 
-// ID returns the publisher ID
-func (publisher *Publisher) ID() string {
-	return publisher.id
+// GetPublisherID returns the publisher's ID
+func (publisher *Publisher) GetPublisherID() string {
+	return publisher.publisherID
 }
 
-// GetConfigValue convenience function to get a configuration value
-// This retuns the 'default' value if no value is set
-func GetConfigValue(configMap map[string]iotc.ConfigAttr, attrName string) string {
-	config, configExists := configMap[attrName]
-	if !configExists {
-		return ""
-	}
-	if config.Value == "" {
-		return config.Default
-	}
-	return config.Value
-}
-
-// GetNodeByID returns a node from this publisher or nil if the id isn't found in this publisher
-// This is a convenience function as publishers tend to do this quite often
-func (publisher *Publisher) GetNodeByID(id string) *iotc.NodeDiscoveryMessage {
-	node := publisher.Nodes.GetNodeByID(publisher.Zone, publisher.id, id)
-	return node
+// GetZone returns the publication zone
+func (publisher *Publisher) GetZone() string {
+	return publisher.zone
 }
 
 // PublisherNode return this publisher's node
 func (publisher *Publisher) PublisherNode() *iotc.NodeDiscoveryMessage {
-	node := publisher.Nodes.GetNodeByID(publisher.Zone, publisher.id, iotc.PublisherNodeID)
+	node := publisher.Nodes.GetNodeByID(publisher.zone, publisher.publisherID, iotc.PublisherNodeID)
 	return node
 }
 
@@ -170,6 +156,18 @@ func (publisher *Publisher) SetLogging(levelName string, filename string) {
 	publisher.Logger.SetReportCaller(false) // publisher logging includes caller and file:line#
 }
 
+// SetNodeConfigHandler set the handler for updating node configuration
+func (publisher *Publisher) SetNodeConfigHandler(
+	handler func(node *iotc.NodeDiscoveryMessage, config iotc.NodeAttrMap) iotc.NodeAttrMap) {
+	publisher.onNodeConfigHandler = handler
+}
+
+// SetNodeInputHandler set the handler for updating node inputs
+func (publisher *Publisher) SetNodeInputHandler(
+	handler func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage)) {
+	publisher.onNodeInputHandler = handler
+}
+
 // SetPersistNodes set the folder for loading and saving this publisher's nodes.
 // If a node file exists in the given folder the nodes will be added/updated.
 // Existing nodes will be replaced.
@@ -189,7 +187,7 @@ func (publisher *Publisher) SetPersistNodes(folder string, autosave bool) error 
 	}
 	if folder != "" {
 		nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
-		err = persist.LoadNodes(folder, publisher.id, &nodeList)
+		err = persist.LoadNodes(folder, publisher.publisherID, &nodeList)
 		if err == nil {
 			publisher.Nodes.UpdateNodes(nodeList)
 		}
@@ -197,47 +195,69 @@ func (publisher *Publisher) SetPersistNodes(folder string, autosave bool) error 
 	return err
 }
 
-// SetPollingInterval is a convenience function for periodic update of output values
-// interval in seconds to perform another poll. Default is DefaultPollInterval
+// SetPollInterval is a convenience function for periodic update of output values
+// seconds interval to perform another poll. Default (0) is DefaultPollInterval
 // intended for publishers that need to poll for values
-func (publisher *Publisher) SetPollingInterval(interval int, handler func(publisher *Publisher)) {
-	publisher.Logger.Infof("Publisher.SetPollingInterval: interval = %d seconds", interval)
-	if interval > 0 {
-		publisher.pollInterval = interval
+func (publisher *Publisher) SetPollInterval(seconds int, handler func(publisher *Publisher)) {
+	publisher.Logger.Infof("Publisher.SetPoll: interval = %d seconds", seconds)
+	if seconds > 0 {
+		publisher.pollInterval = seconds
+	} else {
+		publisher.pollInterval = DefaultPollInterval
 	}
 	publisher.pollHandler = handler
 }
 
-// SetPollInterval determines the interval between polling
-func (publisher *Publisher) SetPollInterval(seconds int,
-	handler func(publisher *Publisher)) {
-	publisher.pollInterval = seconds
-	publisher.pollHandler = handler
-}
+// SetPublisherID changes the publisher's ID. Use before calling Start
+// func (publisher *Publisher) SetPublisherID(id string) {
+// 	publisher.id = id
+// }
 
-// SetNodeConfigHandler set the handler for updating node configuration
-func (publisher *Publisher) SetNodeConfigHandler(
-	handler func(node *iotc.NodeDiscoveryMessage, config iotc.NodeAttrMap) iotc.NodeAttrMap) {
-	publisher.onNodeConfigHandler = handler
-}
-
-// SetNodeInputHandler set the handler for updating node inputs
-func (publisher *Publisher) SetNodeInputHandler(handler func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage)) {
-	publisher.onNodeInputHandler = handler
-}
+// // SetZone changes the publisher's zone. Use before calling Start
+// func (publisher *Publisher) SetZone(zone string) {
+// 	publisher.zone = zone
+// }
 
 // Start publishing and listen for configuration and input messages
-// This will load previously saved nodes
+// This will create the publisher node and load previously saved nodes
 // Start will fail if no messenger has been provided.
 // persistNodes will load previously saved nodes at startup and save them on configuration change
 func (publisher *Publisher) Start() {
 
+	// setup the publisher's node
+	var pubNode = nodes.NewNode(publisher.zone, publisher.publisherID, iotc.PublisherNodeID, iotc.NodeTypeAdapter)
+	// publisher.address = pubNode.Address
+	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
+
+	// generate private/public key for signing and store the public key in the publisher identity
+	// TODO: store keys
+	rng := rand.Reader
+	curve := elliptic.P256()
+	privKey, err := ecdsa.GenerateKey(curve, rng)
+	publisher.signPrivateKey = privKey
+	if err != nil {
+		publisher.Logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
+	}
+	privStr, pubStr := messenger.EncodeKeys(privKey, &privKey.PublicKey)
+	_ = privStr
+
+	pubNode.Identity = &iotc.PublisherIdentity{
+		Address:          pubNode.Address,
+		PublicKeySigning: pubStr,
+		Publisher:        publisher.publisherID,
+		Timestamp:        timeStampStr,
+		Zone:             publisher.zone,
+	}
+
+	publisher.Nodes.UpdateNode(pubNode)
+
 	if publisher.messenger == nil {
-		publisher.Logger.Errorf("Publisher.Start: Can't start publisher %s without a messenger. See SetMessenger()", publisher.id)
+		publisher.Logger.Errorf("Publisher.Start: Can't start publisher %s without a messenger. See SetMessenger()",
+			publisher.publisherID)
 		return
 	}
 	if !publisher.isRunning {
-		publisher.Logger.Warningf("Publisher.Start: Starting publisher %s", publisher.id)
+		publisher.Logger.Warningf("Publisher.Start: Starting publisher %s", publisher.publisherID)
 		publisher.updateMutex.Lock()
 		publisher.isRunning = true
 		publisher.updateMutex.Unlock()
@@ -250,27 +270,27 @@ func (publisher *Publisher) Start() {
 		publisher.messenger.Connect("", "")
 
 		// Subscribe to receive configuration and set messages for any of our nodes
-		configAddr := nodes.MakeNodeAddress(publisher.Zone, publisher.id, "+", iotc.MessageTypeConfigure)
+		configAddr := nodes.MakeNodeAddress(publisher.zone, publisher.publisherID, "+", iotc.MessageTypeConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
 		inputAddr := nodes.MakeInputSetAddress(configAddr, "+", "+")
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := nodes.MakeNodeAddress(publisher.Zone, "+", iotc.PublisherNodeID, iotc.MessageTypeNodeDiscovery)
+		pubAddr := nodes.MakeNodeAddress(publisher.zone, "+", iotc.PublisherNodeID, iotc.MessageTypeNodeDiscovery)
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher
 		publisher.PublishUpdatedDiscoveries()
 
-		publisher.Logger.Warningf("Publisher.Start: Publisher %s started", publisher.id)
+		publisher.Logger.Warningf("Publisher.Start: Publisher %s started", publisher.publisherID)
 	}
 }
 
 // Stop publishing
 // Wait until the heartbeat loop has finished processing messages
 func (publisher *Publisher) Stop() {
-	publisher.Logger.Warningf("Publisher.Stop: Stopping publisher %s", publisher.id)
+	publisher.Logger.Warningf("Publisher.Stop: Stopping publisher %s", publisher.publisherID)
 	publisher.updateMutex.Lock()
 	if publisher.isRunning {
 		publisher.isRunning = false
@@ -335,7 +355,7 @@ func (publisher *Publisher) heartbeatLoop() {
 		}
 	}
 	publisher.exitChannel <- true
-	publisher.Logger.Warningf("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.id)
+	publisher.Logger.Warningf("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.publisherID)
 }
 
 // VerifyMessageSignature Verify a received message is signed by the sender
@@ -364,21 +384,24 @@ func (publisher *Publisher) VerifyMessageSignature(
 // messenger to use fo publications and for the zone to publish in
 // logger is the optional logger to use.
 //
-// zone the publisher uses to create addresses
-// publisherID of this publisher, unique within the zone
+// zone the publisher uses to create addresses. If not provided LocalZone is used
+// publisherID of this publisher, unique within the zone. See also SetPublisherID
 // messenger for publishing onto the message bus
 func NewPublisher(
 	zone string,
 	publisherID string,
 	sender messenger.IMessenger,
 ) *Publisher {
-	var pubNode = nodes.NewNode(zone, publisherID, iotc.PublisherNodeID, iotc.NodeTypeAdapter)
+
+	if zone == "" {
+		zone = iotc.LocalZoneID
+	}
 
 	// IotConnect core running state of the publisher
 	var publisher = &Publisher{
 		discoveryInterval: DefaultDiscoveryInterval,
 		exitChannel:       make(chan bool),
-		id:                publisherID,
+		publisherID:       publisherID,
 		Inputs:            nodes.NewInputList(),
 		messenger:         sender,
 		Nodes:             nodes.NewNodeList(),
@@ -387,34 +410,34 @@ func NewPublisher(
 		OutputForecasts:   nodes.NewOutputForecastList(),
 		pollCountdown:     1, // run discovery before poll
 		pollInterval:      DefaultPollInterval,
-		address:           pubNode.Address,
-		updateMutex:       &sync.Mutex{},
-		Zone:              zone,
-		zonePublishers:    make(map[string]*iotc.NodeDiscoveryMessage),
+		// address:           pubNode.Address,
+		updateMutex:    &sync.Mutex{},
+		zone:           zone,
+		zonePublishers: make(map[string]*iotc.NodeDiscoveryMessage),
 	}
 	publisher.SetLogging("debug", "")
 
-	// generate private/public key for signing and store the public key in the publisher identity
-	// TODO: store keys
-	rng := rand.Reader
-	curve := elliptic.P256()
-	privKey, err := ecdsa.GenerateKey(curve, rng)
-	publisher.signPrivateKey = privKey
-	if err != nil {
-		publisher.Logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
-	}
-	privStr, pubStr := messenger.EncodeKeys(privKey, &privKey.PublicKey)
-	_ = privStr
+	// // generate private/public key for signing and store the public key in the publisher identity
+	// // TODO: store keys
+	// rng := rand.Reader
+	// curve := elliptic.P256()
+	// privKey, err := ecdsa.GenerateKey(curve, rng)
+	// publisher.signPrivateKey = privKey
+	// if err != nil {
+	// 	publisher.Logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
+	// }
+	// privStr, pubStr := messenger.EncodeKeys(privKey, &privKey.PublicKey)
+	// _ = privStr
 
-	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
-	pubNode.Identity = &iotc.PublisherIdentity{
-		Address:          pubNode.Address,
-		PublicKeySigning: pubStr,
-		Publisher:        publisherID,
-		Timestamp:        timeStampStr,
-		Zone:             zone,
-	}
+	// timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
+	// pubNode.Identity = &iotc.PublisherIdentity{
+	// 	Address:          pubNode.Address,
+	// 	PublicKeySigning: pubStr,
+	// 	Publisher:        publisherID,
+	// 	Timestamp:        timeStampStr,
+	// 	Zone:             zone,
+	// }
 
-	publisher.Nodes.UpdateNode(pubNode)
+	// publisher.Nodes.UpdateNode(pubNode)
 	return publisher
 }
