@@ -17,7 +17,7 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, publication 
 	publisher.Logger.Infof("handleNodeConfig on address %s", address)
 	// TODO: authorization check
 	node := publisher.Nodes.GetNodeByAddress(address)
-	if node == nil || publication.Message == nil {
+	if node == nil || publication.Message == "" {
 		publisher.Logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
 		return
 	}
@@ -38,6 +38,8 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, publication 
 		// A handler can filter which configuration updates take place
 		params = publisher.onNodeConfigHandler(node, params)
 	}
-	// process the requested configuration
-	publisher.Nodes.SetNodeConfigValues(address, params)
+	// process the requested configuration, or ignore if none are applicable
+	if params != nil {
+		publisher.Nodes.SetNodeConfigValues(address, params)
+	}
 }

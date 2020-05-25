@@ -25,7 +25,7 @@ func (publisher *Publisher) handleNodeInput(address string, publication *iotc.Pu
 
 	input := publisher.Inputs.GetInputByAddress(inputAddr)
 
-	if input == nil || publication.Message == nil {
+	if input == nil || publication.Message == "" {
 		publisher.Logger.Infof("handleNodeInput unknown input for address %s or missing message", address)
 		return
 	}

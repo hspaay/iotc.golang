@@ -2,9 +2,11 @@
 package publisher
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 
 	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/hspaay/iotc.golang/messenger"
 )
 
 // // handleNodeDiscovery collects and saves any discovered node
@@ -33,11 +35,26 @@ import (
 // publication contains a message with the publisher node info.
 func (publisher *Publisher) handlePublisherDiscovery(address string, publication *iotc.Publication) {
 	var pubNode iotc.NodeDiscoveryMessage
-	err := json.Unmarshal(publication.Message, &pubNode)
+
+	// Decode the message into a NodeDiscoveryMessage type
+	err := json.Unmarshal([]byte(publication.Message), &pubNode)
 	if err != nil {
 		publisher.Logger.Warningf("Unable to unmarshal Publisher Node in %s: %s", address, err)
 		return
 	}
+	// Verify that the message comes from the publisher using the publisher's own address and public key
+	sender := pubNode.Identity.Address
+	pubKeyStr := pubNode.Identity.PublicKeySigning
+
+	var pubKey *ecdsa.PublicKey = messenger.DecodePublicKey(pubKeyStr)
+	isValid := messenger.VerifyEcdsaSignature(publication.Message, publication.Signature, pubKey)
+	if !isValid {
+		publisher.Logger.Warningf("Incoming node publication verification failed for sender: %s", sender)
+		return
+	}
+
+	// TODO: if the publisher is in a secure zone its identity must have a valid signature from the ZCAS service
+	// assume the publisher has a valid identity
 	publisher.updateMutex.Lock()
 	defer publisher.updateMutex.Unlock()
 

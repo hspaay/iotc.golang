@@ -97,7 +97,10 @@ func (messenger *DummyMessenger) Publish(address string, retained bool, publicat
 }
 
 // PublishRaw message
-func (messenger *DummyMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
+// address is the MQTT address to send to
+// retained (ignored)
+// message JSON text or raw message base64 encoded text
+func (messenger *DummyMessenger) PublishRaw(address string, retained bool, message string) error {
 	payload := iotc.Publication{
 		Message: message,
 	}

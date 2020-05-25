@@ -253,7 +253,7 @@ func (nodes *NodeList) SetNodeConfigValues(address string, params map[iotc.NodeA
 	defer nodes.updateMutex.Unlock()
 
 	node := nodes.getNode(address)
-	if node == nil {
+	if node == nil || params == nil {
 		return false
 	}
 	newNode := nodes.Clone(node)

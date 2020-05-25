@@ -187,20 +187,20 @@ func (publisher *Publisher) publishHistory(outputAddress string, unit iotc.Unit)
 	publisher.publishMessage(aliasAddress, true, historyMessage)
 }
 
-// publishMessage encapsulates the message object in a payload, signs, and sends it
-// not thread-safe, using within a locked section
+// publishMessage encapsulates the message object in a payload, signs the message, and sends it.
 // address of the publication
 // object to publish. This will be marshalled to JSON and signed by this publisher
 func (publisher *Publisher) publishMessage(address string, retained bool, object interface{}) {
-	buffer, err := json.MarshalIndent(object, " ", " ")
+	buffer, err := json.Marshal(object)
+	// buffer, err := json.MarshalIndent(object, " ", " ")
 	if err != nil {
 		publisher.Logger.Errorf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
 		return
 	}
-	signature := messenger.CreateEcdsaSignature(buffer, publisher.signPrivateKey)
+	signature := messenger.CreateEcdsaSignature(buffer, publisher.privateKeySigning)
 
 	publication := &iotc.Publication{
-		Message:   buffer,
+		Message:   string(buffer),
 		Signature: signature,
 	}
 	publisher.messenger.Publish(address, retained, publication)
@@ -225,5 +225,5 @@ func (publisher *Publisher) publishValueCommand(outputAddress string) {
 	}
 	publisher.Logger.Infof("Publisher.publishValueCommand: output value '%s' on %s", s, aliasAddress)
 
-	publisher.messenger.PublishRaw(aliasAddress, true, []byte(latest.Value)) // raw
+	publisher.messenger.PublishRaw(aliasAddress, true, latest.Value)
 }

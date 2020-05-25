@@ -10,7 +10,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -63,7 +62,7 @@ type Publisher struct {
 	pollCountdown       int                        // countdown each heartbeat
 	pollInterval        int                        // value polling interval in seconds
 	publisherID         string                     // publisher ID
-	signPrivateKey      *ecdsa.PrivateKey          // key for singing published messages
+	privateKeySigning   *ecdsa.PrivateKey          // key for singing published messages
 
 	zone           string                                // The zone this publisher lives in
 	zonePublishers map[string]*iotc.NodeDiscoveryMessage // publishers on the network by discovery address
@@ -218,12 +217,16 @@ func (publisher *Publisher) SetPollInterval(seconds int, handler func(publisher 
 // 	publisher.zone = zone
 // }
 
-// Start publishing and listen for configuration and input messages
-// This will create the publisher node and load previously saved nodes
-// Start will fail if no messenger has been provided.
-// persistNodes will load previously saved nodes at startup and save them on configuration change
-func (publisher *Publisher) Start() {
-
+// SetupPublisherIdentity creates the publisher node with identitiy and public/private signing keys
+// In a secure zone you'd want to restore this node from file to retain the keys signed by the ZCAS.
+//
+// TODO: Add the ability to save/restore this identity along with the private key.
+//       Required for use in secure zone where the identitiy and its keys are signed by the ZCAS
+//
+// * zone of this publisher
+// * publisherID of this publisher
+// Returns the created node
+func (publisher *Publisher) SetupPublisherIdentity(zone string, publisherID string) (node *iotc.NodeDiscoveryMessage) {
 	// setup the publisher's node
 	var pubNode = nodes.NewNode(publisher.zone, publisher.publisherID, iotc.PublisherNodeID, iotc.NodeTypeAdapter)
 	// publisher.address = pubNode.Address
@@ -234,7 +237,7 @@ func (publisher *Publisher) Start() {
 	rng := rand.Reader
 	curve := elliptic.P256()
 	privKey, err := ecdsa.GenerateKey(curve, rng)
-	publisher.signPrivateKey = privKey
+	publisher.privateKeySigning = privKey
 	if err != nil {
 		publisher.Logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
 	}
@@ -244,12 +247,20 @@ func (publisher *Publisher) Start() {
 	pubNode.Identity = &iotc.PublisherIdentity{
 		Address:          pubNode.Address,
 		PublicKeySigning: pubStr,
-		Publisher:        publisher.publisherID,
+		Publisher:        publisherID,
 		Timestamp:        timeStampStr,
-		Zone:             publisher.zone,
+		Zone:             zone,
 	}
 
 	publisher.Nodes.UpdateNode(pubNode)
+	return pubNode
+}
+
+// Start publishing and listen for configuration and input messages
+// This will create the publisher node and load previously saved nodes
+// Start will fail if no messenger has been provided.
+// persistNodes will load previously saved nodes at startup and save them on configuration change
+func (publisher *Publisher) Start() {
 
 	if publisher.messenger == nil {
 		publisher.Logger.Errorf("Publisher.Start: Can't start publisher %s without a messenger. See SetMessenger()",
@@ -361,7 +372,7 @@ func (publisher *Publisher) heartbeatLoop() {
 // VerifyMessageSignature Verify a received message is signed by the sender
 // The node of the sender must have been received for its public key
 func (publisher *Publisher) VerifyMessageSignature(
-	sender string, message json.RawMessage, base64signature string) bool {
+	sender string, message string, base64signature string) bool {
 
 	publisher.updateMutex.Lock()
 	node := publisher.zonePublishers[sender]
@@ -417,27 +428,8 @@ func NewPublisher(
 	}
 	publisher.SetLogging("debug", "")
 
-	// // generate private/public key for signing and store the public key in the publisher identity
-	// // TODO: store keys
-	// rng := rand.Reader
-	// curve := elliptic.P256()
-	// privKey, err := ecdsa.GenerateKey(curve, rng)
-	// publisher.signPrivateKey = privKey
-	// if err != nil {
-	// 	publisher.Logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
-	// }
-	// privStr, pubStr := messenger.EncodeKeys(privKey, &privKey.PublicKey)
-	// _ = privStr
+	// create a default publisher node with identity and signatures
+	publisher.SetupPublisherIdentity(zone, publisherID)
 
-	// timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
-	// pubNode.Identity = &iotc.PublisherIdentity{
-	// 	Address:          pubNode.Address,
-	// 	PublicKeySigning: pubStr,
-	// 	Publisher:        publisherID,
-	// 	Timestamp:        timeStampStr,
-	// 	Zone:             zone,
-	// }
-
-	// publisher.Nodes.UpdateNode(pubNode)
 	return publisher
 }

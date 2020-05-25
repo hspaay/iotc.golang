@@ -30,10 +30,17 @@ func (publisher *Publisher) GetNodeConfigInt(nodeID string, attrName iotc.NodeAt
 }
 
 // GetNodeConfigValue convenience function to get a node configuration value
-// This retuns the 'default' value if no value is set
-func (publisher *Publisher) GetNodeConfigValue(nodeID string, attrName iotc.NodeAttr) (value string, exists bool) {
+// nodeID is the node to read from
+// attrName identifies the configuration attribute to get
+// retuns the 'defaultValue' if no value is set
+func (publisher *Publisher) GetNodeConfigValue(
+	nodeID string, attrName iotc.NodeAttr, defaultValue string) (value string, exists bool) {
+
 	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
 	value, exists = publisher.Nodes.GetNodeConfigValue(nodeAddr, attrName)
+	if value == "" {
+		value = defaultValue
+	}
 	return value, exists
 }
 

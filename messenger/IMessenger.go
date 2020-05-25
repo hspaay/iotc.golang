@@ -2,8 +2,6 @@
 package messenger
 
 import (
-	"encoding/json"
-
 	"github.com/hspaay/iotc.golang/iotc"
 )
 
@@ -40,13 +38,13 @@ type IMessenger interface {
 
 	// Sign and Publish a message
 	// address to subscribe to as per IotConnect standard
-	// publication object to transmit, this is an object that will be converted into a JSON
+	// publication object to transmit, this is an object that will be converted into a JSON message
 	Publish(address string, retained bool, publication *iotc.Publication) error
 
-	// Publis raw data
+	// Publish raw data
 	// address to subscribe top as per IotConnect standard
-	// raw data, published as-is
-	PublishRaw(address string, retained bool, raw json.RawMessage) error
+	// raw is a JSON text message or base64 binary data
+	PublishRaw(address string, retained bool, raw string) error
 
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent

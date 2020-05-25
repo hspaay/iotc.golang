@@ -91,7 +91,7 @@ func TestDiscover(t *testing.T) {
 	assert.Equalf(t, node1Output1Addr, tmpOut.Address, "Output address doesn't match")
 }
 
-// TestNodePublication tests if discoveries are published.
+// TestNodePublication tests if discoveries are published and properly signed
 func TestNodePublication(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	pub1 := NewPublisher(msgConfig.Zone, publisher1ID, testMessenger)
@@ -181,7 +181,7 @@ func TestConfigure(t *testing.T) {
 	// message = `{ "a": "Hello world" }`
 	var m json.RawMessage
 	m = json.RawMessage(message)
-	signatureBase64 := messenger.CreateEcdsaSignature(m, pub1.signPrivateKey)
+	signatureBase64 := messenger.CreateEcdsaSignature(m, pub1.privateKeySigning)
 	payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	testMessenger.OnReceive(node1ConfigureAddr, []byte(payload))
 
@@ -267,7 +267,7 @@ func TestReceiveInput(t *testing.T) {
 
 	var message = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
 		node1InputSetAddr, pubAddr, time.Now().Format(iotc.TimeFormat))
-	signatureBase64 := messenger.CreateEcdsaSignature([]byte(message), pub1.signPrivateKey)
+	signatureBase64 := messenger.CreateEcdsaSignature([]byte(message), pub1.privateKeySigning)
 	// publicKey := &publisher.signPrivateKey.PublicKey
 	// test := publisher.ecdsaVerify([]byte(message), signatureBase64, publicKey)
 	// _ = test

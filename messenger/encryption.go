@@ -65,7 +65,8 @@ func CreateEcdsaSignature(message []byte, privateKey *ecdsa.PrivateKey) string {
 }
 
 // VerifyEcdsaSignature the message using the base64 encoded signature and public key
-func VerifyEcdsaSignature(message []byte, signatureBase64 string, publicKey *ecdsa.PublicKey) bool {
+// message is a text message or base64 encoded raw data
+func VerifyEcdsaSignature(message string, signatureBase64 string, publicKey *ecdsa.PublicKey) bool {
 
 	var rs ECDSASignature
 	signature, err := base64.StdEncoding.DecodeString(signatureBase64)
@@ -76,6 +77,6 @@ func VerifyEcdsaSignature(message []byte, signatureBase64 string, publicKey *ecd
 		return false
 	}
 
-	hashed := sha256.Sum256(message)
+	hashed := sha256.Sum256([]byte(message))
 	return ecdsa.Verify(publicKey, hashed[:], rs.R, rs.S)
 }

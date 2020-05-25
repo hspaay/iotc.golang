@@ -200,7 +200,7 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 }
 
 // PublishRaw message
-func (messenger *MqttMessenger) PublishRaw(address string, retained bool, message json.RawMessage) error {
+func (messenger *MqttMessenger) PublishRaw(address string, retained bool, message string) error {
 	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
 		messenger.Logger.Warnf("MqttMessenger.PublishRaw: Unable to publish. No connection with server.")
 		return errors.New("MqttMessenger.PublishRaw: no connection with server")
