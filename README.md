@@ -6,7 +6,7 @@ iotc.golang is an implementation of the IoTConnect (iotc) standard for publishin
 
 This readme is currently under construction... 
 The golang library is functional but should be considered Alpha code.
-The current focus is on improving this library by adding adapters that use it.
+The current focus is on improving this library by adding publishers that use it.
 
 TODO:
 * TLS connection to MQTT brokers
@@ -20,10 +20,10 @@ A similar library for the Python and Javascript/Typescript languages is planned 
 ## This Library Provides
 
 * systemd launcher of adapters for Linux 
-* Messenger for MQTT brokers
+* Messengers MQTT brokers and testing (DummyMessenger)
 * Management of nodes, inputs and outputs (see IoTConnect standard for further explanation)
-* Publish discovery when nodes are updated 
-* Publish updates to output values 
+* Publish discovery when nodes are updated
+* Publish updates to output values
 * Signing of published messages
 * Hook to handle node input control messages
 * Hook to handle node configuration updates
@@ -57,13 +57,13 @@ This example uses Go modules as this lets you control versioning and choose your
 
 Recommended installation of your publisher on a linux platform. The iotc namespace is used for publisher applications:
 
-The folder structure for deployment as a normal user:
-* ~/bin/iotc/bin      location of the publisher binaries
-* ~/bin/iotc/config   location of the configuration files, including iotc.conf
-* ~/bin/iotc/logs     logging output
+The folder structure for deployment as a regular user:
+* ~/bin/iotc/bin/     location of the publisher binaries
+* ~/.config/iotc/     location of the configuration files, including messenger.yaml
+* ~/bin/iotc/logs/    logging output
 
-When deploying as an system application, create these folders and update /etc/iotc.conf
-* /etc/iotc/conf         location of iotc.conf main configuration file
+When deploying as an system application, create these folders and update /etc/messenger.conf
+* /etc/iotc/conf/        location of messenger.yaml and publisher configuration files
 * /opt/iotc/             location of the publisher binaries
 * /var/lib/iotc/         location of the persistence files
 * /var/log/iotc/         location of iotc log files
@@ -93,7 +93,7 @@ Common questions will be captured in the [Q&A](docs/FAQ.md).
 
 ... under construction ...
 
-This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/Projects/iotc/myweather*
+This example creates a publisher for a weather forecast that updates the forecast every hour. The project folder is *~/projects/iotc/myweather*
 The publisher is called myweather, and each node is a city. More cities can be added with more nodes. 
 This example assumes you have a MQTT broker running locally. 
 
@@ -102,8 +102,8 @@ This example assumes you have a MQTT broker running locally.
 This uses golang modules so you can use the folder of your choice. More info here: https://blog.golang.org/using-go-modules
 
 ~~~bash
-$ mkdir -p ~/Projects/iotc/myweather
-$ cd ~/Projects/iotc/myweather
+$ mkdir -p ~/projects/iotc/myweather
+$ cd ~/projects/iotc/myweather
 $ go mod init myweather
    > go: creating new go.mod: module myweather
 ~~~
@@ -137,54 +137,65 @@ Change myweather.go to look like this:
 ~~~golang
 package myweather
 
-import "github.com/hspaay/iotc"
+import "github.com/hspaay/iotc.golang/iotc"
+import "github.com/hspaay/iotc.golang/publisher"
 
-const ZoneID = standard.LocalZoneID
-const MqttServerAddress = "localhost"
-const PublisherId = "myweather"
-const NodeId = "amsterdam"  
-const OutputTypeForecast = "forecast"
+const configFolder = "./"
+const appId = "myweather"
+const city = "amsterdam"  
+
 // this is their example apikey. Sign up to openweathermap.org to obtain a key for your app"
 const APIKEY = "b6907d289e10d714a6e88b30761fae22" 
-const DefaultWeatherServiceUrl = "https://api.openweathermap.org/data/2.5/weather?q=amsterdam&appid="+APIKEY
+const AmsterdanWeatherServiceUrl = "https://api.openweathermap.org/data/2.5/weather?q="+city+"&appid="+APIKEY
+
+// CurrentWeather API result
+type CurrentWeather struct {
+  Main struct {
+		Humidity     int     `json:"humidity"`
+		Temperature  float32 `json:"temp"`       //
+	} `json:"main"`
+}
 
 var publisher publisher.Publisher
 
 func main() {
-  messenger = NewMessenger(MqttServerAddress, 0) // use default mqtt port
+  weatherApp := internal.NewWeatherApp()
+  pub, err := publisher.NewAppPublisher(appID, configFolder, &weatherApp, false)
   
-  publisher = publisher.NewPublisher(ZoneID, PublisherID, messenger)
+  // republish discovered nodes, inputs and outputs once a day (default)
+  weatherPub.SetDiscoveryInterval(0, weatherApp.PublishNodes)
 
   // Update the forecast once an hour
-  iotc.SetDefaultOutputInterval(3600, this.PollOutputs)
+  pub.SetPollInterval(3600, weatherApp.UpdateWeather)
 
-  // See below for Discover and Poll functions
-  publisher.Start(nil, nil, Discover, Poll)
+  // Run the publisher until TERM or INT signals
+  pub.Start()
+  pub.WaitForSignal()
+  pub.Stop()
 }
 
 // Discover creates a node for each city with configuration for latitude, longitude.
-function Discover(publisher *Publisher) {
-  node = publisher.DiscoverNode(NodeId) // add/update node with ID forecast
-  publisher.SetNodeDefaultConfig(node, "url", DataTypeString, DefaultWeatherServiceUrl)
-  publisher.DiscoverOutput(node, OutputTypeForecast, "temperature")
-  publisher.DiscoverOutput(node, OutputTypeForecast, "humidity")
+function Discover(pub *Publisher) {
+  pub.NewNode(city, iotc.NodeTypeWeatherService) // add/update node with city forecast
+  pub.NewOutput(city, iotc.OutputTypeTemperature, "temperature")
+  pub.NewOutput(city, iotc.OutputTypeHumidity, "humidity")
 }
 
 // Poll obtains the forcast and updates the output value.
 // The iotc library will automatically publish the output discovery and values.
-function Poll(publisher *Publisher) {
-  node = publisher.GetNode(NodeId)
-  configValues = publisher.GetNodeConfigValues(node)
-  forecastRaw, err = httplib.get(configValues["url"]))
+function Poll(pub *Publisher) {
+  var currentWeather *CurrentWeather
+  node = pub.GetNode(NodeId)
+  rawWeather, err := getWeather(AmsterdanWeatherServiceUrl)
+
   if (err == nil) {
-      forecastObject := JSON.parse(forecastRaw)
+      err = json.Unmarshal(rawWeather, &currentWeather)
       mainForecast := forecastObject["main"]
-      // This publishes the forecast on $local/myweather/amsterdam/$value/forecast/0
-      publisher.UpdateOutput(node, OutputType, OutputTypeTemperature, main["temp"])
-      publisher.UpdateOutput(node, OutputType, OutputTypeHumidity, main["humidity"])
+      // This publishes the forecast on $local/myweather/amsterdam/forecast/0/$value
+      publ.UpdateOutputValue(node, OutputType, OutputTypeTemperature, currentWeather.Main.Temperature)
+      publ.UpdateOutputValue(node, OutputType, OutputTypeHumidity, currentWeather.Main.Humidity)
   } else {
-    publisher.UpdateOutputError(node, OutputType, OutputTypeTemperature, "Forecast not available")
-    publisher.UpdateOutputError(node, OutputType, OutputTypeHumidity, "Forecast not available")
+     pub.SetNodeErrorStatus(node.NodeID, iotc.NodeRunStateError, "Current weather not available: "+err.Error())
   }
 }
 ~~~
