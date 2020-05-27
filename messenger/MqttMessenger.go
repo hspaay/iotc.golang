@@ -247,7 +247,7 @@ func (messenger *MqttMessenger) resubscribe() {
 	messenger.updateMutex.Lock()
 	defer messenger.updateMutex.Unlock()
 
-	messenger.Logger.Infof("MqttMessenger.resubscribe to %d addresss", len(messenger.subscriptions))
+	messenger.Logger.Infof("MqttMessenger.resubscribe to %d addresess", len(messenger.subscriptions))
 	for _, subscription := range messenger.subscriptions {
 		// clear existing subscription
 		messenger.pahoClient.Unsubscribe(subscription.address)
