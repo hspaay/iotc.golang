@@ -9,9 +9,10 @@ This library is intended for software developers that wish to develop IoT applic
 ## This Library Provides
 
 * systemd launcher of adapters for Linux 
-* Messenger for MQTT brokers
-* Management of nodes, inputs, outputs and output values (see IoTConnect standard for further explanation)
-* Publisher that automatically publishes updates for node discovery and output values
+* Messengers MQTT brokers and testing (DummyMessenger)
+* Management of nodes, inputs and outputs (see IoTConnect standard for further explanation)
+* Publish discovery when nodes are updated
+* Publish updates to output values
 * Signing of published messages
 * Hook to handle node input control messages
 * Hook to handle node configuration updates
