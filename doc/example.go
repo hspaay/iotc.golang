@@ -59,20 +59,24 @@ import (
 )
 
 const appID = "myweather"
-const zoneID = iotc.LocalZoneID
+const domain = iotc.LocalDomainID
 const mqttServerAddress = "localhost"
 const outputTypeForecast = "forecast"
 
-// APIKEY is a example apikey. Sign up to openweathermap.org to obtain a key for your app"
-const APIKEY = "b6907d289e10d714a6e88b30761fae22"
+// APIKEY is a example apikey. Sign up to openweathermap.org to obtain a key"
+const APIKEY = "a0e4c673de4517470b956be21abbf377"
+const weatherCity = "amsterdam"
+const weatherUnits = "metric"
 
 // DefaultWeatherServiceURL contains the openweathermap URL for querying current weather
-const DefaultWeatherServiceURL = "https://api.openweathermap.org/data/2.5/weather?q=amsterdam&appid=" + APIKEY
+// See https://openweathermap.org/current#data for more information
+const DefaultWeatherServiceURL = "https://api.openweathermap.org/data/2.5/weather?q=" +
+	weatherCity + "&units=" + weatherUnits + "&appid=" + APIKEY
 
 // AppConfig contains the application configuration and can be loaded from {AppID}.yaml
 type AppConfig struct {
 	PublisherID string `yaml:"publisherId"`
-	City        string `yaml:"city"`
+	WeatherURL  string `yaml:"weatherURL"`
 }
 
 // CurrentWeather is the struct to load the openweathermap result
@@ -83,26 +87,27 @@ type CurrentWeather struct {
 	} `json:"main"`
 }
 
+// Sign up to openweathermap.org to obtain a key
 var appConfig = &AppConfig{
 	PublisherID: appID,
-	City:        "amsterdam",
+	WeatherURL:  DefaultWeatherServiceURL,
 }
 
 // SetupNodes creates a node for each city with outputs for temperature and humidity
 func SetupNodes(pub *publisher.Publisher, city string) {
-	// Weather service URL can be configured through the publisher node
-	pub.NewNodeConfig(iotc.PublisherNodeID, "url", iotc.DataTypeString, "Weather Service URL", DefaultWeatherServiceURL)
-
 	pub.NewNode(city, iotc.NodeTypeWeatherService)
-	pub.NewOutput(city, iotc.OutputTypeTemperature, iotc.DefaultOutputInstance)
+	output := pub.NewOutput(city, iotc.OutputTypeTemperature, iotc.DefaultOutputInstance)
+	output.Unit = iotc.UnitCelcius
+	pub.Outputs.UpdateOutput(output)
 	pub.NewOutput(city, iotc.OutputTypeHumidity, iotc.DefaultOutputInstance)
 }
 
 // UpdateWeather obtains the forecast and updates the output value.
 // The iotc library will automatically publish the output discovery and values.
 func UpdateWeather(pub *publisher.Publisher) {
-	nodeID := appConfig.City
-	requestURL, _ := pub.GetNodeConfigValue(appConfig.City, "url", DefaultWeatherServiceURL)
+	nodeID := weatherCity
+	// allow custom weather URL from a node configuration, fall back to the default URL
+	requestURL, _ := pub.GetNodeConfigValue(nodeID, "url", DefaultWeatherServiceURL)
 	resp, err := http.Get(requestURL)
 
 	if err == nil {
@@ -110,7 +115,7 @@ func UpdateWeather(pub *publisher.Publisher) {
 		forecastRaw, _ := ioutil.ReadAll(resp.Body)
 		json.Unmarshal(forecastRaw, &weather)
 
-		// This publishes the forecast on $local/myweather/amsterdam/$value/forecast/0
+		// This publishes the forecast on local/myweather/amsterdam/$value/forecast/0
 		temp := fmt.Sprintf("%0.1f", weather.Main.Temperature)
 		hum := fmt.Sprintf("%d", weather.Main.Humidity)
 		pub.UpdateOutputValue(nodeID, iotc.OutputTypeTemperature, iotc.DefaultOutputInstance, temp)
@@ -127,7 +132,7 @@ func main() {
 	// this auto loads the messenger.yaml and myweather.yaml from ~/.config/iotc
 	pub, _ := publisher.NewAppPublisher(appID, "", appConfig, false)
 
-	SetupNodes(pub, appConfig.City)
+	SetupNodes(pub, weatherCity)
 	// Update the forecast once an hour
 	pub.SetPollInterval(3600, UpdateWeather)
 

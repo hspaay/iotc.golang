@@ -12,10 +12,10 @@ const node1ID = "node1"
 const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
 const publisher2ID = "publisher2"
-const zone1ID = iotc.LocalZoneID
+const domain1ID = iotc.LocalDomainID
 
-var node1Base = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1ID)
-var node1Alias = fmt.Sprintf("%s/%s/%s", zone1ID, publisher1ID, node1AliasID)
+var node1Base = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1ID)
+var node1Alias = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
 
 var node1ConfigureAddr = node1Base + "/$configure"
@@ -36,7 +36,7 @@ var node1historyAddr = node1Base + "/switch/0/$history"
 // TestNewNode instance
 func TestNewNode(t *testing.T) {
 	nodeList := NewNodeList()
-	node := nodeList.NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+	node := nodeList.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 
 	if !assert.NotNil(t, node, "Failed creating node") {
 		return
@@ -50,7 +50,7 @@ func TestNewNode(t *testing.T) {
 // Test updating of node atributes and status
 func TestAttrStatus(t *testing.T) {
 	nodeList := NewNodeList()
-	nodeList.NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+	nodeList.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 
 	newAttr := map[iotc.NodeAttr]string{"Manufacturer": "Bob"}
 	nodeList.SetNodeAttr(node1Addr, newAttr)
@@ -74,7 +74,7 @@ func TestAttrStatus(t *testing.T) {
 // TestConfigure tests if the node configuration is handled
 func TestConfigure(t *testing.T) {
 	nodeList := NewNodeList()
-	nodeAddr := nodeList.NewNode(zone1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+	nodeAddr := nodeList.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 
 	config := NewNodeConfig(iotc.NodeAttrName, iotc.DataTypeString, "Friendly Name", "")
 	nodeList.UpdateNodeConfig(nodeAddr, config)
@@ -83,11 +83,12 @@ func TestConfigure(t *testing.T) {
 	nodeList.SetNodeConfigValues(nodeAddr, newValues)
 	// node1 must match the newly added node
 	node := nodeList.GetNodeByAddress(node1Addr)
-	c := node.Config[iotc.NodeAttrName]
-	if !assert.NotNil(t, c, "Can't find configuration for name") {
+	config2 := node.Config[iotc.NodeAttrName]
+	value2 := node.Attr[iotc.NodeAttrName]
+	if !assert.NotNil(t, config2, "Can't find configuration for name") {
 		return
 	}
-	assert.Equal(t, "NewName", c.Value, "Configuration wasn't applied")
+	assert.Equal(t, "NewName", value2, "Configuration wasn't applied")
 }
 
 // TODO more tests for node management and concurrency

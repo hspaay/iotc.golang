@@ -12,7 +12,7 @@ import (
 // - check if the signature is valid
 // - check if the node is valid
 // - pass the input value update to the adapter's onNodeInputHandler callback
-func (publisher *Publisher) handleNodeInput(address string, publication *iotc.Publication) {
+func (publisher *Publisher) handleNodeInput(address string, message []byte) {
 	// Check that address is one of our inputs
 	segments := strings.Split(address, "/")
 	// a full address is required
@@ -25,23 +25,29 @@ func (publisher *Publisher) handleNodeInput(address string, publication *iotc.Pu
 
 	input := publisher.Inputs.GetInputByAddress(inputAddr)
 
-	if input == nil || publication.Message == "" {
-		publisher.Logger.Infof("handleNodeInput unknown input for address %s or missing message", address)
+	if input == nil || message == nil {
+		publisher.logger.Infof("handleNodeInput unknown input for address %s or missing message", address)
 		return
 	}
 	// Decode the message into a SetMessage type
-	var setMessage iotc.SetInputMessage
-	err := json.Unmarshal([]byte(publication.Message), &setMessage)
+	payload, err := publisher.signer.Verify(message)
 	if err != nil {
-		publisher.Logger.Infof("Unable to unmarshal SetMessage in %s", address)
+		publisher.logger.Warningf("handleNodeConfig Invalid message: %s", err)
+		return
+	}
+
+	var setMessage iotc.SetInputMessage
+	err = json.Unmarshal(payload, &setMessage)
+	if err != nil {
+		publisher.logger.Infof("Unable to unmarshal SetMessage in %s", address)
 		return
 	}
 	// Verify that the message comes from the sender using the sender's public key
-	isValid := publisher.VerifyMessageSignature(setMessage.Sender, publication.Message, publication.Signature)
-	if !isValid {
-		publisher.Logger.Warningf("Incoming message verification failed for sender: %s", setMessage.Sender)
-		return
-	}
+	// isValid := publisher.VerifyMessageSignature(setMessage.Sender, message, publication.Signature)
+	// if !isValid {
+	// 	publisher.Logger.Warningf("Incoming message verification failed for sender: %s", setMessage.Sender)
+	// 	return
+	// }
 	if publisher.onNodeInputHandler != nil {
 		publisher.onNodeInputHandler(input, &setMessage)
 	}

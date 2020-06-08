@@ -3,7 +3,6 @@ package subscriber
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 
 	"github.com/hspaay/iotc.golang/iotc"
@@ -12,28 +11,27 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Subscriber carries the operating state of the subscriber
+// Subscriber carries the operating state of the consumer
 // Start() will subscribe to discover all publishers.
 // To discover nodes, subscribe to the publisher
 type Subscriber struct {
-	Logger        *log.Logger          //
-	messenger     messenger.IMessenger // Message bus messenger to use
-	zoneID        string               // The zone in which we live
-	isRunning     bool                 // publisher was started and is running
-	subscriptions nodes.NodeList       // publishers to which we subscribe to receive their nodes
-
-	// handle updates in the background
-	updateMutex *sync.Mutex       // mutex for async updating and publishing
-	publishers  *nodes.NodeList   // publishers on the network
-	nodes       *nodes.NodeList   // nodes by discovery address
-	inputList   *nodes.InputList  // inputs by discovery address
-	outputList  *nodes.OutputList // outputs by discovery address
+	domain        string                   // The domain in which we live
+	isRunning     bool                     // publisher was started and is running
+	logger        *log.Logger              //
+	inputList     *nodes.InputList         // inputs by discovery address
+	messenger     messenger.IMessenger     // Message bus messenger to use
+	nodes         *nodes.NodeList          // nodes by discovery address
+	outputList    *nodes.OutputList        // outputs by discovery address
+	publishers    *nodes.PublisherList     // publishers on the network
+	signer        messenger.IMessageSigner // Signing and verification of messages
+	subscriptions nodes.NodeList           // publishers to which we subscribe to receive their nodes
+	updateMutex   *sync.Mutex              // mutex for async updating and publishing
 }
 
 // Start listen for publisher nodes
 func (subscriber *Subscriber) Start() {
 	if !subscriber.isRunning {
-		subscriber.Logger.Warningf("Starting subscriber")
+		subscriber.logger.Warningf("Starting subscriber")
 		subscriber.updateMutex.Lock()
 		subscriber.isRunning = true
 		subscriber.updateMutex.Unlock()
@@ -41,58 +39,72 @@ func (subscriber *Subscriber) Start() {
 		// TODO: support LWT
 		subscriber.messenger.Connect("", "")
 
-		// subscribe to receive any publisher node
-		pubAddr := fmt.Sprintf("+/+/%s/%s", iotc.PublisherNodeID, iotc.MessageTypeNodeDiscovery)
+		// subscribe to receive all publisher identities
+		pubAddr := nodes.MakePublisherIdentityAddress("+", "+")
 		subscriber.messenger.Subscribe(pubAddr, subscriber.handlePublisherDiscovery)
 
-		subscriber.Logger.Warningf("Subscriber started")
+		subscriber.logger.Warningf("Subscriber started")
 	}
 }
 
 // Stop listen for messages
 func (subscriber *Subscriber) Stop() {
 	if subscriber.isRunning {
-		subscriber.Logger.Warningf("Stopping subscriber")
+		subscriber.logger.Warningf("Stopping subscriber")
 		subscriber.updateMutex.Lock()
 		subscriber.isRunning = false
 		subscriber.updateMutex.Unlock()
-		subscriber.Logger.Warningf("Subscriber stopped")
+		subscriber.logger.Warningf("Subscriber stopped")
 	}
 }
 
-// handlePublisherDiscovery stores discovered publishers in the zone for their public key
+// handlePublisherDiscovery stores discovered publishers for their public key
 // Used to verify signatures of incoming configuration and input messages
-// address contains the publisher's discovery address: zone/publisher/$publisher/$node
-// publication contains a message with the publisher node info
-func (subscriber *Subscriber) handlePublisherDiscovery(address string, publication *iotc.Publication) {
-	var pubNode iotc.NodeDiscoveryMessage
-	err := json.Unmarshal([]byte(publication.Message), &pubNode)
+// address contains the publisher's identity address: domain/publisherId/$identity
+// message is the LWS signed message containing the publisher identity
+func (subscriber *Subscriber) handlePublisherDiscovery(address string, message []byte) {
+	var identity iotc.PublisherIdentityMessage
+
+	// FIXME: verify with the signature with the domain security service (DSS) public key or certificate
+	payload, err := subscriber.signer.Verify(message)
 	if err != nil {
-		subscriber.Logger.Warningf("Unable to unmarshal Publisher Node in %s", address)
-		return
-	} else if pubNode.Address != address {
-		subscriber.Logger.Warningf("Received publisher Node with address %s on a different address %s", pubNode.Address)
+		subscriber.logger.Warningf("handlePublisherDiscovery Invalid message: %s", err)
+		// return
+	}
+
+	// Decode the message into a NodeDiscoveryMessage type
+	err = json.Unmarshal(payload, &identity)
+	if err != nil {
+		subscriber.logger.Warningf("Unable to unmarshal Publisher Identity in %s: %s", address, err)
 		return
 	}
-	subscriber.publishers.UpdateNode(&pubNode)
-	subscriber.Logger.Infof("Discovered publisher %s", address)
+
+	// TODO: if the publisher is in a secure zone its identity must have a valid signature from the ZCAS service
+	// assume the publisher has a valid identity
+	subscriber.updateMutex.Lock()
+	defer subscriber.updateMutex.Unlock()
+
+	// TODO: Verify that the publisher is valid...
+	subscriber.publishers.UpdatePublisher(&identity)
+	subscriber.logger.Infof("Discovered publisher %s", address)
+
 }
 
 // NewSubscriber creates a subscriber instance for discoverying publishers, nodes, inputs and
 // outputs and receive output values
-// zoneID for the zone this subscriber lives in
+// domain for this subscriber lives in
 // messenger for subscribing to the message bus
-func NewSubscriber(zoneID string, messenger messenger.IMessenger) *Subscriber {
+func NewSubscriber(domain string, messenger messenger.IMessenger) *Subscriber {
 
 	var subscriber = &Subscriber{
+		domain:      domain,
 		inputList:   nodes.NewInputList(),
-		Logger:      log.New(),
+		logger:      log.New(),
 		messenger:   messenger,
 		nodes:       nodes.NewNodeList(),
 		outputList:  nodes.NewOutputList(),
-		publishers:  nodes.NewNodeList(),
+		publishers:  nodes.NewPublisherList(),
 		updateMutex: &sync.Mutex{},
-		zoneID:      zoneID,
 	}
 	return subscriber
 }

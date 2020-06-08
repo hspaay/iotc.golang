@@ -12,16 +12,16 @@ const (
 	MessageTypeEvent           = "$event"     // node outputs event, payload is EventMessage
 	MessageTypeForecast        = "$forecast"  // output forecast, payload is HistoryMessage
 	MessageTypeHistory         = "$history"   // output history, payload is HistoryMessage
+	MessageTypeIdentity        = "$identity"  // publisher identity
 	MessageTypeInputDiscovery  = "$input"     // input discovery, payload is InOutput object
 	MessageTypeLatest          = "$latest"    // latest output, payload is latest message
+	MessageTypeLWT             = "$lwt"       // publisher last will and testament, if supported
 	MessageTypeNodeDiscovery   = "$node"      // node discovery, payload is Node object
 	MessageTypeOutputDiscovery = "$output"    // output discovery, payload output definition
 	MessageTypeSet             = "$set"       // control input command, payload is input value
 	MessageTypeUpgrade         = "$upgrade"   // perform firmware upgrade, payload is UpgradeMessage
-	MessageTypeValue           = "$value"     // raw output value
-	// LocalZone ID for local-only zones (eg, no sharing outside this zone)
-	LocalZoneID = "local" // local area zone
-	TestZoneID  = "test"  // Zone to use in testing
-	// PublisherNodeID to use when none is provided
-	// PublisherNodeID = "$publisher" // reserved node ID for publishers
+	MessageTypeRaw             = "$raw"       // raw output value
+	// LocaldomainID for local-only domains (eg, no sharing outside this domain)
+	LocalDomainID = "local" // local area domain
+	TestDomainID  = "test"  // Domain to use in testing
 )

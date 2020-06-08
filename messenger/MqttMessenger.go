@@ -4,7 +4,6 @@ package messenger
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	pahomqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/hspaay/iotc.golang/iotc"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,10 +24,10 @@ const TLSPort = 8883
 // MqttMessenger that implements IMessenger
 type MqttMessenger struct {
 	config              *MessengerConfig    // connect information
+	isRunning           bool                // listen for messages while running
+	logger              *log.Logger         // Logger provided by user
 	pahoClient          pahomqtt.Client     // Paho MQTT Client
 	subscriptions       []TopicSubscription // list of TopicSubscription for re-subscribing after reconnect
-	Logger              *log.Logger         // Logger provided by user
-	isRunning           bool                // listen for messages while running
 	tlsVerifyServerCert bool                // verify the server certificate, this requires a Root CA signed cert
 	tlsCACertFile       string              // path to CA certificate
 	updateMutex         *sync.Mutex         // mutex for async updating of subscriptions
@@ -38,7 +36,7 @@ type MqttMessenger struct {
 // TopicSubscription holds subscriptions to restore after disconnect
 type TopicSubscription struct {
 	address string
-	handler func(address string, publication *iotc.Publication)
+	handler func(address string, message []byte)
 	token   pahomqtt.Token // for debugging
 	client  *MqttMessenger //
 	log     *log.Logger
@@ -86,7 +84,7 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 	//opts.SetKeepAlive(60) // keepalive causes deadlock in v1.1.0. See github issue #126
 
 	opts.SetOnConnectHandler(func(client pahomqtt.Client) {
-		messenger.Logger.Warningf("MqttMessenger.onConnect: Connected to server at %s. Connected=%v. ClientId=%s",
+		messenger.logger.Warningf("MqttMessenger.onConnect: Connected to server at %s. Connected=%v. ClientId=%s",
 			brokerURL, client.IsConnected(), config.ClientID)
 		// Subscribe to addresss already registered by the app on connect or reconnect
 		messenger.resubscribe()
@@ -105,7 +103,7 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 		rootCA = x509.NewCertPool()
 		caFile, err := ioutil.ReadFile(messenger.tlsCACertFile)
 		if err != nil {
-			messenger.Logger.Errorf("MqttMessenger.Connect: Unable to read CA certificate chain: %s", err)
+			messenger.logger.Errorf("MqttMessenger.Connect: Unable to read CA certificate chain: %s", err)
 		}
 		rootCA.AppendCertsFromPEM([]byte(caFile))
 	}
@@ -116,7 +114,7 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 		ServerName: "", // hostname on the server certificate. How to get this?
 	})
 
-	messenger.Logger.Infof("MqttMessenger.Connect: Connecting to MQTT server: %s with clientID %s"+
+	messenger.logger.Infof("MqttMessenger.Connect: Connecting to MQTT server: %s with clientID %s"+
 		" AutoReconnect and CleanSession are set.",
 		brokerURL, config.ClientID)
 
@@ -139,7 +137,7 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 			break
 		}
 
-		messenger.Logger.Errorf("MqttMessenger.Connect: Connecting to broker on %s failed: %s. retrying in %d seconds.",
+		messenger.logger.Errorf("MqttMessenger.Connect: Connecting to broker on %s failed: %s. retrying in %d seconds.",
 			brokerURL, token.Error(), retryDelaySec)
 		time.Sleep(time.Duration(retryDelaySec) * time.Second)
 		// slowly increment wait time
@@ -158,7 +156,7 @@ func (messenger *MqttMessenger) Disconnect() {
 	messenger.updateMutex.Unlock()
 
 	if messenger.pahoClient != nil {
-		messenger.Logger.Warningf("MqttMessenger.Disconnect: Set state to disconnected and close connection")
+		messenger.logger.Warningf("MqttMessenger.Disconnect: Set state to disconnected and close connection")
 		//messenger.publish("$state", "disconnected")
 		time.Sleep(time.Second / 10) // Disconnect doesn't seem to wait for all messages. A small delay ahead helps
 		messenger.pahoClient.Disconnect(10 * ConnectionTimeoutSec * 1000)
@@ -173,27 +171,22 @@ func (messenger *MqttMessenger) Disconnect() {
 // address to publish on.
 // retained to have the broker retain the address value
 // payload is converted to string if it isn't a byte array, as Paho doesn't handle int and bool
-func (messenger *MqttMessenger) Publish(address string, retained bool, publication *iotc.Publication) error {
+func (messenger *MqttMessenger) Publish(address string, retained bool, message []byte) error {
 	var err error
 
 	//fullTopic := fmt.Sprintf("%s/%s/%s", messenger.config.Base, messenger.deviceId, addressLevels)
 	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
-		messenger.Logger.Warnf("MqttMessenger.Publish: Unable to publish. No connection with server.")
+		messenger.logger.Warnf("MqttMessenger.Publish: Unable to publish. No connection with server.")
 		return errors.New("no connection with server")
 	}
-	payload, err := json.MarshalIndent(publication, " ", " ")
-	if err != nil {
-		messenger.Logger.Errorf("MqttMessenger.Publish:  Error marshalling publication: %s", err)
-		return err
-	}
-	messenger.Logger.Debugf("MqttMessenger.Publish []byte: address=%s, qos=%d, retained=%v",
+	messenger.logger.Debugf("MqttMessenger.Publish []byte: address=%s, qos=%d, retained=%v",
 		address, messenger.config.PubQos, retained)
-	token := messenger.pahoClient.Publish(address, messenger.config.PubQos, retained, payload)
+	token := messenger.pahoClient.Publish(address, messenger.config.PubQos, retained, message)
 
 	err = token.Error()
 	if err != nil {
 		// TODO: confirm that with qos=1 the message is sent after reconnect
-		messenger.Logger.Warnf("MqttMessenger.Publish: Error during publish on address %s: %v", address, err)
+		messenger.logger.Warnf("MqttMessenger.Publish: Error during publish on address %s: %v", address, err)
 		//return err
 	}
 	return err
@@ -202,7 +195,7 @@ func (messenger *MqttMessenger) Publish(address string, retained bool, publicati
 // PublishRaw message
 func (messenger *MqttMessenger) PublishRaw(address string, retained bool, message string) error {
 	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
-		messenger.Logger.Warnf("MqttMessenger.PublishRaw: Unable to publish. No connection with server.")
+		messenger.logger.Warnf("MqttMessenger.PublishRaw: Unable to publish. No connection with server.")
 		return errors.New("MqttMessenger.PublishRaw: no connection with server")
 	}
 	// publication := Publication{Message: message}
@@ -212,7 +205,7 @@ func (messenger *MqttMessenger) PublishRaw(address string, retained bool, messag
 	err := token.Error()
 	if err != nil {
 		// TODO: confirm that with qos=1 the message is sent after reconnect
-		messenger.Logger.Warnf("MqttMessenger.PublishRaw: Error during publish on address %s: %v", address, err)
+		messenger.logger.Warnf("MqttMessenger.PublishRaw: Error during publish on address %s: %v", address, err)
 		//return err
 	}
 	return err
@@ -225,15 +218,10 @@ func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt
 	// NOTE: Scope in this callback is not always retained. Pipe notifications through a channel and handle in goroutine
 	address := msg.Topic()
 	rawPayload := msg.Payload()
-	var publication iotc.Publication
-	err := json.Unmarshal(rawPayload, &publication)
-	if err != nil {
-		subscription.log.Infof("MqttMessenger.onMessage: Unable to unmarshal payload on address %s. Error: %s", address, err)
-		return
-	}
+
 	subscription.log.Infof("MqttMessenger.onMessage. address=%s, subscription=%s, retained=%v",
 		address, subscription.address, msg.Retained())
-	subscription.handler(address, &publication)
+	subscription.handler(address, rawPayload)
 	//message := &IncomingMessage{msgTopic, payload, subscription}
 	//subscription.client.messageChannel <- message
 }
@@ -247,12 +235,12 @@ func (messenger *MqttMessenger) resubscribe() {
 	messenger.updateMutex.Lock()
 	defer messenger.updateMutex.Unlock()
 
-	messenger.Logger.Infof("MqttMessenger.resubscribe to %d addresess", len(messenger.subscriptions))
+	messenger.logger.Infof("MqttMessenger.resubscribe to %d addresess", len(messenger.subscriptions))
 	for _, subscription := range messenger.subscriptions {
 		// clear existing subscription
 		messenger.pahoClient.Unsubscribe(subscription.address)
 
-		messenger.Logger.Infof("MqttMessenger.resubscribe: address %s", subscription.address)
+		messenger.logger.Infof("MqttMessenger.resubscribe: address %s", subscription.address)
 		// create a new variable to hold the subscription in the closure
 		newSubscr := subscription
 		token := messenger.pahoClient.Subscribe(newSubscr.address, messenger.config.PubQos, newSubscr.onMessage)
@@ -262,7 +250,7 @@ func (messenger *MqttMessenger) resubscribe() {
 		//})
 		newSubscr.token = token
 	}
-	messenger.Logger.Infof("MqttMessenger.resubscribe complete")
+	messenger.logger.Infof("MqttMessenger.resubscribe complete")
 }
 
 // Subscribe to a address
@@ -272,19 +260,19 @@ func (messenger *MqttMessenger) resubscribe() {
 // qos: Quality of service for subscription: 0, 1, 2
 // handler: callback handler.
 func (messenger *MqttMessenger) Subscribe(
-	address string, onMessage func(address string, publication *iotc.Publication)) {
+	address string, onMessage func(address string, message []byte)) {
 	subscription := TopicSubscription{
 		address: address,
 		handler: onMessage,
 		token:   nil,
 		client:  messenger,
-		log:     messenger.Logger,
+		log:     messenger.logger,
 	}
 	messenger.updateMutex.Lock()
 	defer messenger.updateMutex.Unlock()
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
 
-	messenger.Logger.Infof("MqttMessenger.Subscribe: address %s, qos %d", address, messenger.config.SubQos)
+	messenger.logger.Infof("MqttMessenger.Subscribe: address %s, qos %d", address, messenger.config.SubQos)
 	//messenger.pahoClient.Subscribe(address, qos, addressSubscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
 	if messenger.pahoClient != nil {
 		messenger.pahoClient.Subscribe(address, messenger.config.SubQos, subscription.onMessage) //func(c pahomqtt.Client, msg pahomqtt.Message) {
@@ -298,9 +286,9 @@ func NewMqttMessenger(config *MessengerConfig, logger *log.Logger) *MqttMessenge
 		logger = log.New()
 	}
 	messenger := &MqttMessenger{
-		pahoClient: nil,
-		Logger:     logger,
 		config:     config,
+		logger:     logger,
+		pahoClient: nil,
 		//messageChannel: make(chan *IncomingMessage),
 		tlsCACertFile:       "/etc/mosquitto/certs/zcas_ca.crt",
 		tlsVerifyServerCert: true,

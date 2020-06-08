@@ -2,7 +2,6 @@
 package messenger
 
 import (
-	"encoding/json"
 	"strings"
 	"sync"
 
@@ -12,9 +11,9 @@ import (
 
 // DummyMessenger that implements IMessenger
 type DummyMessenger struct {
-	Logger        *log.Logger
-	Publications  map[string]*iotc.Publication
-	config        *MessengerConfig // for zone configuration
+	logger        *log.Logger
+	publications  map[string][]byte
+	config        *MessengerConfig // for domain configuration
 	subscriptions []Subscription
 	publishMutex  *sync.Mutex // mutex for concurrent publishing of messages
 }
@@ -22,7 +21,7 @@ type DummyMessenger struct {
 // Subscription to messages
 type Subscription struct {
 	address string
-	handler func(address string, publication *iotc.Publication)
+	handler func(address string, message []byte)
 }
 
 // Connect the messenger
@@ -35,38 +34,30 @@ func (messenger *DummyMessenger) Disconnect() {
 }
 
 // FindLastPublication with the given address
-func (messenger *DummyMessenger) FindLastPublication(addr string) *iotc.Publication {
+func (messenger *DummyMessenger) FindLastPublication(addr string) (message []byte) {
 	messenger.publishMutex.Lock()
-	pub := messenger.Publications[addr]
+	pub := messenger.publications[addr]
 	messenger.publishMutex.Unlock()
 	return pub
 }
 
-// GetZone returns the zone in which this messenger operates
-// This is provided via the messenger config file or defaults to iotc.LocalZoneID
-func (messenger *DummyMessenger) GetZone() string {
-	zone := messenger.config.Zone
-	if zone == "" {
-		return iotc.LocalZoneID
+// GetDomain returns the domain in which this messenger operates
+// This is provided via the messenger config file or defaults to iotc.LocalDomainID
+func (messenger *DummyMessenger) GetDomain() string {
+	domain := messenger.config.Domain
+	if domain == "" {
+		return iotc.LocalDomainID
 	}
-	return zone
+	return domain
+}
+
+// NrPublications returns the number of received publications
+func (messenger *DummyMessenger) NrPublications() int {
+	return len(messenger.publications)
 }
 
 // OnReceive function to simulate a received message
-func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
-	var payload iotc.Publication
-	var publication iotc.Publication
-	var rawStr = string(rawPayload)
-	_ = rawStr
-	err := json.Unmarshal(rawPayload, &payload)
-	// messageStr := string(publication.Message)
-	if err != nil {
-		messenger.Logger.Infof("DummyMessenger.OnReceive: Unable to unmarshal payload on address %s. Error: %s", address, err)
-		return
-	}
-	publication.Signature = payload.Signature
-	publication.Message = payload.Message
-
+func (messenger *DummyMessenger) OnReceive(address string, message []byte) {
 	messenger.publishMutex.Lock()
 	subs := messenger.subscriptions
 	messenger.publishMutex.Unlock()
@@ -75,46 +66,29 @@ func (messenger *DummyMessenger) OnReceive(address string, rawPayload []byte) {
 		match := messenger.matchAddress(address, subscription.address)
 
 		if match {
-			subscription.handler(address, &publication)
+			subscription.handler(address, message)
 		}
 	}
 }
 
-// Publish a JSON encoded message
-func (messenger *DummyMessenger) Publish(address string, retained bool, publication *iotc.Publication) error {
-	messenger.publishMutex.Lock()
-	messenger.Publications[address] = publication
-	messenger.publishMutex.Unlock()
-	//
-	payload, err := json.Marshal(publication)
-	if err != nil {
-		messenger.Logger.Errorf("DummyMessenger.Publish: Failed marshalling publication for address %s", address)
-		return err
-	}
-	// go messenger.OnReceive(address, payload)
-	messenger.OnReceive(address, payload)
-	return nil
-}
-
-// PublishRaw message
+// Publish a message
 // address is the MQTT address to send to
 // retained (ignored)
 // message JSON text or raw message base64 encoded text
-func (messenger *DummyMessenger) PublishRaw(address string, retained bool, message string) error {
-	payload := iotc.Publication{
-		Message: message,
-	}
+func (messenger *DummyMessenger) Publish(address string, retained bool, message []byte) error {
 	messenger.publishMutex.Lock()
-	messenger.Publications[address] = &payload
+	messenger.publications[address] = message
 	messenger.publishMutex.Unlock()
+	// go messenger.OnReceive(address, payload)
+	messenger.OnReceive(address, message)
 	return nil
 }
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
-	address string, onMessage func(address string, publication *iotc.Publication)) {
+	address string, onMessage func(address string, message []byte)) {
 
-	messenger.Logger.Infof("DummyMessenger.Subscribe: address %s", address)
+	messenger.logger.Infof("DummyMessenger.Subscribe: address %s", address)
 	subscription := Subscription{address: address, handler: onMessage}
 	messenger.publishMutex.Lock()
 	messenger.subscriptions = append(messenger.subscriptions, subscription)
@@ -159,8 +133,8 @@ func NewDummyMessenger(config *MessengerConfig, logger *log.Logger) *DummyMessen
 	}
 	var messenger = &DummyMessenger{
 		config:        config,
-		Logger:        logger,
-		Publications:  make(map[string]*iotc.Publication, 0),
+		logger:        logger,
+		publications:  make(map[string][]byte, 0),
 		subscriptions: make([]Subscription, 0),
 		publishMutex:  &sync.Mutex{},
 	}

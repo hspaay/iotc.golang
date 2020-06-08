@@ -1,12 +1,8 @@
 // Package iotc with IoTConnect node message type definitions
 package iotc
 
-// PublisherNodeID to use when node is a publisher
-const PublisherNodeID = "$publisher" // reserved node ID for publishers
-
 // Predefined node attribute names that describe the node.
 // When they are configurable they also appear in Node Config section.
-// See also NodeStatusXxx below for attributes that describe the state of the node
 const (
 	NodeAttrAddress         NodeAttr = "address"         // the node's internal address. Can be used as the nodeID
 	NodeAttrAlias           NodeAttr = "alias"           // node alias for publishing inputs and outputs
@@ -37,11 +33,12 @@ const (
 	NodeAttrSubnet          NodeAttr = "subnet"          // IP subnets configuration
 )
 
-// Various NodeStatus attributes
+// Various NodeStatus attributes that describe the recent status of the node
+// These indicate how the node is performing and are updated with each publication, typically once a day
 const (
 	NodeStatusErrorCount    NodeStatus = "errorCount"    // nr of errors reported on this device
 	NodeStatusHealth        NodeStatus = "health"        // health status of the device 0-100%
-	NodeStatusLastError     NodeStatus = "lastError"     // most recent error message
+	NodeStatusLastError     NodeStatus = "lastError"     // most recent error message, or "" if no error
 	NodeStatusLastSeen      NodeStatus = "lastSeen"      // ISO time the device was last seen
 	NodeStatusLatencyMSec   NodeStatus = "latencyMSec"   // duration connect to sensor in milliseconds
 	NodeStatusNeighborCount NodeStatus = "neighborCount" // mesh network nr of neighbors
@@ -51,7 +48,8 @@ const (
 	NodeStatusRunState      NodeStatus = "runState"      // Node runstate as per below
 )
 
-// Various Running States
+// Values for NodeStatusRunState
+// These reflect whether a node is ready, sleeping or in error
 const (
 	NodeRunStateError        string = "error"        // Node needs servicing
 	NodeRunStateDisconnected string = "disconnected" // Node has cleanly disconnected
@@ -81,7 +79,6 @@ const (
 	NodeTypeKeypad         NodeType = "keypad"         // Entry key pad
 	NodeTypeLock           NodeType = "lock"           // Electronic door lock
 	NodeTypeMultisensor    NodeType = "multisensor"    // Node with multiple sensors
-	NodeTypePublisher      NodeType = "publisher"      // Node is a zwave or other network repeater
 	NodeTypeNetRepeater    NodeType = "netRepeater"    // Node is a zwave or other network repeater
 	NodeTypeNetRouter      NodeType = "netRouter"      // Node is a network router
 	NodeTypeNetSwitch      NodeType = "netSwitch"      // Node is a network switch
@@ -113,8 +110,9 @@ type NodeStatus string
 // ConfigAttrMap for storing node configuration
 type ConfigAttrMap map[string]ConfigAttr
 
-// ConfigAttr describing the configuration of the device/service or sensor
+// ConfigAttr describes the attributes that are configurable
 type ConfigAttr struct {
+	Name        string   `json:"name"`                  // Name of the attribute as used in the attr section
 	Datatype    DataType `json:"datatype,omitempty"`    // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
 	Default     string   `json:"default,omitempty"`     // Default value
 	Description string   `json:"description,omitempty"` // Description of the attribute
@@ -122,43 +120,24 @@ type ConfigAttr struct {
 	ID          NodeAttr `json:"id,omitempty"`          // Unique ID of this config
 	Max         float64  `json:"max,omitempty"`         // Max value for numbers
 	Min         float64  `json:"min,omitempty"`         // Min value for numbers
-	Secret      bool     `json:"secret,omitempty"`      // the attribute value was set encrypted. Don't publish the value.
-	Value       string   `json:"value,omitempty"`       // Current value of the attribute. Could be a string or map
+	Secret      bool     `json:"secret,omitempty"`      // The configuration attribute is secret. Don't show with attributes.
 }
 
 // NodeConfigureMessage with values to update a node configuration
 type NodeConfigureMessage struct {
 	Address   string      `json:"address"` // zone/publisher/node/$configure
-	Attr      NodeAttrMap `json:"attr"`    // configuration attributes
+	Attr      NodeAttrMap `json:"attr"`    // attributes to configure
 	Sender    string      `json:"sender"`  // sending node: zone/publisher/node
 	Timestamp string      `json:"timestamp"`
 }
 
-// PublisherIdentity for nodes that are publishers
-type PublisherIdentity struct {
-	Address          string `json:"address"`          // discovery address of the publisher (zone/pub/\$publisher/\$node)
-	Expires          string `json:"expires"`          // timestamp this identity expires
-	Location         string `json:"location"`         // city, province, country
-	Organization     string `json:"organization"`     // publishing organization
-	PublicKeyCrypto  string `json:"publicKeyCrypto"`  // public key for encrypting messages to this publisher
-	PublicKeySigning string `json:"publicKeySigning"` // public key for verifying signature of messages published by this publisher
-	Publisher        string `json:"publisher"`        // publisher ID
-	Timestamp        string `json:"timestamp"`        // timestamp this identity was last renewed/verified
-	URL              string `json:"url"`              // Web URL related to the publisher identity, if applicable
-	Zone             string `json:"zone"`             // Zone in which publisher lives
-}
-
 // NodeDiscoveryMessage definition published in node discovery
 type NodeDiscoveryMessage struct {
-	// ID                string                  `json:"id"`                          // Node's immutable ID
-	Address           string                  `json:"address"`                     // Node discovery address
-	Attr              NodeAttrMap             `json:"attr,omitempty"`              // Node/service info attributes
-	Config            map[NodeAttr]ConfigAttr `json:"config,omitempty"`            // Node/service configuration.
-	Identity          *PublisherIdentity      `json:"identity,omitempty"`          // Identity if node is a publisher
-	IdentitySignature string                  `json:"identitySignature,omitempty"` // optional signature of the identity by the ZSAS
-	NodeID            string                  `json:"nodeId"`                      // The node ID
-	// PublisherID       string                  `json:"publisher"`                   // publisher ID
-	Status map[NodeStatus]string `json:"status,omitempty"` // additional node status details
-	Type   NodeType              `json:"type"`             // node type
-	// Zone              string                  `json:"zone"`                        // Zone in which node lives
+	Address     string                  `json:"address"`          // Node discovery address
+	Attr        NodeAttrMap             `json:"attr,omitempty"`   // Attributes describing this node
+	Config      map[NodeAttr]ConfigAttr `json:"config,omitempty"` // Description of configurable attributes
+	NodeID      string                  `json:"nodeId"`           // The node immutable ID
+	PublisherID string                  `json:"publisher"`        // publisher managing this node
+	Status      map[NodeStatus]string   `json:"status,omitempty"` // Node performance status information
+	Type        NodeType                `json:"type"`             // node type
 }

@@ -13,26 +13,32 @@ import (
 // - pass the configuration update to the adapter's callback set in Start()
 // - save node configuration if persistence is set
 // TODO: support for authorization per node
-func (publisher *Publisher) handleNodeConfigCommand(address string, publication *iotc.Publication) {
-	publisher.Logger.Infof("handleNodeConfig on address %s", address)
+func (publisher *Publisher) handleNodeConfigCommand(address string, message []byte) {
+	publisher.logger.Infof("handleNodeConfig on address %s", address)
 	// TODO: authorization check
 	node := publisher.Nodes.GetNodeByAddress(address)
-	if node == nil || publication.Message == "" {
-		publisher.Logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
+	if node == nil || message == nil {
+		publisher.logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
 		return
 	}
-	var configureMessage iotc.NodeConfigureMessage
-	err := json.Unmarshal([]byte(publication.Message), &configureMessage)
+	payload, err := publisher.signer.Verify(message)
 	if err != nil {
-		publisher.Logger.Infof("Unable to unmarshal ConfigureMessage in %s", address)
+		publisher.logger.Warningf("handleNodeConfig Invalid message: %s", err)
+		return
+	}
+
+	var configureMessage iotc.NodeConfigureMessage
+	err = json.Unmarshal(payload, &configureMessage)
+	if err != nil {
+		publisher.logger.Infof("Unable to unmarshal ConfigureMessage in %s", address)
 		return
 	}
 	// Verify that the message comes from the sender using the sender's public key
-	isValid := publisher.VerifyMessageSignature(configureMessage.Sender, publication.Message, publication.Signature)
-	if !isValid {
-		publisher.Logger.Warningf("Incoming configuration verification failed for sender: %s", configureMessage.Sender)
-		return
-	}
+	// isValid := publisher.VerifyMessageSignature(configureMessage.Sender, message, publication.Signature)
+	// if !isValid {
+	// 	publisher.Logger.Warningf("Incoming configuration verification failed for sender: %s", configureMessage.Sender)
+	// 	return
+	// }
 	params := configureMessage.Attr
 	if publisher.onNodeConfigHandler != nil {
 		// A handler can filter which configuration updates take place

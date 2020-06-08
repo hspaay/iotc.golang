@@ -37,7 +37,7 @@ func NewAppPublisher(appID string, configFolder string, appConfig interface{}, p
 	if pubID == "" {
 		pubID = appID
 	}
-	pub := NewPublisher(messengerConfig.Zone, pubID, messenger)
+	pub := NewPublisher(messengerConfig.Domain, pubID, messenger)
 
 	pub.SetPersistNodes(configFolder, persistNodes)
 	return pub, err

@@ -7,15 +7,21 @@ import (
 	"time"
 
 	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
 	"github.com/hspaay/iotc.golang/persist"
 )
+
+// PublishIdentity publishes this publisher's identity on startup or update
+func (publisher *Publisher) PublishIdentity() {
+	identity := publisher.identity
+	publisher.logger.Infof("Publisher.PublishIdentity: publish identity: %s", publisher.identity.Address)
+	publisher.publishMessage(identity.Address, true, identity)
+}
 
 // PublishUpdatedDiscoveries publishes updated nodes, inputs and outputs discovery messages
 // If updates are available then nodes are saved
 func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	if publisher.messenger == nil {
-		publisher.Logger.Error("Publisher.PublishUpdates: No messenger")
+		publisher.logger.Error("Publisher.PublishUpdates: No messenger")
 		return // can't do anything here, just go home
 	}
 	publisher.updateMutex.Lock()
@@ -26,7 +32,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 
 	// publish updated nodes
 	for _, node := range nodeList {
-		publisher.Logger.Infof("Publisher.PublishUpdates: publish node discovery: %s", node.Address)
+		publisher.logger.Infof("Publisher.PublishUpdates: publish node discovery: %s", node.Address)
 		publisher.publishMessage(node.Address, true, node)
 	}
 	if len(nodeList) > 0 && publisher.autosaveFolder != "" {
@@ -37,7 +43,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	// publish updated input discovery
 	for _, input := range inputList {
 		aliasAddress := publisher.getOutputAliasAddress(input.Address, "")
-		publisher.Logger.Infof("Publisher.PublishUpdates: publish input discovery: %s", aliasAddress)
+		publisher.logger.Infof("Publisher.PublishUpdates: publish input discovery: %s", aliasAddress)
 		publisher.publishMessage(aliasAddress, true, input)
 	}
 	if len(inputList) > 0 && publisher.autosaveFolder != "" {
@@ -48,7 +54,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	// publish updated output discovery
 	for _, output := range outputList {
 		aliasAddress := publisher.getOutputAliasAddress(output.Address, "")
-		publisher.Logger.Infof("Publisher.PublishUpdates: publish output discovery: %s", aliasAddress)
+		publisher.logger.Infof("Publisher.PublishUpdates: publish output discovery: %s", aliasAddress)
 		publisher.publishMessage(aliasAddress, true, output)
 	}
 	if len(outputList) > 0 && publisher.autosaveFolder != "" {
@@ -66,7 +72,7 @@ func (publisher *Publisher) PublishUpdatedOutputValues() {
 	for _, outputAddress := range addressesOfUpdatedOutputs {
 		output := publisher.Outputs.GetOutputByAddress(outputAddress)
 		unit := output.Unit
-		publisher.publishValueCommand(outputAddress)
+		publisher.publishRawValue(outputAddress)
 		publisher.publishLatest(outputAddress, unit)
 		publisher.publishHistory(outputAddress, unit)
 	}
@@ -91,7 +97,7 @@ func (publisher *Publisher) getOutputAliasAddress(address string, messageType io
 	// alias, hasAlias := nodes.GetNodeAlias(node)
 	// zone/pub/node/outtype/instance/messagetype
 	parts := strings.Split(address, "/")
-	if !hasAlias {
+	if !hasAlias || alias == "" {
 		alias = parts[2]
 	}
 	parts[2] = alias
@@ -108,7 +114,7 @@ func (publisher *Publisher) getOutputAliasAddress(address string, messageType io
 func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 	// output values are published using their alias address, if any
 	aliasAddress := publisher.getOutputAliasAddress(node.Address, iotc.MessageTypeEvent)
-	publisher.Logger.Infof("Publisher.publishEvent: %s", aliasAddress)
+	publisher.logger.Infof("Publisher.publishEvent: %s", aliasAddress)
 
 	outputs := publisher.Outputs.GetNodeOutputs(node)
 	event := make(map[string]string)
@@ -135,10 +141,10 @@ func (publisher *Publisher) publishLatest(outputAddress string, unit iotc.Unit) 
 	// zone/publisher/node/iotype/instance/$latest
 	latest := publisher.OutputValues.GetOutputValueByAddress(outputAddress)
 	if latest == nil {
-		publisher.Logger.Warningf("Publisher.publishLatest: no latest value. This is unexpected")
+		publisher.logger.Warningf("Publisher.publishLatest: no latest value. This is unexpected")
 		return
 	}
-	publisher.Logger.Infof("Publisher.publishLatest: %s", aliasAddress)
+	publisher.logger.Infof("Publisher.publishLatest: %s", aliasAddress)
 	latestMessage := &iotc.OutputLatestMessage{
 		Address:   aliasAddress,
 		Timestamp: latest.Timestamp,
@@ -164,7 +170,7 @@ func (publisher *Publisher) publishForecast(outputAddress string, unit iotc.Unit
 		Unit:      unit,
 		Forecast:  forecast,
 	}
-	publisher.Logger.Debugf("Publisher.publishForecast: %d entries on %s", len(forecastMessage.Forecast), aliasAddress)
+	publisher.logger.Debugf("Publisher.publishForecast: %d entries on %s", len(forecastMessage.Forecast), aliasAddress)
 	publisher.publishMessage(aliasAddress, true, forecastMessage)
 }
 
@@ -183,7 +189,7 @@ func (publisher *Publisher) publishHistory(outputAddress string, unit iotc.Unit)
 		Unit:      unit,
 		History:   history,
 	}
-	publisher.Logger.Debugf("Publisher.publishHistory: %d entries on %s", len(historyMessage.History), aliasAddress)
+	publisher.logger.Debugf("Publisher.publishHistory: %d entries on %s", len(historyMessage.History), aliasAddress)
 	publisher.publishMessage(aliasAddress, true, historyMessage)
 }
 
@@ -194,36 +200,35 @@ func (publisher *Publisher) publishMessage(address string, retained bool, object
 	buffer, err := json.Marshal(object)
 	// buffer, err := json.MarshalIndent(object, " ", " ")
 	if err != nil {
-		publisher.Logger.Errorf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
+		publisher.logger.Errorf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
 		return
 	}
-	signature := messenger.CreateEcdsaSignature(buffer, publisher.privateKeySigning)
+	// signature := messenger.CreateEcdsaSignature(buffer, publisher.privateKeySigning)
 
-	publication := &iotc.Publication{
-		Message:   string(buffer),
-		Signature: signature,
-	}
-	publisher.messenger.Publish(address, retained, publication)
+	payload := publisher.signer.Sign(buffer)
+	publisher.messenger.Publish(address, retained, payload)
 }
 
-// publish the raw output $value (retained)
+// publishRawValue to the raw output $raw (retained)
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishValueCommand(outputAddress string) {
+func (publisher *Publisher) publishRawValue(outputAddress string) {
 	// output values are published using their alias address, if any
-	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeValue)
+	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeRaw)
 
 	// publish raw value with the $value command
 	// zone/publisher/node/$value/iotype/instance
 	latest := publisher.OutputValues.GetOutputValueByAddress(outputAddress)
 	if latest == nil {
-		publisher.Logger.Warningf("Publisher.publishValueCommand:, no latest value. This is unexpected")
+		publisher.logger.Warningf("Publisher.publishRawValue:, no latest value. This is unexpected")
 		return
 	}
 	s := latest.Value
-	if len(s) > 30 {
-		s = s[:30]
-	}
-	publisher.Logger.Infof("Publisher.publishValueCommand: output value '%s' on %s", s, aliasAddress)
+	// don't send full images ???
+	// if len(s) > 30 {
+	// 	s = s[:30]
+	// }
+	publisher.logger.Infof("Publisher.publishRawValue: output value '%s' on %s", s, aliasAddress)
 
-	publisher.messenger.PublishRaw(aliasAddress, true, latest.Value)
+	payload := publisher.signer.Sign([]byte(s))
+	publisher.messenger.Publish(aliasAddress, true, payload)
 }

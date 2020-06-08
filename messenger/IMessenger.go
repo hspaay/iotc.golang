@@ -1,10 +1,6 @@
 // Package messenger - Interface of messengers for publishers and subscribers
 package messenger
 
-import (
-	"github.com/hspaay/iotc.golang/iotc"
-)
-
 // MessengerConfig with configuration of a messenger
 type MessengerConfig struct {
 	ClientID  string `yaml:"clientid,omitempty"`  // optional connect ID, must be unique. Default is generated.
@@ -15,7 +11,7 @@ type MessengerConfig struct {
 	Server    string `yaml:"server"`              // Message bus server/broker hostname or ip address, required
 	SubQos    byte   `yaml:"subqos,omitempty"`    // Subscription QOS 0-2. Default=0
 	Messenger string `yaml:"messenger,omitempty"` // Messenger client type: "DummyMessenger" (default) or "MQTTMessenger"
-	Zone      string `yaml:"zone,omitempty"`      // Default zone used in NewAppPublisher on startup
+	Domain    string `yaml:"domain,omitempty"`    // Default domain used in NewAppPublisher on startup
 }
 
 // IMessenger interface for messenger implementations
@@ -38,16 +34,13 @@ type IMessenger interface {
 
 	// Sign and Publish a message
 	// address to subscribe to as per IotConnect standard
-	// publication object to transmit, this is an object that will be converted into a JSON message
-	Publish(address string, retained bool, publication *iotc.Publication) error
-
-	// Publish raw data
-	// address to subscribe top as per IotConnect standard
-	// raw is a JSON text message or base64 binary data
-	PublishRaw(address string, retained bool, raw string) error
+	// retained to have MQTT persists the last message
+	// message message to send
+	// Publish(address string, retained bool, publication *iotc.Publication) error
+	Publish(address string, retained bool, message []byte) error
 
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent
 	// onMessage callback is invoked when a message on this address is received
-	Subscribe(address string, onMessage func(address string, publication *iotc.Publication))
+	Subscribe(address string, onMessage func(address string, message []byte))
 }

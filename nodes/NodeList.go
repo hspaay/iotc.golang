@@ -56,8 +56,8 @@ func (nodes *NodeList) GetAllNodes() []*iotc.NodeDiscoveryMessage {
 	return nodeList
 }
 
-// GetNodeByAddress returns a node by its node address using the zone, publisherID and nodeID
-// address must contain the zone, publisher and nodeID. Any other fields are ignored.
+// GetNodeByAddress returns a node by its node address using the domain, publisherID and nodeID
+// address must contain the domain, publisherID and nodeID. Any other fields are ignored.
 // Returns nil if address has no known node
 func (nodes *NodeList) GetNodeByAddress(address string) *iotc.NodeDiscoveryMessage {
 	nodes.updateMutex.Lock()
@@ -78,9 +78,9 @@ func (nodes *NodeList) GetNodeConfigInt(address string, attrName iotc.NodeAttr) 
 	return strconv.Atoi(valueStr)
 }
 
-// GetNodeConfigValue returns the configuration value of a node in this list
-// address must starts with the node's address: zone/publisher/nodeid. Any suffix is ignored.
-// attrName is the name of the configuration attribute to look up
+// GetNodeConfigValue returns the attribute value of a node in this list
+// address must starts with the node's address: domain/publisher/nodeid. Any suffix is ignored.
+// attrName is the name of the attribute to look up
 // This retuns the 'default' value if no value is set
 func (nodes *NodeList) GetNodeConfigValue(address string, attrName iotc.NodeAttr) (value string, configExists bool) {
 	nodes.updateMutex.Lock()
@@ -94,16 +94,17 @@ func (nodes *NodeList) GetNodeConfigValue(address string, attrName iotc.NodeAttr
 	if !configExists {
 		return "", configExists
 	}
-	if config.Value == "" {
+	attrValue, exists := node.Attr[attrName]
+	if !exists || attrValue == "" {
 		return config.Default, configExists
 	}
-	return config.Value, configExists
+	return attrValue, configExists
 }
 
-// GetNodeByID returns a node by its zone, publisher and node ID
+// GetNodeByID returns a node by its domain, publisher and node ID
 // Returns nil if address has no known node
-func (nodes *NodeList) GetNodeByID(zone string, publisherID string, nodeID string) *iotc.NodeDiscoveryMessage {
-	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", zone, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
+func (nodes *NodeList) GetNodeByID(domain string, publisherID string, nodeID string) *iotc.NodeDiscoveryMessage {
+	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", domain, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
@@ -165,13 +166,13 @@ func (nodes *NodeList) SetErrorStatus(address string, runState string, errorMsg 
 // NewNode creates a node instance and adds it to the list.
 // If the node exists it will remain unchanged
 // This returns the node discovery address
-func (nodes *NodeList) NewNode(zone string, publisherID string, nodeID string, nodeType iotc.NodeType) string {
+func (nodes *NodeList) NewNode(domain string, publisherID string, nodeID string, nodeType iotc.NodeType) string {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
-	addr := MakeNodeAddress(zone, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
+	addr := MakeNodeAddress(domain, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	existingNode := nodes.getNode(addr)
 	if existingNode == nil {
-		newNode := NewNode(zone, publisherID, nodeID, nodeType)
+		newNode := NewNode(domain, publisherID, nodeID, nodeType)
 		nodes.updateNode(newNode)
 	}
 	return addr
@@ -247,7 +248,7 @@ func (nodes *NodeList) SetNodeAttr(address string, attrParams map[iotc.NodeAttr]
 // published and the old node instance is discarded.
 // - address is the node discovery address
 // - param is the map with key-value pairs of configuration values to update
-// returns true if configuration changes
+// returns true if configuration changes, false if configuration doesn't exist
 func (nodes *NodeList) SetNodeConfigValues(address string, params map[iotc.NodeAttr]string) (changed bool) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
@@ -260,15 +261,15 @@ func (nodes *NodeList) SetNodeConfigValues(address string, params map[iotc.NodeA
 
 	changed = false
 	for key, newValue := range params {
-		config, configExists := node.Config[key]
+		_, configExists := node.Config[key]
 		if !configExists {
-			newConfig := iotc.ConfigAttr{Value: newValue}
-			newNode.Config[key] = newConfig
-			changed = true
+			// ignore invalid configuration
 		} else {
-			if config.Value != newValue {
-				config.Value = newValue
-				newNode.Config[key] = config
+			// update attribute with the new value
+			// TODO: datatype check
+			oldValue, attrExists := node.Attr[key]
+			if !attrExists || oldValue != newValue {
+				newNode.Attr[key] = newValue
 				changed = true
 			}
 		}
@@ -350,11 +351,11 @@ func (nodes *NodeList) UpdateNodeConfig(address string, configAttr *iotc.ConfigA
 	if node == nil {
 		return
 	}
-	existingAttr, found := node.Config[configAttr.ID]
+	// existingAttr, found := node.Config[configAttr.ID]
 	newAttr := *configAttr
-	if found {
-		newAttr.Value = existingAttr.Value
-	}
+	// if found {
+	// newAttr.Value = existingAttr.Value
+	// }
 	newNode := nodes.Clone(node)
 	newNode.Config[configAttr.ID] = newAttr
 	nodes.updateNode(newNode)
@@ -381,13 +382,13 @@ func (nodes *NodeList) UpdateNodes(updates []*iotc.NodeDiscoveryMessage) {
 	}
 }
 
-// getNode returns a node by its node address using the zone, publisherID and nodeID
-// address must contain the zone, publisher and nodeID. Any other fields are ignored.
+// getNode returns a node by its node address using the domain, publisherID and nodeID
+// address must contain the domain, publisher and nodeID. Any other fields are ignored.
 // Intended for use within a locked section for updating, eg lock - read - update - write - unlock
 // Returns nil if address has no known node
 func (nodes *NodeList) getNode(address string) *iotc.NodeDiscoveryMessage {
 	segments := strings.Split(address, "/")
-	if len(segments) < 3 {
+	if len(segments) <= 3 {
 		return nil
 	}
 	segments[3] = iotc.MessageTypeNodeDiscovery
@@ -406,26 +407,26 @@ func (nodes *NodeList) updateNode(node *iotc.NodeDiscoveryMessage) {
 	nodes.updatedNodes[node.Address] = node
 }
 
-// MakeNodeAddress generates the address of a node: zone/publisherID/nodeID[/messageType]
-// zoneID of the zone the node lives in.
-// publisherID of the publisher for this node, unique for the zone
+// MakeNodeAddress generates the address of a node: domain/publisherID/nodeID[/messageType]
+// domain of the domain the node lives in.
+// publisherID of the publisher for this node, unique for the domain
 // nodeID of the node itself, unique for the publisher
 // messageType is optional
-func MakeNodeAddress(zoneID string, publisherID string, nodeID string, messageType string) string {
-	address := fmt.Sprintf("%s/%s/%s", zoneID, publisherID, nodeID)
+func MakeNodeAddress(domain string, publisherID string, nodeID string, messageType string) string {
+	address := fmt.Sprintf("%s/%s/%s", domain, publisherID, nodeID)
 	if messageType != "" {
 		address = address + "/" + messageType
 	}
 	return address
 }
 
-// MakeNodeDiscoveryAddress generates the address of a node: zone/publisherID/nodeID/$node
+// MakeNodeDiscoveryAddress generates the address of a node: domain/publisherID/nodeID/$node
 // Intended for lookup of nodes in the node list.
-// zoneID of the zone the node lives in.
-// publisherID of the publisher for this node, unique for the zone
+// domain of the domain the node lives in.
+// publisherID of the publisher for this node, unique for the domain
 // nodeID of the node itself, unique for the publisher
-func MakeNodeDiscoveryAddress(zoneID string, publisherID string, nodeID string) string {
-	address := fmt.Sprintf("%s/%s/%s/%s", zoneID, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
+func MakeNodeDiscoveryAddress(domain string, publisherID string, nodeID string) string {
+	address := fmt.Sprintf("%s/%s/%s/%s", domain, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	return address
 }
 
@@ -449,8 +450,9 @@ func NewNodeConfig(attrName iotc.NodeAttr, dataType iotc.DataType, description s
 }
 
 // NewNode returns a new instance of a node
-func NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.NodeType) *iotc.NodeDiscoveryMessage {
-	address := MakeNodeAddress(zoneID, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
+// This node will have default configurations for name and alias
+func NewNode(domain string, publisherID string, nodeID string, nodeType iotc.NodeType) *iotc.NodeDiscoveryMessage {
+	address := MakeNodeAddress(domain, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	newNode := &iotc.NodeDiscoveryMessage{
 		Address: address,
 		Attr:    map[iotc.NodeAttr]string{},
@@ -459,8 +461,9 @@ func NewNode(zoneID string, publisherID string, nodeID string, nodeType iotc.Nod
 		// PublisherID: publisherID,
 		Status: make(map[iotc.NodeStatus]string),
 		Type:   nodeType,
-		// Zone:        zoneID,
 	}
+	newNode.Config[iotc.NodeAttrAlias] = *NewNodeConfig(iotc.NodeAttrAlias, iotc.DataTypeString, "Alias node ID for inputs and outputs", "")
+	newNode.Config[iotc.NodeAttrName] = *NewNodeConfig(iotc.NodeAttrName, iotc.DataTypeString, "Human friendly node name", "")
 	return newNode
 }
 
@@ -477,7 +480,7 @@ func NewNodeList() *NodeList {
 // // address is the address to split
 // // returns address parts, returns empty string if
 // func SplitNodeAddress(address string) (nodeAddress string, messageType iotc.MessageType, ioType string, instance string) {
-// 	// zone/publisher/node[/mtype[/iotype/instance]]
+// 	// domain/publisher/node[/mtype[/iotype/instance]]
 // 	segments := strings.Split(address, "/")
 // 	if len(segments) < 3 {
 // 		return
