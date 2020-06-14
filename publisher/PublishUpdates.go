@@ -3,10 +3,13 @@ package publisher
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/hspaay/iotc.golang/messenger"
 	"github.com/hspaay/iotc.golang/persist"
 )
 
@@ -14,7 +17,7 @@ import (
 func (publisher *Publisher) PublishIdentity() {
 	identity := publisher.identity
 	publisher.logger.Infof("Publisher.PublishIdentity: publish identity: %s", publisher.identity.Address)
-	publisher.publishMessage(identity.Address, true, identity)
+	publisher.publishObject(identity.Address, true, identity)
 }
 
 // PublishUpdatedDiscoveries publishes updated nodes, inputs and outputs discovery messages
@@ -33,7 +36,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	// publish updated nodes
 	for _, node := range nodeList {
 		publisher.logger.Infof("Publisher.PublishUpdates: publish node discovery: %s", node.Address)
-		publisher.publishMessage(node.Address, true, node)
+		publisher.publishObject(node.Address, true, node)
 	}
 	if len(nodeList) > 0 && publisher.autosaveFolder != "" {
 		allNodes := publisher.Nodes.GetAllNodes()
@@ -44,7 +47,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	for _, input := range inputList {
 		aliasAddress := publisher.getOutputAliasAddress(input.Address, "")
 		publisher.logger.Infof("Publisher.PublishUpdates: publish input discovery: %s", aliasAddress)
-		publisher.publishMessage(aliasAddress, true, input)
+		publisher.publishObject(aliasAddress, true, input)
 	}
 	if len(inputList) > 0 && publisher.autosaveFolder != "" {
 		allInputs := publisher.Inputs.GetAllInputs()
@@ -55,7 +58,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	for _, output := range outputList {
 		aliasAddress := publisher.getOutputAliasAddress(output.Address, "")
 		publisher.logger.Infof("Publisher.PublishUpdates: publish output discovery: %s", aliasAddress)
-		publisher.publishMessage(aliasAddress, true, output)
+		publisher.publishObject(aliasAddress, true, output)
 	}
 	if len(outputList) > 0 && publisher.autosaveFolder != "" {
 		allOutputs := publisher.Outputs.GetAllOutputs()
@@ -129,7 +132,7 @@ func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 		Event:     event,
 		Timestamp: timeStampStr,
 	}
-	publisher.publishMessage(aliasAddress, true, eventMessage)
+	publisher.publishObject(aliasAddress, true, eventMessage)
 }
 
 // publish the $latest output value
@@ -152,7 +155,7 @@ func (publisher *Publisher) publishLatest(outputAddress string, unit iotc.Unit) 
 		Unit:  unit,
 		Value: latest.Value,
 	}
-	publisher.publishMessage(aliasAddress, true, latestMessage)
+	publisher.publishObject(aliasAddress, true, latestMessage)
 }
 
 // publish the $forecast output values retained=true
@@ -171,7 +174,7 @@ func (publisher *Publisher) publishForecast(outputAddress string, unit iotc.Unit
 		Forecast:  forecast,
 	}
 	publisher.logger.Debugf("Publisher.publishForecast: %d entries on %s", len(forecastMessage.Forecast), aliasAddress)
-	publisher.publishMessage(aliasAddress, true, forecastMessage)
+	publisher.publishObject(aliasAddress, true, forecastMessage)
 }
 
 // publish the $history output values retained=true
@@ -190,28 +193,27 @@ func (publisher *Publisher) publishHistory(outputAddress string, unit iotc.Unit)
 		History:   history,
 	}
 	publisher.logger.Debugf("Publisher.publishHistory: %d entries on %s", len(historyMessage.History), aliasAddress)
-	publisher.publishMessage(aliasAddress, true, historyMessage)
+	publisher.publishObject(aliasAddress, true, historyMessage)
 }
 
-// publishMessage encapsulates the message object in a payload, signs the message, and sends it.
+// publishObject encapsulates the message object in a payload, signs the message, and sends it.
 // address of the publication
 // object to publish. This will be marshalled to JSON and signed by this publisher
-func (publisher *Publisher) publishMessage(address string, retained bool, object interface{}) {
-	buffer, err := json.Marshal(object)
+func (publisher *Publisher) publishObject(address string, retained bool, object interface{}) error {
+	payload, err := json.Marshal(object)
 	// buffer, err := json.MarshalIndent(object, " ", " ")
 	if err != nil {
 		publisher.logger.Errorf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
-		return
+		return err
 	}
-	// signature := messenger.CreateEcdsaSignature(buffer, publisher.privateKeySigning)
-
-	payload := publisher.signer.Sign(buffer)
-	publisher.messenger.Publish(address, retained, payload)
+	err = publisher.publishPayload(address, retained, string(payload))
+	return err
 }
 
 // publishRawValue to the raw output $raw (retained)
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishRawValue(outputAddress string) {
+func (publisher *Publisher) publishRawValue(outputAddress string) error {
+
 	// output values are published using their alias address, if any
 	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeRaw)
 
@@ -219,8 +221,9 @@ func (publisher *Publisher) publishRawValue(outputAddress string) {
 	// zone/publisher/node/$value/iotype/instance
 	latest := publisher.OutputValues.GetOutputValueByAddress(outputAddress)
 	if latest == nil {
-		publisher.logger.Warningf("Publisher.publishRawValue:, no latest value. This is unexpected")
-		return
+		errMsg := fmt.Sprintf("Publisher.publishRawValue:, no latest value for %s. This is unexpected", outputAddress)
+		publisher.logger.Error(errMsg)
+		return errors.New(errMsg)
 	}
 	s := latest.Value
 	// don't send full images ???
@@ -229,6 +232,25 @@ func (publisher *Publisher) publishRawValue(outputAddress string) {
 	// }
 	publisher.logger.Infof("Publisher.publishRawValue: output value '%s' on %s", s, aliasAddress)
 
-	payload := publisher.signer.Sign([]byte(s))
-	publisher.messenger.Publish(aliasAddress, true, payload)
+	err := publisher.publishPayload(outputAddress, true, s)
+	return err
+}
+
+// publishMessage sign the payload and publish the resulting message
+// address of the publication
+// payload to publish
+func (publisher *Publisher) publishPayload(address string, retained bool, payload string) error {
+	var err error
+
+	// default is unsigned
+	message := string(payload)
+
+	if publisher.signingMethod == SigningMethodJWS {
+		message, err = messenger.CreateJWSSignature(string(payload), publisher.privateKeySigning)
+		if err != nil {
+			publisher.logger.Errorf("Publisher.publishMessage: Error signing message for address %s: %s", address, err)
+		}
+	}
+	err = publisher.messenger.Publish(address, retained, message)
+	return err
 }
