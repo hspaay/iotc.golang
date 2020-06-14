@@ -46,7 +46,7 @@ func TestPublish(t *testing.T) {
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 
-	err = messenger.Publish(pub1Addr, false, pub1JSON)
+	err = messenger.Publish(pub1Addr, false, string(pub1JSON))
 	assert.NoError(t, err, "Publish failed")
 	messenger.Disconnect()
 }
@@ -63,15 +63,15 @@ func TestPublishSubscribe(t *testing.T) {
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 
-	messenger.Subscribe(pub1Addr, func(addr string, message []byte) {
-		err := json.Unmarshal(message, &receivedMessage)
+	messenger.Subscribe(pub1Addr, func(addr string, message string) {
+		err := json.Unmarshal([]byte(message), &receivedMessage)
 		assert.NoError(t, err, "Received message can't be parsed")
 		rxLength = len(message)
 		logger.Infof("TestPublishSubscribe: Received message. Length=%d: %s", len(message), message)
 	})
 
 	logger.Infof("TestPublishSubscribe: sending message. Length=%d", len(pub1JSON))
-	err = messenger.Publish(pub1Addr, false, pub1JSON)
+	err = messenger.Publish(pub1Addr, false, string(pub1JSON))
 	assert.NoError(t, err, "Publish failed")
 	time.Sleep(time.Second * 2)
 	messenger.Disconnect()

@@ -10,7 +10,7 @@ require (
 	github.com/square/go-jose v2.5.1+incompatible
 	github.com/stretchr/testify v1.6.0
 	golang.org/x/net v0.0.0-20200528225125-3c3fba18258b // indirect
-	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
+	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v2 v2.3.0
 )
 

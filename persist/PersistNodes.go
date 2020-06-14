@@ -23,7 +23,7 @@ const OutputsFileSuffix = "-outputs.json"
 // after lodaing nodes from file as previously saved versions will be loaded here.
 //
 // altConfigFolder contains a alternate location for the configuration files, intended for testing.
-//   Use "" for default, which is <userhome>/.config/iotconnect
+//   Use "" for default, which is <userhome>/.config/iotc
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the address of a list that holds nodes
 func LoadNodes(altConfigFolder string, publisherID string, nodelist interface{}) error {

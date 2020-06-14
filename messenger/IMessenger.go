@@ -35,12 +35,12 @@ type IMessenger interface {
 	// Sign and Publish a message
 	// address to subscribe to as per IotConnect standard
 	// retained to have MQTT persists the last message
-	// message message to send
+	// message is a serialzied message to send
 	// Publish(address string, retained bool, publication *iotc.Publication) error
-	Publish(address string, retained bool, message []byte) error
+	Publish(address string, retained bool, message string) error
 
 	// Subscribe to a message
 	// address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must conver to equivalent
 	// onMessage callback is invoked when a message on this address is received
-	Subscribe(address string, onMessage func(address string, message []byte))
+	Subscribe(address string, onMessage func(address string, message string))
 }

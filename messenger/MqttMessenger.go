@@ -36,7 +36,7 @@ type MqttMessenger struct {
 // TopicSubscription holds subscriptions to restore after disconnect
 type TopicSubscription struct {
 	address string
-	handler func(address string, message []byte)
+	handler func(address string, message string)
 	token   pahomqtt.Token // for debugging
 	client  *MqttMessenger //
 	log     *log.Logger
@@ -171,7 +171,7 @@ func (messenger *MqttMessenger) Disconnect() {
 // address to publish on.
 // retained to have the broker retain the address value
 // payload is converted to string if it isn't a byte array, as Paho doesn't handle int and bool
-func (messenger *MqttMessenger) Publish(address string, retained bool, message []byte) error {
+func (messenger *MqttMessenger) Publish(address string, retained bool, message string) error {
 	var err error
 
 	//fullTopic := fmt.Sprintf("%s/%s/%s", messenger.config.Base, messenger.deviceId, addressLevels)
@@ -217,7 +217,7 @@ func (messenger *MqttMessenger) PublishRaw(address string, retained bool, messag
 func (subscription *TopicSubscription) onMessage(c pahomqtt.Client, msg pahomqtt.Message) {
 	// NOTE: Scope in this callback is not always retained. Pipe notifications through a channel and handle in goroutine
 	address := msg.Topic()
-	rawPayload := msg.Payload()
+	rawPayload := string(msg.Payload())
 
 	subscription.log.Infof("MqttMessenger.onMessage. address=%s, subscription=%s, retained=%v",
 		address, subscription.address, msg.Retained())
@@ -260,7 +260,7 @@ func (messenger *MqttMessenger) resubscribe() {
 // qos: Quality of service for subscription: 0, 1, 2
 // handler: callback handler.
 func (messenger *MqttMessenger) Subscribe(
-	address string, onMessage func(address string, message []byte)) {
+	address string, onMessage func(address string, message string)) {
 	subscription := TopicSubscription{
 		address: address,
 		handler: onMessage,

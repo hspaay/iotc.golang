@@ -12,7 +12,7 @@ import (
 // DummyMessenger that implements IMessenger
 type DummyMessenger struct {
 	logger        *log.Logger
-	publications  map[string][]byte
+	publications  map[string]string
 	config        *MessengerConfig // for domain configuration
 	subscriptions []Subscription
 	publishMutex  *sync.Mutex // mutex for concurrent publishing of messages
@@ -21,7 +21,7 @@ type DummyMessenger struct {
 // Subscription to messages
 type Subscription struct {
 	address string
-	handler func(address string, message []byte)
+	handler func(address string, message string)
 }
 
 // Connect the messenger
@@ -34,7 +34,7 @@ func (messenger *DummyMessenger) Disconnect() {
 }
 
 // FindLastPublication with the given address
-func (messenger *DummyMessenger) FindLastPublication(addr string) (message []byte) {
+func (messenger *DummyMessenger) FindLastPublication(addr string) (message string) {
 	messenger.publishMutex.Lock()
 	pub := messenger.publications[addr]
 	messenger.publishMutex.Unlock()
@@ -57,7 +57,7 @@ func (messenger *DummyMessenger) NrPublications() int {
 }
 
 // OnReceive function to simulate a received message
-func (messenger *DummyMessenger) OnReceive(address string, message []byte) {
+func (messenger *DummyMessenger) OnReceive(address string, message string) {
 	messenger.publishMutex.Lock()
 	subs := messenger.subscriptions
 	messenger.publishMutex.Unlock()
@@ -75,7 +75,7 @@ func (messenger *DummyMessenger) OnReceive(address string, message []byte) {
 // address is the MQTT address to send to
 // retained (ignored)
 // message JSON text or raw message base64 encoded text
-func (messenger *DummyMessenger) Publish(address string, retained bool, message []byte) error {
+func (messenger *DummyMessenger) Publish(address string, retained bool, message string) error {
 	messenger.publishMutex.Lock()
 	messenger.publications[address] = message
 	messenger.publishMutex.Unlock()
@@ -86,7 +86,7 @@ func (messenger *DummyMessenger) Publish(address string, retained bool, message 
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
-	address string, onMessage func(address string, message []byte)) {
+	address string, onMessage func(address string, message string)) {
 
 	messenger.logger.Infof("DummyMessenger.Subscribe: address %s", address)
 	subscription := Subscription{address: address, handler: onMessage}
@@ -134,7 +134,7 @@ func NewDummyMessenger(config *MessengerConfig, logger *log.Logger) *DummyMessen
 	var messenger = &DummyMessenger{
 		config:        config,
 		logger:        logger,
-		publications:  make(map[string][]byte, 0),
+		publications:  make(map[string]string, 0),
 		subscriptions: make([]Subscription, 0),
 		publishMutex:  &sync.Mutex{},
 	}

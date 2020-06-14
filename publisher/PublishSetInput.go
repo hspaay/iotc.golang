@@ -28,5 +28,5 @@ func (publisher *Publisher) PublishSetInput(remoteNodeInputAddress string, value
 		Timestamp: timeStampStr,
 		Value:     value,
 	}
-	publisher.publishMessage(inputAddr, false, &setMessage)
+	publisher.publishObject(inputAddr, false, &setMessage)
 }

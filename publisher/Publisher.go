@@ -34,6 +34,12 @@ const (
 	DefaultPollInterval = 24 * 3600
 )
 
+// Message signing methods
+const (
+	SigningMethodNone = ""
+	SigningMethodJWS  = "jws"
+)
+
 // NodeConfigHandler callback when command to update node config is received
 type NodeConfigHandler func(node *iotc.NodeDiscoveryMessage, config iotc.NodeAttrMap) iotc.NodeAttrMap
 
@@ -49,15 +55,15 @@ type Publisher struct {
 	OutputValues    *nodes.OutputValueList    // output values published by this publisher
 
 	// address             string                     // the publisher node address
-	autosaveFolder      string                         // folder to save nodes after update
-	discoverCountdown   int                            // countdown each heartbeat
-	discoveryInterval   int                            // discovery polling interval
-	discoveryHandler    func(publisher *Publisher)     // function that performs discovery
+	autosaveFolder    string                     // folder to save nodes after update
+	discoverCountdown int                        // countdown each heartbeat
+	discoveryInterval int                        // discovery polling interval
+	discoveryHandler  func(publisher *Publisher) // function that performs discovery
+
 	identity            *iotc.PublisherIdentityMessage // identity for signing messages
 	isRunning           bool                           // publisher was started and is running
 	logger              *log.Logger                    // logger for all publisher's logging
 	messenger           messenger.IMessenger           // Message bus messenger to use
-	signer              messenger.IMessageSigner       // Signing and verification of messages
 	onNodeConfigHandler NodeConfigHandler              // handle before applying configuration
 	onNodeInputHandler  NodeInputHandler               // handle to update device/service input
 	pollHandler         func(publisher *Publisher)     // function that performs value polling
@@ -70,8 +76,9 @@ type Publisher struct {
 	domainPublishers *nodes.PublisherList // publishers on the network by discovery address
 
 	// background publications require a mutex to prevent concurrent access
-	exitChannel chan bool
-	updateMutex *sync.Mutex // mutex for async updating and publishing
+	exitChannel   chan bool
+	signingMethod string      // "" (none) or "jws"
+	updateMutex   *sync.Mutex // mutex for async updating and publishing
 }
 
 // Address  returns the publisher's identity address
@@ -218,49 +225,64 @@ func (publisher *Publisher) SetPollInterval(seconds int, handler func(publisher 
 // 	publisher.id = id
 // }
 
-// SetupPublisherIdentity creates the publisher node with identity and public/private signing keys
-// The identity is restored from storage to retain the keys signed by the ZCAS.
-//
-// * domain of this publisher
-// * publisherID of this publisher
-func (publisher *Publisher) SetupPublisherIdentity(domain string, publisherID string) {
+// SetupPublisherIdentity loads the publisher identity and keys from file, or creates a new one
+// if none yet exists.
+// identityFolder contains the folder with the identity files, use "" for default config folder (.config/iotc)
+//   if you're paranoid, this can be on a USB key that is inserted on startup and removed once running.
+// domain for this identity
+// publisherID for this identity
+func (publisher *Publisher) SetupPublisherIdentity(identityFolder string, domain string, publisherID string) {
+	var identity *iotc.PublisherIdentityMessage
 
-	// publisher.address = pubNode.Address
-	timestampStr := time.Now().Format(iotc.TimeFormat)
-	validUntil := time.Now().Add(time.Hour * 24 * 365) // valid for 1 year
-	validUntilStr := validUntil.Format(iotc.TimeFormat)
-
-	// generate private/public key for signing and store the public key in the publisher identity
-	// TODO: store keys
-	rng := rand.Reader
-	curve := elliptic.P256()
-	privKey, err := ecdsa.GenerateKey(curve, rng)
-	publisher.privateKeySigning = privKey
-	if err != nil {
-		publisher.logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
+	if identityFolder == "" {
+		identityFolder = persist.DefaultConfigFolder
 	}
-	privStr, pubStr := messenger.EncodeKeys(privKey, &privKey.PublicKey)
-	_ = privStr
 
-	addr := publisher.Address()
-	publisher.signer = NewJWSSigner(publisher.logger, addr, privKey)
+	identity, privKey, err := persist.LoadIdentity(identityFolder, publisherID)
+	if err == nil {
+		publisher.identity = identity
+		publisher.privateKeySigning = privKey
 
-	publisher.identity = &iotc.PublisherIdentityMessage{
-		Address: addr,
-		Identity: iotc.PublisherIdentity{
-			Domain:       domain,
-			IssuerName:   publisherID, // self issued, will be replaced by ZCAS
-			Location:     "local",
-			Organization: "", // todo: get from messenger configuration
-			// PublicKeyCrypto:  cryptoStr,
-			PublicKeySigning: pubStr,
-			PublisherID:      publisherID,
-			Timestamp:        timestampStr,
-			ValidUntil:       validUntilStr,
-		},
-		Signature: "",
-		Signer:    publisherID,
-		Timestamp: timestampStr,
+	} else {
+		// we don't have an identity yet, so create one
+
+		// publisher.address = pubNode.Address
+		timestampStr := time.Now().Format(iotc.TimeFormat)
+		validUntil := time.Now().Add(time.Hour * 24 * 365) // valid for 1 year
+		validUntilStr := validUntil.Format(iotc.TimeFormat)
+
+		// generate private/public key for signing and store the public key in the publisher identity
+		// TODO: store keys
+		rng := rand.Reader
+		curve := elliptic.P256()
+		privKey, err := ecdsa.GenerateKey(curve, rng)
+		publisher.privateKeySigning = privKey
+		if err != nil {
+			publisher.logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
+		}
+		privStr, pubStr := messenger.KeysToPem(privKey, &privKey.PublicKey)
+		_ = privStr
+
+		addr := publisher.Address()
+
+		publisher.identity = &iotc.PublisherIdentityMessage{
+			Address: addr,
+			Identity: iotc.PublisherIdentity{
+				Domain:       domain,
+				IssuerName:   publisherID, // self issued, will be replaced by ZCAS
+				Location:     "local",
+				Organization: "", // todo: get from messenger configuration
+				// PublicKeyCrypto:  cryptoStr,
+				PublicKeySigning: pubStr,
+				PublisherID:      publisherID,
+				Timestamp:        timestampStr,
+				ValidUntil:       validUntilStr,
+			},
+			IdentitySignature: "",
+			SignerName:        publisherID,
+			Timestamp:         timestampStr,
+		}
+		persist.SaveIdentity(identityFolder, publisherID, publisher.identity, privKey)
 	}
 }
 
@@ -400,10 +422,12 @@ func (publisher *Publisher) heartbeatLoop() {
 // messenger to use fo publications and for the domain to publish in
 // logger is the optional logger to use.
 //
+// identityFolder where to store identity, "" for default config folder
 // domain the publisher uses to create addresses. If not provided iotc.LocalDomain is used
 // publisherID of this publisher, unique within the domain. See also SetPublisherID
 // messenger for publishing onto the message bus
 func NewPublisher(
+	identityFolder string,
 	domain string,
 	publisherID string,
 	messenger messenger.IMessenger,
@@ -413,28 +437,27 @@ func NewPublisher(
 		domain = iotc.LocalDomainID
 	}
 
-	// IotConnect core running state of the publisher
 	var publisher = &Publisher{
+		Inputs:          nodes.NewInputList(),
+		Nodes:           nodes.NewNodeList(),
+		Outputs:         nodes.NewOutputList(),
+		OutputValues:    nodes.NewOutputValueList(),
+		OutputForecasts: nodes.NewOutputForecastList(),
+		//
 		discoveryInterval: DefaultDiscoveryInterval,
+		domain:            domain,
+		domainPublishers:  nodes.NewPublisherList(),
 		exitChannel:       make(chan bool),
-		publisherID:       publisherID,
-		Inputs:            nodes.NewInputList(),
 		messenger:         messenger,
-		Nodes:             nodes.NewNodeList(),
-		Outputs:           nodes.NewOutputList(),
-		OutputValues:      nodes.NewOutputValueList(),
-		OutputForecasts:   nodes.NewOutputForecastList(),
 		pollCountdown:     1, // run discovery before poll
 		pollInterval:      DefaultPollInterval,
-		// address:           pubNode.Address,
-		updateMutex:      &sync.Mutex{},
-		domain:           domain,
-		domainPublishers: nodes.NewPublisherList(),
+		publisherID:       publisherID,
+		updateMutex:       &sync.Mutex{},
 	}
 	publisher.SetLogging("debug", "")
 
 	// create a default publisher node with identity and signatures
-	publisher.SetupPublisherIdentity(domain, publisherID)
+	publisher.SetupPublisherIdentity(identityFolder, domain, publisherID)
 
 	return publisher
 }
