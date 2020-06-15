@@ -38,9 +38,9 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 		publisher.logger.Infof("Publisher.PublishUpdates: publish node discovery: %s", node.Address)
 		publisher.publishObject(node.Address, true, node)
 	}
-	if len(nodeList) > 0 && publisher.autosaveFolder != "" {
+	if len(nodeList) > 0 && publisher.cacheFolder != "" {
 		allNodes := publisher.Nodes.GetAllNodes()
-		persist.SaveNodes(publisher.autosaveFolder, publisher.publisherID, allNodes)
+		persist.SaveNodesToCache(publisher.cacheFolder, publisher.publisherID, allNodes)
 	}
 
 	// publish updated input discovery
@@ -49,9 +49,9 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 		publisher.logger.Infof("Publisher.PublishUpdates: publish input discovery: %s", aliasAddress)
 		publisher.publishObject(aliasAddress, true, input)
 	}
-	if len(inputList) > 0 && publisher.autosaveFolder != "" {
+	if len(inputList) > 0 && publisher.cacheFolder != "" {
 		allInputs := publisher.Inputs.GetAllInputs()
-		persist.SaveInputs(publisher.autosaveFolder, publisher.publisherID, allInputs)
+		persist.SaveInputs(publisher.cacheFolder, publisher.publisherID, allInputs)
 	}
 
 	// publish updated output discovery
@@ -60,9 +60,9 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 		publisher.logger.Infof("Publisher.PublishUpdates: publish output discovery: %s", aliasAddress)
 		publisher.publishObject(aliasAddress, true, output)
 	}
-	if len(outputList) > 0 && publisher.autosaveFolder != "" {
+	if len(outputList) > 0 && publisher.cacheFolder != "" {
 		allOutputs := publisher.Outputs.GetAllOutputs()
-		persist.SaveOutputs(publisher.autosaveFolder, publisher.publisherID, allOutputs)
+		persist.SaveOutputs(publisher.cacheFolder, publisher.publisherID, allOutputs)
 	}
 }
 

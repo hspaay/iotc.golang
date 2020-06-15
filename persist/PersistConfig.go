@@ -23,6 +23,9 @@ var UserHomeDir, _ = os.UserHomeDir()
 // DefaultConfigFolder for IoTConnect publisher configuration files: ~/.config/iotc
 var DefaultConfigFolder = path.Join(UserHomeDir, ".config", "iotc")
 
+// DefaultCacheFolder for caching discovered nodes and other publishers
+var DefaultCacheFolder = path.Join(UserHomeDir, ".cache", "iotc")
+
 // LoadAppConfig loads the application configuration from a configuration file
 //
 // configFolder contains the location for the configuration files.
@@ -36,7 +39,7 @@ func LoadAppConfig(configFolder string, appID string, appConfig interface{}) err
 
 // LoadMessengerConfig loads the message bus messenger configuration from a configuration file
 //
-// configFolder location of configuration files. Use persist.DefaultConfigFolder for default
+// configFolder location of configuration files. Default is persist.DefaultConfigFolder.
 // messengerConfig is the object to store messenger configuration parameters using yaml.
 func LoadMessengerConfig(configFolder string, messengerConfig interface{}) error {
 	publisherID := ""

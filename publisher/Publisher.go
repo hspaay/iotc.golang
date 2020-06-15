@@ -8,8 +8,6 @@ package publisher
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"os/signal"
@@ -54,8 +52,7 @@ type Publisher struct {
 	OutputForecasts *nodes.OutputForecastList // output forecasts values published by this publisher
 	OutputValues    *nodes.OutputValueList    // output values published by this publisher
 
-	// address             string                     // the publisher node address
-	autosaveFolder    string                     // folder to save nodes after update
+	cacheFolder       string                     // folder to save discovered nodes and publishers
 	discoverCountdown int                        // countdown each heartbeat
 	discoveryInterval int                        // discovery polling interval
 	discoveryHandler  func(publisher *Publisher) // function that performs discovery
@@ -180,26 +177,25 @@ func (publisher *Publisher) SetNodeInputHandler(
 	publisher.onNodeInputHandler = handler
 }
 
-// SetPersistNodes set the folder for loading and saving this publisher's nodes.
-// If a node file exists in the given folder the nodes will be added/updated.
-// Existing nodes will be replaced.
+// LoadFromCache loads previously cached nodes of this publisher, and discovered publishers in the domain.
+// If a node file exists in the given folder the nodes will be added/updated. Existing nodes will be replaced.
 // If autosave is set then save this publisher's nodes and configs when updated.
 //
-// - folder of the configuration files.
-//     Use "" for default, which is persist.DefaultConfigFolder: <userhome>/.config/iotconnect
+// - folder with the cache files.
+//     Use "" for default, which is persist.DefaultCacheFolder: <userhome>/.cache/iotc
 // - autosave indicates to save updates to node configuration
 // returns error if folder doesn't exist
-func (publisher *Publisher) SetPersistNodes(folder string, autosave bool) error {
+func (publisher *Publisher) LoadFromCache(folder string, autosave bool) error {
 	var err error = nil
 	if folder == "" {
-		folder = persist.DefaultConfigFolder
+		folder = persist.DefaultCacheFolder
 	}
 	if autosave {
-		publisher.autosaveFolder = folder
+		publisher.cacheFolder = folder
 	}
 	if folder != "" {
 		nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
-		err = persist.LoadNodes(folder, publisher.publisherID, &nodeList)
+		err = persist.LoadNodesFromCache(folder, publisher.publisherID, &nodeList)
 		if err == nil {
 			publisher.Nodes.UpdateNodes(nodeList)
 		}
@@ -224,67 +220,6 @@ func (publisher *Publisher) SetPollInterval(seconds int, handler func(publisher 
 // func (publisher *Publisher) SetPublisherID(id string) {
 // 	publisher.id = id
 // }
-
-// SetupPublisherIdentity loads the publisher identity and keys from file, or creates a new one
-// if none yet exists.
-// identityFolder contains the folder with the identity files, use "" for default config folder (.config/iotc)
-//   if you're paranoid, this can be on a USB key that is inserted on startup and removed once running.
-// domain for this identity
-// publisherID for this identity
-func (publisher *Publisher) SetupPublisherIdentity(identityFolder string, domain string, publisherID string) {
-	var identity *iotc.PublisherIdentityMessage
-
-	if identityFolder == "" {
-		identityFolder = persist.DefaultConfigFolder
-	}
-
-	identity, privKey, err := persist.LoadIdentity(identityFolder, publisherID)
-	if err == nil {
-		publisher.identity = identity
-		publisher.privateKeySigning = privKey
-
-	} else {
-		// we don't have an identity yet, so create one
-
-		// publisher.address = pubNode.Address
-		timestampStr := time.Now().Format(iotc.TimeFormat)
-		validUntil := time.Now().Add(time.Hour * 24 * 365) // valid for 1 year
-		validUntilStr := validUntil.Format(iotc.TimeFormat)
-
-		// generate private/public key for signing and store the public key in the publisher identity
-		// TODO: store keys
-		rng := rand.Reader
-		curve := elliptic.P256()
-		privKey, err := ecdsa.GenerateKey(curve, rng)
-		publisher.privateKeySigning = privKey
-		if err != nil {
-			publisher.logger.Errorf("Publisher.NewPublisher: Failed to create keys for signing: %s", err)
-		}
-		privStr, pubStr := messenger.KeysToPem(privKey, &privKey.PublicKey)
-		_ = privStr
-
-		addr := publisher.Address()
-
-		publisher.identity = &iotc.PublisherIdentityMessage{
-			Address: addr,
-			Identity: iotc.PublisherIdentity{
-				Domain:       domain,
-				IssuerName:   publisherID, // self issued, will be replaced by ZCAS
-				Location:     "local",
-				Organization: "", // todo: get from messenger configuration
-				// PublicKeyCrypto:  cryptoStr,
-				PublicKeySigning: pubStr,
-				PublisherID:      publisherID,
-				Timestamp:        timestampStr,
-				ValidUntil:       validUntilStr,
-			},
-			IdentitySignature: "",
-			SignerName:        publisherID,
-			Timestamp:         timestampStr,
-		}
-		persist.SaveIdentity(identityFolder, publisherID, publisher.identity, privKey)
-	}
-}
 
 // Start publishing and listen for configuration and input messages
 // This will create the publisher node and load previously saved nodes
@@ -422,12 +357,14 @@ func (publisher *Publisher) heartbeatLoop() {
 // messenger to use fo publications and for the domain to publish in
 // logger is the optional logger to use.
 //
-// identityFolder where to store identity, "" for default config folder
+// identityFolder where to store this publisher's identity and keys, "" for default config folder
+// cacheFolder where to store discovered nodes, inputs, outputs and external publishers
 // domain the publisher uses to create addresses. If not provided iotc.LocalDomain is used
 // publisherID of this publisher, unique within the domain. See also SetPublisherID
 // messenger for publishing onto the message bus
 func NewPublisher(
 	identityFolder string,
+	cacheFolder string,
 	domain string,
 	publisherID string,
 	messenger messenger.IMessenger,

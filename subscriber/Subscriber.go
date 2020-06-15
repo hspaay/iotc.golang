@@ -9,23 +9,23 @@ import (
 	"github.com/hspaay/iotc.golang/messenger"
 	"github.com/hspaay/iotc.golang/nodes"
 	log "github.com/sirupsen/logrus"
+	"github.com/square/go-jose"
 )
 
 // Subscriber carries the operating state of the consumer
 // Start() will subscribe to discover all publishers.
 // To discover nodes, subscribe to the publisher
 type Subscriber struct {
-	domain        string                   // The domain in which we live
-	isRunning     bool                     // publisher was started and is running
-	logger        *log.Logger              //
-	inputList     *nodes.InputList         // inputs by discovery address
-	messenger     messenger.IMessenger     // Message bus messenger to use
-	nodes         *nodes.NodeList          // nodes by discovery address
-	outputList    *nodes.OutputList        // outputs by discovery address
-	publishers    *nodes.PublisherList     // publishers on the network
-	signer        messenger.IMessageSigner // Signing and verification of messages
-	subscriptions nodes.NodeList           // publishers to which we subscribe to receive their nodes
-	updateMutex   *sync.Mutex              // mutex for async updating and publishing
+	domain        string               // The domain in which we live
+	isRunning     bool                 // publisher was started and is running
+	logger        *log.Logger          //
+	inputList     *nodes.InputList     // inputs by discovery address
+	messenger     messenger.IMessenger // Message bus messenger to use
+	nodes         *nodes.NodeList      // nodes by discovery address
+	outputList    *nodes.OutputList    // outputs by discovery address
+	publishers    *nodes.PublisherList // publishers on the network
+	subscriptions nodes.NodeList       // publishers to which we subscribe to receive their nodes
+	updateMutex   *sync.Mutex          // mutex for async updating and publishing
 }
 
 // Start listen for publisher nodes
@@ -62,20 +62,30 @@ func (subscriber *Subscriber) Stop() {
 // Used to verify signatures of incoming configuration and input messages
 // address contains the publisher's identity address: domain/publisherId/$identity
 // message is the LWS signed message containing the publisher identity
-func (subscriber *Subscriber) handlePublisherDiscovery(address string, message []byte) {
-	var identity iotc.PublisherIdentityMessage
+func (subscriber *Subscriber) handlePublisherDiscovery(address string, message string) {
+	var pubIdentityMsg iotc.PublisherIdentityMessage
+	var payload string
 
-	// FIXME: verify with the signature with the domain security service (DSS) public key or certificate
-	payload, err := subscriber.signer.Verify(message)
+	// message can be signed or not signed so start with trying to parse
+	jseSignature, err := jose.ParseSigned(string(message))
 	if err != nil {
-		subscriber.logger.Warningf("handlePublisherDiscovery Invalid message: %s", err)
-		// return
+		// message isn't signed
+		// if subscriber.signingMethod == SigningMethodJWS {
+		// 	// message must be signed though. Discard
+		// 	subscriber.logger.Warnf("handlePublisherDiscovery: Publisher update isn't signed but only signed updates are accepted. Publisher: %s", address)
+		// 	return
+		// }
+		// accept the unsigned message as signing isn't required
+		payload = message
+	} else {
+		// message is signed. The signature must verify with the publisher signing key included in the message
+		payload = string(jseSignature.UnsafePayloadWithoutVerification())
 	}
 
-	// Decode the message into a NodeDiscoveryMessage type
-	err = json.Unmarshal(payload, &identity)
+	err = json.Unmarshal([]byte(payload), &pubIdentityMsg)
 	if err != nil {
-		subscriber.logger.Warningf("Unable to unmarshal Publisher Identity in %s: %s", address, err)
+		subscriber.logger.Warnf("handlePublisherDiscovery: Failed parsing json payload [unsigned]: %s", err)
+		// abort
 		return
 	}
 
@@ -85,7 +95,7 @@ func (subscriber *Subscriber) handlePublisherDiscovery(address string, message [
 	defer subscriber.updateMutex.Unlock()
 
 	// TODO: Verify that the publisher is valid...
-	subscriber.publishers.UpdatePublisher(&identity)
+	subscriber.publishers.UpdatePublisher(&pubIdentityMsg)
 	subscriber.logger.Infof("Discovered publisher %s", address)
 
 }

@@ -18,24 +18,24 @@ const InputsFileSuffix = "-inputs.json"
 // OutputsFileSuffix to append to name of the file containing saved output
 const OutputsFileSuffix = "-outputs.json"
 
-// LoadNodes loads previously saved publisher node messages from JSON file.
+// LoadNodesFromCache loads previously cached publisher node messages from JSON file.
 // Existing nodes are replaced if they exist in the JSON file. Custom nodes must be updated
-// after lodaing nodes from file as previously saved versions will be loaded here.
+// after loading nodes from file as previously saved versions will be loaded here.
 //
-// altConfigFolder contains a alternate location for the configuration files, intended for testing.
-//   Use "" for default, which is <userhome>/.config/iotc
+// altCacheFolder contains a alternate location for the cached files, intended for testing.
+//   Use "" for default, which is <userhome>/.cache/iotc
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the address of a list that holds nodes
-func LoadNodes(altConfigFolder string, publisherID string, nodelist interface{}) error {
-	configFolder := altConfigFolder
-	if altConfigFolder == "" {
-		configFolder = DefaultConfigFolder
+func LoadNodesFromCache(altCacheFolder string, publisherID string, nodelist interface{}) error {
+	cacheFolder := altCacheFolder
+	if altCacheFolder == "" {
+		cacheFolder = DefaultCacheFolder
 	}
-	nodesFile := path.Join(configFolder, publisherID+NodesFileSuffix)
+	nodesFile := path.Join(cacheFolder, publisherID+NodesFileSuffix)
 
 	jsonNodes, err := ioutil.ReadFile(nodesFile)
 	if err != nil {
-		log.Warningf("LoadNodes: Unable to open configuration file %s: %s", nodesFile, err)
+		log.Infof("LoadNodes: Unable to open cache file %s: %s", nodesFile, err)
 		return err
 	}
 	err = json.Unmarshal(jsonNodes, nodelist)
@@ -47,43 +47,43 @@ func LoadNodes(altConfigFolder string, publisherID string, nodelist interface{})
 	return nil
 }
 
-// SaveNodes saves the nodelist to a JSON file
-// configFolder contains the location for the configuration files
+// SaveNodesToCache saves the nodelist to a JSON file in the cache folder
+// cacheFolder is the location for the cache
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is a list of nodes to save
-func SaveNodes(configFolder string, publisherID string, nodeList interface{}) error {
-	return SaveToJSON(configFolder, publisherID+NodesFileSuffix, nodeList)
+func SaveNodesToCache(cacheFolder string, publisherID string, nodeList interface{}) error {
+	return SaveToJSON(cacheFolder, publisherID+NodesFileSuffix, nodeList)
 }
 
-// SaveInputs saves the inputlist to a JSON file
-// configFolder contains the location for the configuration files
+// SaveInputs saves the discovered inputs to cache
+// cacheFolder is  the location for the files
+//   Use "" for default, which is <userhome>/.cache/iotconnect
+// publisherID determines the filename: <publisherID-nodes.json>
+// nodelist is the object to hold list of nodes
+func SaveInputs(cacheFolder string, publisherID string, inputList interface{}) error {
+	return SaveToJSON(cacheFolder, publisherID+InputsFileSuffix, inputList)
+}
+
+// SaveOutputs saves the discovered outputs to cache
+// cacheFolder contains the location for the files
 //   Use "" for default, which is <userhome>/.config/iotconnect
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the object to hold list of nodes
-func SaveInputs(configFolder string, publisherID string, inputList interface{}) error {
-	return SaveToJSON(configFolder, publisherID+InputsFileSuffix, inputList)
-}
-
-// SaveOutputs saves the outputlist to a JSON file
-// configFolder contains the location for the configuration files
-//   Use "" for default, which is <userhome>/.config/iotconnect
-// publisherID determines the filename: <publisherID-nodes.json>
-// nodelist is the object to hold list of nodes
-func SaveOutputs(configFolder string, publisherID string, outputList interface{}) error {
-	return SaveToJSON(configFolder, publisherID+OutputsFileSuffix, outputList)
+func SaveOutputs(cacheFolder string, publisherID string, outputList interface{}) error {
+	return SaveToJSON(cacheFolder, publisherID+OutputsFileSuffix, outputList)
 }
 
 // SaveToJSON saves the given collection to a JSON file
-// configFolder contains the location for the configuration files
+// cacheFolder contains the location for the files
 // filename is the name to save the collection under
 // nodelist is the object to hold list of nodes
-func SaveToJSON(configFolder string, fileName string, collection interface{}) error {
+func SaveToJSON(cacheFolder string, fileName string, collection interface{}) error {
 	jsonText, err := json.MarshalIndent(collection, "", "  ")
 	if err != nil {
 		log.Errorf("Save: Error Marshalling JSON collection '%s': %v", fileName, err)
 		return err
 	}
-	fullPath := path.Join(configFolder, fileName)
+	fullPath := path.Join(cacheFolder, fileName)
 	err = ioutil.WriteFile(fullPath, jsonText, 0664)
 	if err != nil {
 		log.Errorf("Save: Error saving collection to JSON file %s: %v", fullPath, err)

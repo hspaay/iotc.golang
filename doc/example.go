@@ -130,7 +130,7 @@ func UpdateWeather(pub *publisher.Publisher) {
 // Run the example
 func main() {
 	// this auto loads the messenger.yaml and myweather.yaml from ~/.config/iotc
-	pub, _ := publisher.NewAppPublisher(appID, "", appConfig, false)
+	pub, _ := publisher.NewAppPublisher(appID, "", "", appConfig, false)
 
 	SetupNodes(pub, weatherCity)
 	// Update the forecast once an hour

@@ -1,4 +1,4 @@
-// Package nodes with publisher management
+// Package nodes with management of discovered publishers
 package nodes
 
 import (
@@ -32,7 +32,7 @@ func (pubList *PublisherList) GetAllPublishers() []*iotc.PublisherIdentityMessag
 	return identList
 }
 
-// GetDSSIdentity returns the Domain Security Service identity
+// GetDSSIdentity returns the Domain Security Service publisher identity
 // Returns nil if no DSS was received
 func (pubList *PublisherList) GetDSSIdentity(domain string) *iotc.PublisherIdentity {
 	addr := MakePublisherIdentityAddress(domain, iotc.DSSPublisherID)

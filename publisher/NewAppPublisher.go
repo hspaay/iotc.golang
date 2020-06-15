@@ -16,11 +16,12 @@ import (
 //
 // appID is the application ID, used as default publisher ID
 // configFolder location, use "" for default location (.config/iotc)
+// cache folder location, use "" for default location (.cache/iotc)
 // appConfig address for storing loaded application, use "" if not to load an appConfig
 //    if appConfig has a field named 'PublisherID' it will be used instead of appID
 // persistNodes flags whether to save discovered nodes and their configuration changes
 // returns publisher instance or error if messenger fails to load
-func NewAppPublisher(appID string, configFolder string, appConfig interface{}, persistNodes bool) (*Publisher, error) {
+func NewAppPublisher(appID string, configFolder string, cacheFolder string, appConfig interface{}, persistNodes bool) (*Publisher, error) {
 	logger := logrus.New()
 	var messengerConfig = messenger.MessengerConfig{}
 
@@ -37,8 +38,11 @@ func NewAppPublisher(appID string, configFolder string, appConfig interface{}, p
 	if pubID == "" {
 		pubID = appID
 	}
-	pub := NewPublisher("", messengerConfig.Domain, pubID, messenger)
+	// identity lives in the config folder
+	pub := NewPublisher(configFolder, cacheFolder, messengerConfig.Domain, pubID, messenger)
 
-	pub.SetPersistNodes(configFolder, persistNodes)
+	// cache holds previously discovered nodes and external publisher
+	// Should node name and alias configuration updates be stored in config or cache?
+	pub.LoadFromCache(cacheFolder, persistNodes)
 	return pub, err
 }
