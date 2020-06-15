@@ -3,18 +3,15 @@ package nodes
 
 import (
 	"crypto/ecdsa"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/messenger"
-	"github.com/square/go-jose"
 )
 
-const DSSAddress = ""
+// const DSSAddress = ""
 
 // PublisherList with discovered and verified publishers
 type PublisherList struct {
@@ -57,7 +54,7 @@ func (pubList *PublisherList) GetPublisherByAddress(address string) *iotc.Publis
 	return identity
 }
 
-// getPublisherSigningKey returns the public signing key of a publisher
+// GetPublisherSigningKey returns the public signing key of a publisher
 // publisherAddress starts with domain/publisherId
 // returns public key or nil if publisher public key not found
 func (pubList *PublisherList) GetPublisherSigningKey(publisherAddress string) *ecdsa.PublicKey {
@@ -76,17 +73,17 @@ func (pubList *PublisherList) GetPublisherSigningKey(publisherAddress string) *e
 	return pubSigningKey
 }
 
-// SignIdentity returns a base64URL encoded signature of the given identity
-// used to sign the identity.
-func (pubList *PublisherList) SignIdentity(ident *iotc.PublisherIdentity, privKey *jose.SigningKey) string {
-	signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
-	signer, _ := jose.NewSigner(signingKey, nil)
-	payload, _ := json.Marshal(ident)
-	jws, _ := signer.Sign(payload)
-	sig := jws.Signatures[0].Signature
-	sigStr := base64.URLEncoding.EncodeToString(sig)
-	return sigStr
-}
+// // SignIdentity returns a base64URL encoded signature of the given identity
+// // used to sign the identity.
+// func (pubList *PublisherList) SignIdentity(ident *iotc.PublisherIdentity, privKey *jose.SigningKey) string {
+// 	signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
+// 	signer, _ := jose.NewSigner(signingKey, nil)
+// 	payload, _ := json.Marshal(ident)
+// 	jws, _ := signer.Sign(payload)
+// 	sig := jws.Signatures[0].Signature
+// 	sigStr := base64.URLEncoding.EncodeToString(sig)
+// 	return sigStr
+// }
 
 // UpdatePublisher replaces a publisher identity
 // Intended for use within a locked section

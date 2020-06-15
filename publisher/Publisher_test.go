@@ -3,14 +3,12 @@ package publisher
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
 	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/messenger"
 	"github.com/hspaay/iotc.golang/nodes"
-	"github.com/square/go-jose"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,6 +60,7 @@ func TestNewPublisher(t *testing.T) {
 func TestDiscover(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	pub1 := NewPublisher(identityFolder, msgConfig.Domain, publisher1ID, testMessenger)
+	pub1.signingMethod = SigningMethodJWS
 	pub1.Nodes.UpdateNode(node1)
 	tmpNode := pub1.Nodes.GetNodeByAddress(node1Addr)
 	if !(assert.NotNil(t, tmpNode, "Failed getting discovered node") &&
@@ -94,6 +93,7 @@ func TestDiscover(t *testing.T) {
 func TestNodePublication(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	pub1 := NewPublisher(identityFolder, msgConfig.Domain, publisher1ID, testMessenger)
+	pub1.signingMethod = SigningMethodJWS
 
 	// Start synchroneous publications to verify publications in order
 	pub1.Start()                            // publisher is first publication [0]
@@ -131,6 +131,7 @@ func TestNodePublication(t *testing.T) {
 func TestAlias(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	pub1 := NewPublisher(identityFolder, msgConfig.Domain, publisher1ID, testMessenger)
+	pub1.signingMethod = SigningMethodJWS
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
@@ -154,10 +155,13 @@ func TestAlias(t *testing.T) {
 	if !assert.NotNil(t, p3, "output discovery should use alias with address %s but no publication was found", node1AliasOutput1Addr) {
 		return
 	}
-	payload, _ := messenger.VerifyJWSMessage(p3, &pub1.privateKeySigning.PublicKey)
+	payload, err := messenger.VerifyJWSMessage(p3, &pub1.privateKeySigning.PublicKey)
+	if !assert.NoError(t, err, "Failed to verify published message") {
+		return
+	}
 
 	var out iotc.OutputDiscoveryMessage
-	err := json.Unmarshal([]byte(payload), &out)
+	err = json.Unmarshal([]byte(payload), &out)
 	if !assert.NoError(t, err, "Failed to unmarshal published message") {
 		return
 	}
@@ -169,6 +173,7 @@ func TestAlias(t *testing.T) {
 func TestConfigure(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	pub1 := NewPublisher(identityFolder, msgConfig.Domain, publisher1ID, testMessenger)
+	pub1.signingMethod = SigningMethodJWS
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
@@ -205,6 +210,7 @@ func TestConfigure(t *testing.T) {
 func TestOutputValue(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	pub1 := NewPublisher(identityFolder, msgConfig.Domain, publisher1ID, testMessenger)
+	pub1.signingMethod = SigningMethodJWS
 
 	// assert.Nilf(t, node1.Config["alias"], "Alias set for node 1, unexpected")
 	node1 = nodes.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
@@ -216,12 +222,13 @@ func TestOutputValue(t *testing.T) {
 	pub1.OutputValues.UpdateOutputValue(node1Output1Addr, "true")
 
 	pub1.PublishUpdatedDiscoveries()
+	pub1.PublishUpdatedOutputValues()
 	// time.Sleep(time.Second * 1) // receive publications
 	pub1.Stop()
 
 	// test $raw publication
 	p1 := testMessenger.FindLastPublication(node1valueAddr)
-	if !assert.NotNilf(t, p1, "Unable to find published value on address", node1valueAddr) {
+	if !assert.NotEmptyf(t, p1, "Unable to find published value on address %s", node1valueAddr) {
 		return
 	}
 	payload, _ := messenger.VerifyJWSMessage(p1, &pub1.privateKeySigning.PublicKey)
@@ -300,6 +307,8 @@ func TestSetInput(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	var receivedInputValue = ""
 	pub1 := NewPublisher(identityFolder, msgConfig.Domain, publisher1ID, testMessenger)
+	// pub1.signingMethod = SigningMethodJWS
+
 	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
 		receivedInputValue = message.Value
 	})
@@ -315,64 +324,23 @@ func TestSetInput(t *testing.T) {
 func TestDiscoverPublishers(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	pub1 := NewPublisher(identityFolder, msgConfig.Domain, publisher1ID, testMessenger)
+	pub1.signingMethod = SigningMethodJWS
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
 
 	// Use the dummy messenger for multiple publishers
-	publisher2 := NewPublisher(identityFolder, msgConfig.Domain, publisher2ID, testMessenger)
-	publisher2.Start()
+	pub2 := NewPublisher(identityFolder, msgConfig.Domain, publisher2ID, testMessenger)
+	pub2.signingMethod = SigningMethodJWS
+	pub2.Start()
 	// wait for incoming messages to be processed
 
 	time.Sleep(time.Second * 1) // receive publications
 
-	publisher2.Stop()
+	pub2.Stop()
 	pub1.Stop()
 
 	// publisher 1 and 2 should have been discovered
 	nrPub := len(pub1.domainPublishers.GetAllPublishers())
 	assert.Equal(t, 2, nrPub, "Expected discovery of 2 publishers")
-}
-
-// TestNewNode instance
-func TestJWSSigning(t *testing.T) {
-	privKey := messenger.CreateAsymKeys()
-
-	payload1, err := json.Marshal(node1)
-	assert.NoErrorf(t, err, "Serializing node1 failed")
-
-	sig1, err := messenger.CreateJWSSignature(string(payload1), privKey)
-	assert.NoErrorf(t, err, "signing node1 failed")
-	assert.NotEmpty(t, sig1, "Signature is empty")
-
-	sig2 := messenger.CreateEcdsaSignature(payload1, privKey)
-	assert.NotEqual(t, sig1, sig2, "JWS Signature doesn't match with Ecdsa")
-
-	// generate jws sig
-	start := time.Now()
-	for count := 0; count < 10000; count++ {
-		messenger.CreateJWSSignature(string(payload1), privKey)
-	}
-	duration := time.Since(start).Seconds()
-	log.Printf("10K JWS signatures generated in %f seconds", duration)
-
-	// verify sig
-	start = time.Now()
-	for count := 0; count < 10000; count++ {
-		messenger.VerifyJWSMessage(sig1, &privKey.PublicKey)
-	}
-	duration = time.Since(start).Seconds()
-	log.Printf("10K JWS signatures verified in %f seconds", duration)
-
-	start = time.Now()
-	joseSigner, _ := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.ES256, Key: privKey}, nil)
-	for count := 0; count < 10000; count++ {
-		jws, _ := joseSigner.Sign([]byte(payload1))
-		sig2 := jws.Signatures[0].Signature
-		_ = sig2
-	}
-	duration = time.Since(start).Seconds()
-	log.Printf("10K JOSE signatures generated in %f seconds", duration)
-
 }

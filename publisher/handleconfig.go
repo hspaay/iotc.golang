@@ -2,11 +2,8 @@
 package publisher
 
 import (
-	"encoding/json"
-
 	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/messenger"
-	"gopkg.in/square/go-jose.v2"
 )
 
 // handle an incoming a configuration command for one of our nodes. This:
@@ -18,40 +15,18 @@ import (
 func (publisher *Publisher) handleNodeConfigCommand(address string, message string) {
 	var configureMessage iotc.NodeConfigureMessage
 
-	publisher.logger.Infof("handleNodeConfig on address %s", address)
+	publisher.logger.Infof("handleNodeConfigCommand on address %s", address)
 
-	payload := string(message)
-
-	// determine the sender public signing key so we can check the message signature
-	// decode the jws signature
-	if publisher.signingMethod == SigningMethodJWS {
-		jwsSignature, err := jose.ParseSigned(message)
-		if err != nil {
-			publisher.logger.Warningf("handleNodeConfig: Not a JWS signed message on address %s: %s", address, err)
-			return
-		}
-
-		payload = string(jwsSignature.UnsafePayloadWithoutVerification())
-
-		err = json.Unmarshal([]byte(payload), &configureMessage)
-		if err != nil {
-			publisher.logger.Infof("Unable to unmarshal ConfigureMessage in %s", address)
-			return
-		}
-
-		publicKey := publisher.domainPublishers.GetPublisherSigningKey(configureMessage.Sender)
-
-		_, err = messenger.VerifyJWSMessage(message, publicKey)
-		if err != nil {
-			publisher.logger.Warningf("Incoming configuration verification failed for sender: %s", configureMessage.Sender)
-			return
-		}
-	} else {
-		err := json.Unmarshal([]byte(payload), &configureMessage)
-		if err != nil {
-			publisher.logger.Infof("Unable to unmarshal ConfigureMessage in %s", address)
-			return
-		}
+	// Verify the message using the public key of the sender
+	isSigned, err := messenger.VerifySender(message, &configureMessage, publisher.domainPublishers.GetPublisherSigningKey)
+	if !isSigned {
+		// all configuration commands must use signed messages
+		publisher.logger.Warnf("handleNodeConfigCommand: message to input '%s' is not signed. Message discarded.", address)
+		return
+	} else if err != nil {
+		// signing failed, discard the message
+		publisher.logger.Warnf("handleNodeConfigCommand: signature verification failed for message to input %s. Message discarded.", address)
+		return
 	}
 
 	// TODO: authorization check
@@ -61,12 +36,6 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, message stri
 		return
 	}
 
-	// Verify that the message comes from the sender using the sender's public key
-	// isValid := publisher.VerifyMessageSignature(configureMessage.Sender, message, publication.Signature)
-	// if !isValid {
-	// 	publisher.Logger.Warningf("Incoming configuration verification failed for sender: %s", configureMessage.Sender)
-	// 	return
-	// }
 	params := configureMessage.Attr
 	if publisher.onNodeConfigHandler != nil {
 		// A handler can filter which configuration updates take place

@@ -232,7 +232,7 @@ func (publisher *Publisher) publishRawValue(outputAddress string) error {
 	// }
 	publisher.logger.Infof("Publisher.publishRawValue: output value '%s' on %s", s, aliasAddress)
 
-	err := publisher.publishPayload(outputAddress, true, s)
+	err := publisher.publishPayload(aliasAddress, true, s)
 	return err
 }
 
@@ -243,7 +243,7 @@ func (publisher *Publisher) publishPayload(address string, retained bool, payloa
 	var err error
 
 	// default is unsigned
-	message := string(payload)
+	message := payload
 
 	if publisher.signingMethod == SigningMethodJWS {
 		message, err = messenger.CreateJWSSignature(string(payload), publisher.privateKeySigning)

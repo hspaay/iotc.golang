@@ -325,7 +325,7 @@ func (publisher *Publisher) Start() {
 		publisher.PublishIdentity()
 		publisher.PublishUpdatedDiscoveries()
 
-		publisher.logger.Warningf("Publisher.Start: Publisher %s started", publisher.publisherID)
+		publisher.logger.Infof("Publisher.Start: Publisher %s started", publisher.publisherID)
 	}
 }
 
@@ -363,7 +363,7 @@ func (publisher *Publisher) WaitForSignal() {
 
 // Main heartbeat loop to publish, discove and poll value updates
 func (publisher *Publisher) heartbeatLoop() {
-	publisher.logger.Warningf("Publisher.heartbeatLoop: starting heartbeat loop")
+	publisher.logger.Infof("Publisher.heartbeatLoop: starting heartbeat loop")
 	publisher.exitChannel <- false
 
 	for {
@@ -397,7 +397,7 @@ func (publisher *Publisher) heartbeatLoop() {
 		}
 	}
 	publisher.exitChannel <- true
-	publisher.logger.Warningf("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.publisherID)
+	publisher.logger.Infof("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.publisherID)
 }
 
 // // VerifyMessageSignature Verify a received message is signed by the sender

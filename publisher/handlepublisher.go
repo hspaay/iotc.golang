@@ -56,29 +56,29 @@ func (publisher *Publisher) handleDSSDiscovery(dssIdentityMsg *iotc.PublisherIde
 // message contains the publisher identity message
 func (publisher *Publisher) handlePublisherDiscovery(address string, message string) {
 	var pubIdentityMsg *iotc.PublisherIdentityMessage
+	var payload string
 
-	if publisher.signingMethod == SigningMethodJWS {
-		jseSignature, err := jose.ParseSigned(string(message))
-		if err != nil {
-			publisher.logger.Warnf("handlePublisherDiscovery: Failed parsing message signature: %s", err)
-			// abort
+	// message can be signed or not signed so start with trying to parse
+	jseSignature, err := jose.ParseSigned(string(message))
+	if err != nil {
+		// message isn't signed
+		if publisher.signingMethod == SigningMethodJWS {
+			// message must be signed though. Discard
+			publisher.logger.Warnf("handlePublisherDiscovery: Publisher update isn't signed but only signed updates are accepted. Publisher: %s", address)
 			return
 		}
-		payload := jseSignature.UnsafePayloadWithoutVerification()
-		err = json.Unmarshal(payload, &pubIdentityMsg)
-		if err != nil {
-			publisher.logger.Warnf("handlePublisherDiscovery: Failed parsing json payload [signed]: %s", err)
-			// abort
-			return
-		}
+		// accept the unsigned message as signing isn't required
+		payload = message
 	} else {
-		payload := []byte(message)
-		err := json.Unmarshal(payload, &pubIdentityMsg)
-		if err != nil {
-			publisher.logger.Warnf("handlePublisherDiscovery: Failed parsing json payload [unsigned]: %s", err)
-			// abort
-			return
-		}
+		// message is signed. The signature must verify with the publisher signing key included in the message
+		payload = string(jseSignature.UnsafePayloadWithoutVerification())
+	}
+
+	err = json.Unmarshal([]byte(payload), &pubIdentityMsg)
+	if err != nil {
+		publisher.logger.Warnf("handlePublisherDiscovery: Failed parsing json payload [unsigned]: %s", err)
+		// abort
+		return
 	}
 
 	// Handle the DSS publisher separately

@@ -2,12 +2,10 @@
 package publisher
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/messenger"
-	"gopkg.in/square/go-jose.v2"
 )
 
 // handle an incoming a set command for input of one of our nodes. This:
@@ -23,7 +21,7 @@ func (publisher *Publisher) handleNodeInput(address string, message string) {
 	if len(segments) < 6 {
 		return
 	}
-	// zone/pub/node/inputtype/instance/$input
+	// domain/pub/node/inputtype/instance/$input
 	segments[5] = iotc.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
 
@@ -34,36 +32,20 @@ func (publisher *Publisher) handleNodeInput(address string, message string) {
 		return
 	}
 
-	payload := string(message)
-	// decode the jws signature
-	if publisher.signingMethod == SigningMethodJWS {
-		// determine the sender public signing key so we can check the message signature
-		jwsSignature, err := jose.ParseSigned(message)
-		if err != nil {
-			publisher.logger.Warningf("handleNodeInput: Not a JWS signed message on address %s: %s", address, err)
+	// Verify the message using the public key of the sender
+	isSigned, err := messenger.VerifySender(message, &setMessage, publisher.domainPublishers.GetPublisherSigningKey)
+	if !isSigned {
+		if publisher.signingMethod != SigningMethodNone {
+			// all inputs must use signed messages
+			publisher.logger.Warnf("handleNodeInput: message to input '%s' is not signed. Message discarded.", address)
 			return
 		}
-		payload = string(jwsSignature.UnsafePayloadWithoutVerification())
-
-		err = json.Unmarshal([]byte(payload), &setMessage)
-		if err != nil {
-			publisher.logger.Infof("handleNodeInput: Unable to unmarshal message in %s", address)
-			return
-		}
-		publicKey := publisher.domainPublishers.GetPublisherSigningKey(setMessage.Sender)
-
-		_, err = messenger.VerifyJWSMessage(message, publicKey)
-		if err != nil {
-			publisher.logger.Warningf("handleNodeInput: verification failed for sender: %s", setMessage.Sender)
-			return
-		}
-	} else {
-		err := json.Unmarshal([]byte(payload), &setMessage)
-		if err != nil {
-			publisher.logger.Infof("handleNodeInput: Unable to unmarshal message in %s", address)
-			return
-		}
+	} else if err != nil {
+		// signing failed, discard the message
+		publisher.logger.Warnf("handleNodeInput: signature verification failed for message to input %s. Message discarded.", address)
+		return
 	}
+
 	if publisher.onNodeInputHandler != nil {
 		publisher.onNodeInputHandler(input, &setMessage)
 	}
