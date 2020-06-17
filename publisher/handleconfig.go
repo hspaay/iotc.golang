@@ -18,7 +18,7 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, message stri
 	publisher.logger.Infof("handleNodeConfigCommand on address %s", address)
 
 	// Verify the message using the public key of the sender
-	isSigned, err := messenger.VerifySender(message, &configureMessage, publisher.domainPublishers.GetPublisherSigningKey)
+	isSigned, err := messenger.VerifySender(message, &configureMessage, publisher.domainPublishers.GetPublisherKey)
 	if !isSigned {
 		// all configuration commands must use signed messages
 		publisher.logger.Warnf("handleNodeConfigCommand: message to input '%s' is not signed. Message discarded.", address)

@@ -41,9 +41,9 @@ func CreateJWSSignature(payload string, privateKey *ecdsa.PrivateKey) (string, e
 	return serialized, err
 }
 
-// SignEncodeIdentity returns a base64URL encoded ECDSA256 signature of the given object
-// Intended to sign the publisher identity
-func SignEncodeIdentity(ident *iotc.PublisherIdentity, privKey *jose.SigningKey) string {
+// SignEncodeIdentity returns a base64URL encoded ECDSA256 signature of the publisher identity.
+// Used in creating or updating a publisher's identity.
+func SignEncodeIdentity(ident *iotc.PublisherIdentity, privKey *ecdsa.PrivateKey) string {
 	signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
 	signer, _ := jose.NewSigner(signingKey, nil)
 	payload, _ := json.Marshal(ident)

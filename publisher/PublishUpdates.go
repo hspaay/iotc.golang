@@ -40,7 +40,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	}
 	if len(nodeList) > 0 && publisher.cacheFolder != "" {
 		allNodes := publisher.Nodes.GetAllNodes()
-		persist.SaveNodesToCache(publisher.cacheFolder, publisher.publisherID, allNodes)
+		persist.SaveNodesToCache(publisher.cacheFolder, publisher.PublisherID(), allNodes)
 	}
 
 	// publish updated input discovery
@@ -51,7 +51,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	}
 	if len(inputList) > 0 && publisher.cacheFolder != "" {
 		allInputs := publisher.Inputs.GetAllInputs()
-		persist.SaveInputs(publisher.cacheFolder, publisher.publisherID, allInputs)
+		persist.SaveInputs(publisher.cacheFolder, publisher.PublisherID(), allInputs)
 	}
 
 	// publish updated output discovery
@@ -62,7 +62,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	}
 	if len(outputList) > 0 && publisher.cacheFolder != "" {
 		allOutputs := publisher.Outputs.GetAllOutputs()
-		persist.SaveOutputs(publisher.cacheFolder, publisher.publisherID, allOutputs)
+		persist.SaveOutputs(publisher.cacheFolder, publisher.PublisherID(), allOutputs)
 	}
 }
 

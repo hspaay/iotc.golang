@@ -82,7 +82,7 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	}
 
 	// Handle the DSS publisher separately
-	dssAddress := fmt.Sprintf("%s/%s/%s", publisher.domain, iotc.DSSPublisherID, iotc.MessageTypeIdentity)
+	dssAddress := fmt.Sprintf("%s/%s/%s", publisher.Domain(), iotc.DSSPublisherID, iotc.MessageTypeIdentity)
 	if address == dssAddress {
 		publisher.handleDSSDiscovery(pubIdentityMsg)
 		return
@@ -91,7 +91,7 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	// So we have a publisher identity update. Determine if it is trusted.
 	// 1: No DSS, assume address protection is in place
 	// 2: Do we have a DSS? If so, require the identity is signed by the DSS
-	dssSigningKey := publisher.domainPublishers.GetPublisherSigningKey(dssAddress)
+	dssSigningKey := publisher.domainPublishers.GetPublisherKey(dssAddress)
 	if dssSigningKey == nil {
 		// 1: No DSS, assume address protection is in place
 		publisher.domainPublishers.UpdatePublisher(pubIdentityMsg)

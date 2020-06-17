@@ -15,16 +15,15 @@ const LWTStatusLost = "lost"
 
 // PublisherIdentity public record
 type PublisherIdentity struct {
-	Certificate      string `json:"certificate,omitempty"` // optional x509 cert base64 encoded
-	Domain           string `json:"domain"`                // IoT domain name for this publisher
-	IssuerName       string `json:"issuerName"`            // Issuer of the identity, usually the ZCAS
-	Location         string `json:"location,omitempty"`    // city, province, country
-	Organization     string `json:"organization"`          // publishing organization
-	PublicKeyCrypto  string `json:"publicKeyCrypto"`       // public key for encrypting messages to this publisher
-	PublicKeySigning string `json:"publicKeySigning"`      // public key for verifying signature of messages published by this publisher
-	PublisherID      string `json:"publisherId"`           // This publisher's ID for this zone
-	Timestamp        string `json:"timestamp"`             // timestamp this identity was signed
-	ValidUntil       string `json:"validUntil"`            // timestamp this identity expires
+	Certificate  string `json:"certificate,omitempty"` // optional x509 cert base64 encoded
+	Domain       string `json:"domain"`                // IoT domain name for this publisher
+	IssuerName   string `json:"issuerName"`            // Issuer of the identity, usually the ZCAS
+	Location     string `json:"location,omitempty"`    // city, province, country
+	Organization string `json:"organization"`          // publishing organization
+	PublicKey    string `json:"publicKey"`             // public key for signing and and encryption
+	PublisherID  string `json:"publisherId"`           // This publisher's ID for this zone
+	Timestamp    string `json:"timestamp"`             // timestamp this identity was signed
+	ValidUntil   string `json:"validUntil"`            // timestamp this identity expires
 }
 
 // PublisherIdentityMessage for publisher discovery

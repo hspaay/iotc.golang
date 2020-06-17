@@ -66,10 +66,10 @@ type Publisher struct {
 	pollHandler         func(publisher *Publisher)     // function that performs value polling
 	pollCountdown       int                            // countdown each heartbeat
 	pollInterval        int                            // value polling interval in seconds
-	publisherID         string                         // publisher ID
-	privateKeySigning   *ecdsa.PrivateKey              // key for singing published messages
+	// publisherID         string                         // publisher ID
+	privateKeySigning *ecdsa.PrivateKey // key for singing published messages
 
-	domain           string               // The domain this publisher lives in
+	// domain           string               // The domain this publisher lives in
 	domainPublishers *nodes.PublisherList // publishers on the network by discovery address
 
 	// background publications require a mutex to prevent concurrent access
@@ -78,20 +78,21 @@ type Publisher struct {
 	updateMutex   *sync.Mutex // mutex for async updating and publishing
 }
 
-// Address  returns the publisher's identity address
+// Address returns the publisher's identity address
 func (publisher *Publisher) Address() string {
-	identityAddr := nodes.MakePublisherIdentityAddress(publisher.domain, publisher.publisherID)
-	return identityAddr
+	// identityAddr := nodes.MakePublisherIdentityAddress(publisher.Domain(), publisher.PublisherID())
+	// return identityAddr
+	return publisher.identity.Address
 }
 
 // PublisherID returns the publisher's ID
 func (publisher *Publisher) PublisherID() string {
-	return publisher.publisherID
+	return publisher.identity.Identity.PublisherID
 }
 
 // Domain returns the publication domain
 func (publisher *Publisher) Domain() string {
-	return publisher.domain
+	return publisher.identity.Identity.Domain
 }
 
 // Identity return this publisher's identity
@@ -195,7 +196,7 @@ func (publisher *Publisher) LoadFromCache(folder string, autosave bool) error {
 	}
 	if folder != "" {
 		nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
-		err = persist.LoadNodesFromCache(folder, publisher.publisherID, &nodeList)
+		err = persist.LoadNodesFromCache(folder, publisher.PublisherID(), &nodeList)
 		if err == nil {
 			publisher.Nodes.UpdateNodes(nodeList)
 		}
@@ -221,6 +222,12 @@ func (publisher *Publisher) SetPollInterval(seconds int, handler func(publisher 
 // 	publisher.id = id
 // }
 
+// SetSigningMethod sets the signing method: JWS or none for publications.
+// Default is SigningMethodJWS
+func (publisher *Publisher) SetSigningMethod(signingMethod string) {
+	publisher.signingMethod = signingMethod
+}
+
 // Start publishing and listen for configuration and input messages
 // This will create the publisher node and load previously saved nodes
 // Start will fail if no messenger has been provided.
@@ -229,11 +236,11 @@ func (publisher *Publisher) Start() {
 
 	if publisher.messenger == nil {
 		publisher.logger.Errorf("Publisher.Start: Can't start publisher %s/%s without a messenger. See SetMessenger()",
-			publisher.domain, publisher.publisherID)
+			publisher.Domain(), publisher.PublisherID())
 		return
 	}
 	if !publisher.isRunning {
-		publisher.logger.Warningf("Publisher.Start: Starting publisher %s/%s", publisher.domain, publisher.publisherID)
+		publisher.logger.Warningf("Publisher.Start: Starting publisher %s/%s", publisher.Domain(), publisher.PublisherID())
 		publisher.updateMutex.Lock()
 		publisher.isRunning = true
 		publisher.updateMutex.Unlock()
@@ -246,28 +253,28 @@ func (publisher *Publisher) Start() {
 		publisher.messenger.Connect("", "")
 
 		// Subscribe to receive configuration and set messages for any of our nodes
-		configAddr := nodes.MakeNodeAddress(publisher.domain, publisher.publisherID, "+", iotc.MessageTypeConfigure)
+		configAddr := nodes.MakeNodeAddress(publisher.Domain(), publisher.PublisherID(), "+", iotc.MessageTypeConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
 		inputAddr := nodes.MakeInputSetAddress(configAddr, "+", "+")
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := nodes.MakePublisherIdentityAddress(publisher.domain, "+")
+		pubAddr := nodes.MakePublisherIdentityAddress(publisher.Domain(), "+")
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher
 		publisher.PublishIdentity()
 		publisher.PublishUpdatedDiscoveries()
 
-		publisher.logger.Infof("Publisher.Start: Publisher %s started", publisher.publisherID)
+		publisher.logger.Infof("Publisher.Start: Publisher %s started", publisher.PublisherID())
 	}
 }
 
 // Stop publishing
 // Wait until the heartbeat loop has finished processing messages
 func (publisher *Publisher) Stop() {
-	publisher.logger.Warningf("Publisher.Stop: Stopping publisher %s", publisher.publisherID)
+	publisher.logger.Warningf("Publisher.Stop: Stopping publisher %s", publisher.PublisherID())
 	publisher.updateMutex.Lock()
 	if publisher.isRunning {
 		publisher.isRunning = false
@@ -332,7 +339,7 @@ func (publisher *Publisher) heartbeatLoop() {
 		}
 	}
 	publisher.exitChannel <- true
-	publisher.logger.Infof("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.publisherID)
+	publisher.logger.Infof("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.PublisherID())
 }
 
 // // VerifyMessageSignature Verify a received message is signed by the sender
@@ -382,19 +389,21 @@ func NewPublisher(
 		OutputForecasts: nodes.NewOutputForecastList(),
 		//
 		discoveryInterval: DefaultDiscoveryInterval,
-		domain:            domain,
 		domainPublishers:  nodes.NewPublisherList(),
 		exitChannel:       make(chan bool),
 		messenger:         messenger,
 		pollCountdown:     1, // run discovery before poll
 		pollInterval:      DefaultPollInterval,
-		publisherID:       publisherID,
+		signingMethod:     SigningMethodJWS, // by default sign with JWS
 		updateMutex:       &sync.Mutex{},
 	}
 	publisher.SetLogging("debug", "")
 
 	// create a default publisher node with identity and signatures
-	publisher.SetupPublisherIdentity(identityFolder, domain, publisherID)
+	identityMsg, privKey := SetupPublisherIdentity(identityFolder, domain, publisherID)
+	publisher.identity = identityMsg
+	publisher.privateKeySigning = privKey
+	publisher.domainPublishers.UpdatePublisher(publisher.identity)
 
 	return publisher
 }

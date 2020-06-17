@@ -33,7 +33,7 @@ func (publisher *Publisher) handleNodeInput(address string, message string) {
 	}
 
 	// Verify the message using the public key of the sender
-	isSigned, err := messenger.VerifySender(message, &setMessage, publisher.domainPublishers.GetPublisherSigningKey)
+	isSigned, err := messenger.VerifySender(message, &setMessage, publisher.domainPublishers.GetPublisherKey)
 	if !isSigned {
 		if publisher.signingMethod != SigningMethodNone {
 			// all inputs must use signed messages

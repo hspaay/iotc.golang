@@ -54,10 +54,10 @@ func (pubList *PublisherList) GetPublisherByAddress(address string) *iotc.Publis
 	return identity
 }
 
-// GetPublisherSigningKey returns the public signing key of a publisher
+// GetPublisherKey returns the public key of a publisher for signature verification or encryption
 // publisherAddress starts with domain/publisherId
 // returns public key or nil if publisher public key not found
-func (pubList *PublisherList) GetPublisherSigningKey(publisherAddress string) *ecdsa.PublicKey {
+func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.PublicKey {
 	segments := strings.Split(publisherAddress, "/")
 	if len(segments) < 2 {
 		// missing publisherId
@@ -68,9 +68,9 @@ func (pubList *PublisherList) GetPublisherSigningKey(publisherAddress string) *e
 	if pub == nil {
 		return nil
 	}
-	pubSigningPem := pub.Identity.PublicKeySigning
-	pubSigningKey := messenger.PublicKeyFromPem(pubSigningPem)
-	return pubSigningKey
+	pubKeyPem := pub.Identity.PublicKey
+	pubKey := messenger.PublicKeyFromPem(pubKeyPem)
+	return pubKey
 }
 
 // // SignIdentity returns a base64URL encoded signature of the given identity

@@ -47,14 +47,14 @@ func (publisher *Publisher) GetNodeConfigValue(
 // GetNodeByID returns a node from this publisher or nil if the id isn't found in this publisher
 // This is a convenience function as publishers tend to do this quite often
 func (publisher *Publisher) GetNodeByID(nodeID string) (node *iotc.NodeDiscoveryMessage) {
-	node = publisher.Nodes.GetNodeByID(publisher.domain, publisher.publisherID, nodeID)
+	node = publisher.Nodes.GetNodeByID(publisher.Domain(), publisher.PublisherID(), nodeID)
 	return node
 }
 
 // GetNodeStatus returns a node's status attribute
 // This is a convenience function. See NodeList.GetNodeStatus for details
 func (publisher *Publisher) GetNodeStatus(nodeID string, attrName iotc.NodeStatus) (value string, exists bool) {
-	node := publisher.Nodes.GetNodeByID(publisher.domain, publisher.publisherID, nodeID)
+	node := publisher.Nodes.GetNodeByID(publisher.Domain(), publisher.PublisherID(), nodeID)
 	if node == nil {
 		return "", false
 	}
@@ -65,7 +65,7 @@ func (publisher *Publisher) GetNodeStatus(nodeID string, attrName iotc.NodeStatu
 // GetOutputByType returns a node output object using node id and output type and instance
 // This is a convenience function using the publisher's output list
 func (publisher *Publisher) GetOutputByType(nodeID string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	output := publisher.Outputs.GetOutputByAddress(outputAddr)
 	return output
@@ -73,7 +73,7 @@ func (publisher *Publisher) GetOutputByType(nodeID string, outputType string, in
 
 // MakeNodeDiscoveryAddress makes the node discovery address using the publisher domain and publisherID
 func (publisher *Publisher) MakeNodeDiscoveryAddress(nodeID string) string {
-	addr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	addr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	return addr
 }
 
@@ -81,7 +81,7 @@ func (publisher *Publisher) MakeNodeDiscoveryAddress(nodeID string) string {
 // This is a convenience function that uses the publisher domain and id to create a node in its node list.
 // returns the node's address
 func (publisher *Publisher) NewNode(nodeID string, nodeType iotc.NodeType) string {
-	addr := publisher.Nodes.NewNode(publisher.domain, publisher.publisherID, nodeID, nodeType)
+	addr := publisher.Nodes.NewNode(publisher.Domain(), publisher.PublisherID(), nodeID, nodeType)
 	return addr
 }
 
@@ -97,7 +97,7 @@ func (publisher *Publisher) NewNodeConfig(
 	description string,
 	defaultValue string) *iotc.ConfigAttr {
 
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	config := publisher.Nodes.NewNodeConfig(nodeAddr, attrName, dataType, description, defaultValue)
 	return config
 }
@@ -105,7 +105,7 @@ func (publisher *Publisher) NewNodeConfig(
 // NewInput creates a new node input and adds it to this publisher inputs list
 // returns the input to allow for easy update
 func (publisher *Publisher) NewInput(nodeID string, inputType string, instance string) *iotc.InputDiscoveryMessage {
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	input := nodes.NewInput(nodeAddr, inputType, instance)
 	publisher.Inputs.UpdateInput(input)
 	return input
@@ -115,7 +115,7 @@ func (publisher *Publisher) NewInput(nodeID string, inputType string, instance s
 // This is a convenience function for the publisher.Outputs list
 // returns the output object to allow for easy updates
 func (publisher *Publisher) NewOutput(nodeID string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	output := nodes.NewOutput(nodeAddr, outputType, instance)
 	publisher.Outputs.UpdateOutput(output)
 	return output
@@ -124,14 +124,14 @@ func (publisher *Publisher) NewOutput(nodeID string, outputType string, instance
 // SetNodeAttr sets one or more attributes of the node
 // This only updates the node if the status or lastError message changes
 func (publisher *Publisher) SetNodeAttr(nodeID string, attrParams map[iotc.NodeAttr]string) (changed bool) {
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	return publisher.Nodes.SetNodeAttr(nodeAddr, attrParams)
 }
 
 // SetNodeStatus sets one or more status attributes of the node
 // This only updates the node if the status or lastError message changes
 func (publisher *Publisher) SetNodeStatus(nodeID string, status map[iotc.NodeStatus]string) (changed bool) {
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	return publisher.Nodes.SetNodeStatus(nodeAddr, status)
 }
 
@@ -139,14 +139,14 @@ func (publisher *Publisher) SetNodeStatus(nodeID string, status map[iotc.NodeSta
 // Use NodeRunStateError for errors and NodeRunStateReady to clear error
 // This only updates the node if the status or lastError message changes
 func (publisher *Publisher) SetNodeErrorStatus(nodeID string, status string, lastError string) {
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	publisher.Nodes.SetErrorStatus(nodeAddr, status, lastError)
 }
 
 // UpdateOutputValue adds the new node output value to the front of the value history
 // See NodeList.UpdateOutputValue for more details
 func (publisher *Publisher) UpdateOutputValue(nodeID string, outputType string, instance string, newValue string) bool {
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.domain, publisher.publisherID, nodeID)
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	return publisher.OutputValues.UpdateOutputValue(outputAddr, newValue)
 }
