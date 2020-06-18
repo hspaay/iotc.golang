@@ -108,7 +108,7 @@ func TestNodePublication(t *testing.T) {
 		return
 	}
 	p0 := testMessenger.FindLastPublication(node1Addr)
-	payload, err := messenger.VerifyJWSMessage(p0, &pub1.privateKeySigning.PublicKey)
+	payload, err := messenger.VerifyJWSMessage(p0, &pub1.identityPrivateKey.PublicKey)
 	assert.NotNilf(t, p0, "Publication for publisher %s not found", pubAddr)
 	assert.NoError(t, err, "Publication signing not valid %s", pubAddr)
 
@@ -156,7 +156,7 @@ func TestAlias(t *testing.T) {
 	if !assert.NotNil(t, p3, "output discovery should use alias with address %s but no publication was found", node1AliasOutput1Addr) {
 		return
 	}
-	payload, err := messenger.VerifyJWSMessage(p3, &pub1.privateKeySigning.PublicKey)
+	payload, err := messenger.VerifyJWSMessage(p3, &pub1.identityPrivateKey.PublicKey)
 	if !assert.NoError(t, err, "Failed to verify published message") {
 		return
 	}
@@ -185,12 +185,16 @@ func TestConfigure(t *testing.T) {
 	// time.Sleep(time.Second * 1) // receive publications
 
 	// publish a configuration update for the name -> NewName
-	var payload = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "attr": {"name":"NewName"} }`,
-		node1ConfigureAddr, pubAddr, time.Now().Format(iotc.TimeFormat))
-	// signatureBase64 := messenger.CreateEcdsaSignature(m, pub1.privateKeySigning)
-	// payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
-	message, _ := messenger.CreateJWSSignature(payload, pub1.privateKeySigning)
-	testMessenger.OnReceive(node1ConfigureAddr, message)
+	// var payload = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "attr": {"name":"NewName"} }`,
+	// node1ConfigureAddr, pubAddr, time.Now().Format(iotc.TimeFormat))
+	// // signatureBase64 := messenger.CreateEcdsaSignature(m, pub1.identityPrivateKey)
+	// // payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
+	// message, _ := messenger.CreateJWSSignature(payload, pub1.identityPrivateKey)
+	// testMessenger.OnReceive(node1ConfigureAddr, message)
+
+	pubKey := pub1.domainPublishers.GetPublisherKey(node1ConfigureAddr)
+	attrMap := iotc.NodeAttrMap{"name": "NewName"}
+	pub1.PublishConfigureNode(node1ConfigureAddr, attrMap, pubKey)
 
 	// config := map[string]string{"alias": "myalias"}
 	// publisher.UpdateNodeConfig(node1Addr, config) // p2
@@ -229,7 +233,7 @@ func TestOutputValue(t *testing.T) {
 	if !assert.NotEmptyf(t, p1, "Unable to find published value on address %s", node1valueAddr) {
 		return
 	}
-	payload, _ := messenger.VerifyJWSMessage(p1, &pub1.privateKeySigning.PublicKey)
+	payload, _ := messenger.VerifyJWSMessage(p1, &pub1.identityPrivateKey.PublicKey)
 	p1Str := string(payload)
 	assert.Equal(t, "true", p1Str, "Published $raw value differs")
 
@@ -239,13 +243,13 @@ func TestOutputValue(t *testing.T) {
 	if !assert.NotNil(t, p2) {
 		return
 	}
-	payload, _ = messenger.VerifyJWSMessage(p2, &pub1.privateKeySigning.PublicKey)
+	payload, _ = messenger.VerifyJWSMessage(p2, &pub1.identityPrivateKey.PublicKey)
 	json.Unmarshal([]byte(payload), &latest)
 	assert.Equal(t, "true", latest.Value, "Published $latest differs")
 
 	// test $history publication
 	p3 := testMessenger.FindLastPublication(node1historyAddr)
-	payload, _ = messenger.VerifyJWSMessage(p3, &pub1.privateKeySigning.PublicKey)
+	payload, _ = messenger.VerifyJWSMessage(p3, &pub1.identityPrivateKey.PublicKey)
 	var history iotc.OutputHistoryMessage
 	json.Unmarshal([]byte(payload), &history)
 	assert.Len(t, history.History, 1, "History length differs")
@@ -278,16 +282,21 @@ func TestReceiveInput(t *testing.T) {
 	// process background messages
 	// time.Sleep(time.Second * 1) // receive publications
 
-	// Pass a set input message to the onreceive handler
+	// Pass a set input command to the onreceive handler
 	var payload = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
 		node1InputSetAddr, pubAddr, time.Now().Format(iotc.TimeFormat))
-	message, err := messenger.CreateJWSSignature(payload, pub1.privateKeySigning)
 
-	// encrypter, err := jose.NewEncrypter()
+	// sign the command
+	message, err := messenger.CreateJWSSignature(payload, pub1.identityPrivateKey)
+	assert.NoErrorf(t, err, "signing input message failed")
 
-	assert.NoErrorf(t, err, "signing node1 failed")
+	// encrypt the command
+	pubKey := pub1.domainPublishers.GetPublisherKey(pub1.Address())
+	emessage, err := messenger.EncryptMessage(message, pubKey)
 
-	testMessenger.OnReceive(node1InputSetAddr, message)
+	assert.NoErrorf(t, err, "encrypting input message failed")
+
+	testMessenger.OnReceive(node1InputSetAddr, emessage)
 
 	val := pub1.OutputValues.GetOutputValueByAddress(node1Output1Addr)
 	if !assert.NotNilf(t, val, "Unable to find output value for output %s", node1Output1Addr) {
@@ -311,7 +320,9 @@ func TestSetInput(t *testing.T) {
 	pub1.Inputs.UpdateInput(node1Input1)
 
 	pub1.Start()
-	pub1.PublishSetInput(node1InputSetAddr, "true")
+	// encrypt
+	pubKey := pub1.domainPublishers.GetPublisherKey(node1InputSetAddr)
+	pub1.PublishSetInput(node1InputSetAddr, "true", pubKey)
 	pub1.Stop()
 	assert.Equal(t, "true", receivedInputValue, "Expected input value not received")
 }

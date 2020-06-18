@@ -28,7 +28,7 @@ func TestPersistIdentity(t *testing.T) {
 
 	ident, privKey := CreateIdentity(testDomain, testPublisherID)
 
-	err := SaveIdentity(configFolder, testPublisherID, ident, privKey)
+	err := SaveIdentity(configFolder, testPublisherID, ident)
 	assert.NoError(t, err, "Failed saving identity")
 
 	// load and compare results
@@ -36,7 +36,7 @@ func TestPersistIdentity(t *testing.T) {
 	assert.NoError(t, err, "Failed loading identity")
 	assert.NotNil(t, privKey2, "Unable to read private key")
 	if assert.NotNil(t, ident2, "Unable to read identity") {
-		assert.Equal(t, testPublisherID, ident2.Identity.PublisherID)
+		assert.Equal(t, testPublisherID, ident2.Public.PublisherID)
 		pe1, _ := x509.MarshalECPrivateKey(privKey)
 		pe2, _ := x509.MarshalECPrivateKey(privKey2)
 		assert.Equal(t, pe1, pe2, "public key not identical")

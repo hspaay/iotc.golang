@@ -56,21 +56,18 @@ type Publisher struct {
 	discoverCountdown int                        // countdown each heartbeat
 	discoveryInterval int                        // discovery polling interval
 	discoveryHandler  func(publisher *Publisher) // function that performs discovery
+	domainPublishers  *nodes.PublisherList       // publishers on the network by discovery address
 
-	identity            *iotc.PublisherIdentityMessage // identity for signing messages
-	isRunning           bool                           // publisher was started and is running
-	logger              *log.Logger                    // logger for all publisher's logging
-	messenger           messenger.IMessenger           // Message bus messenger to use
-	onNodeConfigHandler NodeConfigHandler              // handle before applying configuration
-	onNodeInputHandler  NodeInputHandler               // handle to update device/service input
-	pollHandler         func(publisher *Publisher)     // function that performs value polling
-	pollCountdown       int                            // countdown each heartbeat
-	pollInterval        int                            // value polling interval in seconds
-	// publisherID         string                         // publisher ID
-	privateKeySigning *ecdsa.PrivateKey // key for singing published messages
-
-	// domain           string               // The domain this publisher lives in
-	domainPublishers *nodes.PublisherList // publishers on the network by discovery address
+	identity            *iotc.PublisherFullIdentity // identity for signing messages
+	identityPrivateKey  *ecdsa.PrivateKey           // key for signing and encryption
+	isRunning           bool                        // publisher was started and is running
+	logger              *log.Logger                 // logger for all publisher's logging
+	messenger           messenger.IMessenger        // Message bus messenger to use
+	onNodeConfigHandler NodeConfigHandler           // handle before applying configuration
+	onNodeInputHandler  NodeInputHandler            // handle to update device/service input
+	pollHandler         func(publisher *Publisher)  // function that performs value polling
+	pollCountdown       int                         // countdown each heartbeat
+	pollInterval        int                         // value polling interval in seconds
 
 	// background publications require a mutex to prevent concurrent access
 	exitChannel   chan bool
@@ -87,16 +84,16 @@ func (publisher *Publisher) Address() string {
 
 // PublisherID returns the publisher's ID
 func (publisher *Publisher) PublisherID() string {
-	return publisher.identity.Identity.PublisherID
+	return publisher.identity.Public.PublisherID
 }
 
 // Domain returns the publication domain
 func (publisher *Publisher) Domain() string {
-	return publisher.identity.Identity.Domain
+	return publisher.identity.Public.Domain
 }
 
-// Identity return this publisher's identity
-func (publisher *Publisher) Identity() *iotc.PublisherIdentityMessage {
+// Identity return this publisher's full identity
+func (publisher *Publisher) Identity() *iotc.PublisherFullIdentity {
 	return publisher.identity
 }
 
@@ -400,10 +397,10 @@ func NewPublisher(
 	publisher.SetLogging("debug", "")
 
 	// create a default publisher node with identity and signatures
-	identityMsg, privKey := SetupPublisherIdentity(identityFolder, domain, publisherID)
-	publisher.identity = identityMsg
-	publisher.privateKeySigning = privKey
-	publisher.domainPublishers.UpdatePublisher(publisher.identity)
+	identity, privKey := SetupPublisherIdentity(identityFolder, domain, publisherID)
+	publisher.identity = identity
+	publisher.identityPrivateKey = privKey
+	publisher.domainPublishers.UpdatePublisher(&publisher.identity.PublisherIdentityMessage)
 
 	return publisher
 }

@@ -2,6 +2,7 @@
 package publisher
 
 import (
+	"crypto/ecdsa"
 	"strings"
 	"time"
 
@@ -9,7 +10,9 @@ import (
 )
 
 // PublishSetInput sets the input of a remote node by this publisher
-func (publisher *Publisher) PublishSetInput(remoteNodeInputAddress string, value string) {
+// The signed message will be encrypted with the given encryption key
+func (publisher *Publisher) PublishSetInput(remoteNodeInputAddress string, value string, encryptionKey *ecdsa.PublicKey) {
+	publisher.logger.Infof("PublishSetInput: publishing encrypted input %s to %s", value, remoteNodeInputAddress)
 	// Check that address is one of our inputs
 	segments := strings.Split(remoteNodeInputAddress, "/")
 	// a full address is required
@@ -28,5 +31,5 @@ func (publisher *Publisher) PublishSetInput(remoteNodeInputAddress string, value
 		Timestamp: timeStampStr,
 		Value:     value,
 	}
-	publisher.publishObject(inputAddr, false, &setMessage)
+	publisher.publishObject(inputAddr, false, &setMessage, encryptionKey)
 }

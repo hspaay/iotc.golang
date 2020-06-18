@@ -15,10 +15,19 @@ import (
 func (publisher *Publisher) handleNodeConfigCommand(address string, message string) {
 	var configureMessage iotc.NodeConfigureMessage
 
-	publisher.logger.Infof("handleNodeConfigCommand on address %s", address)
+	// Expect the message to be encrypted
+	isEncrypted, dmessage, err := messenger.DecryptMessage(message, publisher.identityPrivateKey)
+	if !isEncrypted {
+		publisher.logger.Infof("handleNodeConfigCommand: message to '%s' is not encrypted.", address)
+		// TODO: determine if encryption is required
+		// this could be fine for now, just warning
+	} else if err != nil {
+		publisher.logger.Warnf("handleNodeConfigCommand: decryption failed of message to '%s'. Message discarded.", address)
+		return
+	}
 
 	// Verify the message using the public key of the sender
-	isSigned, err := messenger.VerifySender(message, &configureMessage, publisher.domainPublishers.GetPublisherKey)
+	isSigned, err := messenger.VerifySender(dmessage, &configureMessage, publisher.domainPublishers.GetPublisherKey)
 	if !isSigned {
 		// all configuration commands must use signed messages
 		publisher.logger.Warnf("handleNodeConfigCommand: message to input '%s' is not signed. Message discarded.", address)
@@ -35,6 +44,7 @@ func (publisher *Publisher) handleNodeConfigCommand(address string, message stri
 		publisher.logger.Infof("handleNodeConfig unknown node for address %s or missing message", address)
 		return
 	}
+	publisher.logger.Infof("handleNodeConfig configure command on address %s. isEncrypted=%t, isSigned=%t", address, isEncrypted, isSigned)
 
 	params := configureMessage.Attr
 	if publisher.onNodeConfigHandler != nil {

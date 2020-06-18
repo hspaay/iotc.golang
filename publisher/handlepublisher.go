@@ -11,24 +11,38 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
-// // handleNodeDiscovery collects and saves any discovered node
-// func (publisher *Publisher) handleNodeDiscovery(address string, publication *iotc.Publication) {
-// 	var pubNode nodes.Node
-// 	err := json.Unmarshal(publication.Message, &pubNode)
-// 	if err != nil {
-// 		publisher.Logger.Warningf("Unable to unmarshal Node in %s: %s", address, err)
-// 		return
-// 	}
-// 	// TODO. Do we need to verify the node identity?
-// 	publisher.Nodes.UpdateNode(&pubNode)
+// handleIdentityUpdate handles the set command for an update to this publisher identity.
+// Intended to be set by the DSS to issue renewed keys and signature.
+// This message must be encrypted and signed or it will be discarded.
+func (publisher *Publisher) handleIdentityUpdate(address string, message string) {
+	var fullIdentity iotc.PublisherFullIdentity
 
-// 	// save the new node
-// 	if publisher.persistFolder != "" {
-// 		persist.SaveNodes(publisher.persistFolder, publisher.publisherID, publisher.Nodes)
-// 	}
+	// Expect the message to be encrypted
+	isEncrypted, dmessage, err := messenger.DecryptMessage(message, publisher.identityPrivateKey)
 
-// 	publisher.Logger.Infof("Discovered node %s", address)
-// }
+	if !isEncrypted {
+		publisher.logger.Warnf("handleIdentityUpdate: message to '%s' must be encrypted but isn't. Message discarded.", address)
+		return
+	} else if err != nil {
+		publisher.logger.Warnf("handleIdentityUpdate: decryption failed of message to '%s'. Message discarded.", address)
+		return
+	}
+
+	// Verify the message using the public key of the sender (should be the DSS)
+	isSigned, err := messenger.VerifySender(dmessage, &fullIdentity, publisher.domainPublishers.GetPublisherKey)
+	if !isSigned {
+		// commands must use signed messages
+		publisher.logger.Warnf("handleIdentityUpdate: Identity update '%s' is not signed. Message discarded.", address)
+		return
+	} else if err != nil {
+		// signing failed, discard the message
+		publisher.logger.Warnf("handleIdentityUpdate: Signature verification failed for  %s. Message discarded.", address)
+		return
+	}
+	privKey := messenger.PrivateKeyFromPem(fullIdentity.PrivateKey)
+	publisher.identityPrivateKey = privKey
+	publisher.identity = &fullIdentity
+}
 
 // handleDSSDiscovery discoveres the identity of the domain security service
 // The DSS publish signing key is used to verify the identity of all publishers
@@ -100,7 +114,7 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	} else {
 		// 2: We have a DSS. Require the publisher identity is signed by the DSS
 		// Create base64 encoded identity
-		identityAsJSON, err := json.Marshal(pubIdentityMsg.Identity)
+		identityAsJSON, err := json.Marshal(pubIdentityMsg.Public)
 		if err != nil {
 			publisher.logger.Infof("handlePublisherDiscovery: Missing identity for %s", address)
 			return

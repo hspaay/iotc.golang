@@ -24,7 +24,6 @@ func (publisher *Publisher) handleNodeInput(address string, message string) {
 	// domain/pub/node/inputtype/instance/$input
 	segments[5] = iotc.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
-
 	input := publisher.Inputs.GetInputByAddress(inputAddr)
 
 	if input == nil || message == "" {
@@ -32,8 +31,18 @@ func (publisher *Publisher) handleNodeInput(address string, message string) {
 		return
 	}
 
+	// Expect the message to be encrypted
+	isEncrypted, dmessage, err := messenger.DecryptMessage(message, publisher.identityPrivateKey)
+	if !isEncrypted {
+		publisher.logger.Infof("handleNodeInput: message to input '%s' is not encrypted.", address)
+		// this could be fine, just warning
+	} else if err != nil {
+		publisher.logger.Warnf("handleNodeInput: decryption failed of message to input '%s'. Message discarded.", address)
+		return
+	}
+
 	// Verify the message using the public key of the sender
-	isSigned, err := messenger.VerifySender(message, &setMessage, publisher.domainPublishers.GetPublisherKey)
+	isSigned, err := messenger.VerifySender(dmessage, &setMessage, publisher.domainPublishers.GetPublisherKey)
 	if !isSigned {
 		if publisher.signingMethod != SigningMethodNone {
 			// all inputs must use signed messages
@@ -42,9 +51,11 @@ func (publisher *Publisher) handleNodeInput(address string, message string) {
 		}
 	} else if err != nil {
 		// signing failed, discard the message
-		publisher.logger.Warnf("handleNodeInput: signature verification failed for message to input %s. Message discarded.", address)
+		publisher.logger.Warnf("handleNodeInput: signature verification failed for message to input %s: %s. Message discarded.", address, err)
 		return
 	}
+
+	publisher.logger.Infof("handleNodeInput input command on address %s. isEncrypted=%t, isSigned=%t", address, isEncrypted, isSigned)
 
 	if publisher.onNodeInputHandler != nil {
 		publisher.onNodeInputHandler(input, &setMessage)

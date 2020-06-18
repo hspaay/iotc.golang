@@ -16,8 +16,9 @@ import (
 // PublisherList with discovered and verified publishers
 type PublisherList struct {
 	// don't access directly. This is only accessible for serialization
-	publisherMap map[string]*iotc.PublisherIdentityMessage
-	updateMutex  *sync.Mutex // mutex for async updating of nodes
+	publisherMap  map[string]*iotc.PublisherIdentityMessage
+	publisherKeys map[string]*ecdsa.PublicKey
+	updateMutex   *sync.Mutex // mutex for async updating of nodes
 }
 
 // GetAllPublishers returns a list of discovered publishers
@@ -34,14 +35,14 @@ func (pubList *PublisherList) GetAllPublishers() []*iotc.PublisherIdentityMessag
 
 // GetDSSIdentity returns the Domain Security Service publisher identity
 // Returns nil if no DSS was received
-func (pubList *PublisherList) GetDSSIdentity(domain string) *iotc.PublisherIdentity {
+func (pubList *PublisherList) GetDSSIdentity(domain string) *iotc.PublisherPublicIdentity {
 	addr := MakePublisherIdentityAddress(domain, iotc.DSSPublisherID)
 	dssMessage := pubList.GetPublisherByAddress(addr)
 	if dssMessage == nil {
 		// DSS for the domain wasn't received
 		return nil
 	}
-	return &dssMessage.Identity
+	return &dssMessage.Public
 }
 
 // GetPublisherByAddress returns a publisher Identity by its identity discovery address
@@ -56,7 +57,7 @@ func (pubList *PublisherList) GetPublisherByAddress(address string) *iotc.Publis
 
 // GetPublisherKey returns the public key of a publisher for signature verification or encryption
 // publisherAddress starts with domain/publisherId
-// returns public key or nil if publisher public key not found
+// returns public key or nil if publisher public key is not found
 func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.PublicKey {
 	segments := strings.Split(publisherAddress, "/")
 	if len(segments) < 2 {
@@ -64,12 +65,18 @@ func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.Pu
 		return nil
 	}
 	identityAddress := fmt.Sprintf("%s/%s/%s", segments[0], segments[1], iotc.MessageTypeIdentity)
-	pub := pubList.GetPublisherByAddress(identityAddress)
-	if pub == nil {
-		return nil
+
+	// Use cached key instead of regenerating them each time
+	pubKey := pubList.publisherKeys[identityAddress]
+	if pubKey == nil {
+		pub := pubList.GetPublisherByAddress(identityAddress)
+		if pub == nil || pub.Public.PublicKey == "" {
+			// unknown publisher
+			return nil
+		}
+		pubKey = messenger.PublicKeyFromPem(pub.Public.PublicKey)
+		pubList.publisherKeys[identityAddress] = pubKey
 	}
-	pubKeyPem := pub.Identity.PublicKey
-	pubKey := messenger.PublicKeyFromPem(pubKeyPem)
 	return pubKey
 }
 
@@ -92,6 +99,7 @@ func (pubList *PublisherList) UpdatePublisher(pub *iotc.PublisherIdentityMessage
 	defer pubList.updateMutex.Unlock()
 
 	pubList.publisherMap[pub.Address] = pub
+	pubList.publisherKeys[pub.Address] = nil // public key will be generated on next use
 }
 
 // MakePublisherIdentityAddress generates the address of a publisher:
@@ -107,8 +115,9 @@ func MakePublisherIdentityAddress(domain string, publisherID string) string {
 // NewPublisherList creates a new list of discovered publishers
 func NewPublisherList() *PublisherList {
 	pubList := &PublisherList{
-		publisherMap: make(map[string]*iotc.PublisherIdentityMessage),
-		updateMutex:  &sync.Mutex{},
+		publisherMap:  make(map[string]*iotc.PublisherIdentityMessage),
+		publisherKeys: make(map[string]*ecdsa.PublicKey),
+		updateMutex:   &sync.Mutex{},
 	}
 	return pubList
 }

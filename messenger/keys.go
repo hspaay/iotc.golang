@@ -24,28 +24,24 @@ func CreateAsymKeys() *ecdsa.PrivateKey {
 	return privKey
 }
 
-// KeysFromPem converts PEM encoded public and private keys into a ECDSA object for use in the application
-// See also EncodeKeysToPem for the opposite
-func KeysFromPem(pemEncodedPriv string, pemEncodedPub string) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
+// PrivateKeyFromPem converts PEM encoded private keys into a ECDSA object for use in the application
+// See also PrivateKeyToPem for the opposite.
+// Returns nil if the encoded pem source isn't a pem format
+func PrivateKeyFromPem(pemEncodedPriv string) *ecdsa.PrivateKey {
 	block, _ := pem.Decode([]byte(pemEncodedPriv))
 	x509Encoded := block.Bytes
 	privateKey, _ := x509.ParseECPrivateKey(x509Encoded)
 
-	publicKey := PublicKeyFromPem(pemEncodedPub)
-	return privateKey, publicKey
+	return privateKey
 }
 
-// KeysToPem converts a public/private key pair into their PEM encoded ascii format
+// PrivateKeyToPem converts a private key into their PEM encoded ascii format
 // see also https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
-// See also DecodeKeysFromPem for the opposite
-func KeysToPem(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) (string, string) {
+func PrivateKeyToPem(privateKey *ecdsa.PrivateKey) string {
 	x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
 	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
 
-	x509EncodedPub, _ := x509.MarshalPKIXPublicKey(publicKey)
-	pemEncodedPub := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
-
-	return string(pemEncoded), string(pemEncodedPub)
+	return string(pemEncoded)
 }
 
 // PublicKeyFromPem converts a ascii encoded public key into a ECDSA public key

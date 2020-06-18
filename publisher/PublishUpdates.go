@@ -2,6 +2,7 @@
 package publisher
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,7 @@ import (
 func (publisher *Publisher) PublishIdentity() {
 	identity := publisher.identity
 	publisher.logger.Infof("Publisher.PublishIdentity: publish identity: %s", publisher.identity.Address)
-	publisher.publishObject(identity.Address, true, identity)
+	publisher.publishObject(identity.Address, true, identity, nil)
 }
 
 // PublishUpdatedDiscoveries publishes updated nodes, inputs and outputs discovery messages
@@ -36,7 +37,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	// publish updated nodes
 	for _, node := range nodeList {
 		publisher.logger.Infof("Publisher.PublishUpdates: publish node discovery: %s", node.Address)
-		publisher.publishObject(node.Address, true, node)
+		publisher.publishObject(node.Address, true, node, nil)
 	}
 	if len(nodeList) > 0 && publisher.cacheFolder != "" {
 		allNodes := publisher.Nodes.GetAllNodes()
@@ -47,7 +48,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	for _, input := range inputList {
 		aliasAddress := publisher.getOutputAliasAddress(input.Address, "")
 		publisher.logger.Infof("Publisher.PublishUpdates: publish input discovery: %s", aliasAddress)
-		publisher.publishObject(aliasAddress, true, input)
+		publisher.publishObject(aliasAddress, true, input, nil)
 	}
 	if len(inputList) > 0 && publisher.cacheFolder != "" {
 		allInputs := publisher.Inputs.GetAllInputs()
@@ -58,7 +59,7 @@ func (publisher *Publisher) PublishUpdatedDiscoveries() {
 	for _, output := range outputList {
 		aliasAddress := publisher.getOutputAliasAddress(output.Address, "")
 		publisher.logger.Infof("Publisher.PublishUpdates: publish output discovery: %s", aliasAddress)
-		publisher.publishObject(aliasAddress, true, output)
+		publisher.publishObject(aliasAddress, true, output, nil)
 	}
 	if len(outputList) > 0 && publisher.cacheFolder != "" {
 		allOutputs := publisher.Outputs.GetAllOutputs()
@@ -132,7 +133,7 @@ func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 		Event:     event,
 		Timestamp: timeStampStr,
 	}
-	publisher.publishObject(aliasAddress, true, eventMessage)
+	publisher.publishObject(aliasAddress, true, eventMessage, nil)
 }
 
 // publish the $latest output value
@@ -155,7 +156,7 @@ func (publisher *Publisher) publishLatest(outputAddress string, unit iotc.Unit) 
 		Unit:  unit,
 		Value: latest.Value,
 	}
-	publisher.publishObject(aliasAddress, true, latestMessage)
+	publisher.publishObject(aliasAddress, true, latestMessage, nil)
 }
 
 // publish the $forecast output values retained=true
@@ -174,7 +175,7 @@ func (publisher *Publisher) publishForecast(outputAddress string, unit iotc.Unit
 		Forecast:  forecast,
 	}
 	publisher.logger.Debugf("Publisher.publishForecast: %d entries on %s", len(forecastMessage.Forecast), aliasAddress)
-	publisher.publishObject(aliasAddress, true, forecastMessage)
+	publisher.publishObject(aliasAddress, true, forecastMessage, nil)
 }
 
 // publish the $history output values retained=true
@@ -193,20 +194,25 @@ func (publisher *Publisher) publishHistory(outputAddress string, unit iotc.Unit)
 		History:   history,
 	}
 	publisher.logger.Debugf("Publisher.publishHistory: %d entries on %s", len(historyMessage.History), aliasAddress)
-	publisher.publishObject(aliasAddress, true, historyMessage)
+	publisher.publishObject(aliasAddress, true, historyMessage, nil)
 }
 
 // publishObject encapsulates the message object in a payload, signs the message, and sends it.
+// If an encryption key is provided then the signed message will be encrypted.
 // address of the publication
 // object to publish. This will be marshalled to JSON and signed by this publisher
-func (publisher *Publisher) publishObject(address string, retained bool, object interface{}) error {
+func (publisher *Publisher) publishObject(address string, retained bool, object interface{}, encryptionKey *ecdsa.PublicKey) error {
 	payload, err := json.Marshal(object)
 	// buffer, err := json.MarshalIndent(object, " ", " ")
 	if err != nil {
 		publisher.logger.Errorf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
 		return err
 	}
-	err = publisher.publishPayload(address, retained, string(payload))
+	if encryptionKey != nil {
+		err = publisher.publishEncrypted(address, retained, string(payload), encryptionKey)
+	} else {
+		err = publisher.publishSigned(address, retained, string(payload))
+	}
 	return err
 }
 
@@ -232,21 +238,34 @@ func (publisher *Publisher) publishRawValue(outputAddress string) error {
 	// }
 	publisher.logger.Infof("Publisher.publishRawValue: output value '%s' on %s", s, aliasAddress)
 
-	err := publisher.publishPayload(aliasAddress, true, s)
+	err := publisher.publishSigned(aliasAddress, true, s)
 	return err
 }
 
-// publishMessage sign the payload and publish the resulting message
-// address of the publication
-// payload to publish
-func (publisher *Publisher) publishPayload(address string, retained bool, payload string) error {
+// publishEncrypted sign and encrypts the payload and publish the resulting message on the given address
+// Signing only happens if the publisher's signingMethod is set to SigningMethodJWS
+func (publisher *Publisher) publishEncrypted(address string, retained bool, payload string, publicKey *ecdsa.PublicKey) error {
+	var err error
+	message := payload
+	// first sign, then encrypt as per RFC
+	if publisher.signingMethod == SigningMethodJWS {
+		message, err = messenger.CreateJWSSignature(string(payload), publisher.identityPrivateKey)
+	}
+	emessage, err := messenger.EncryptMessage(message, publicKey)
+	err = publisher.messenger.Publish(address, retained, emessage)
+	return err
+}
+
+// publishSigned sign the payload and publish the resulting message on the given address
+// Signing only happens if the publisher's signingMethod is set to SigningMethodJWS
+func (publisher *Publisher) publishSigned(address string, retained bool, payload string) error {
 	var err error
 
 	// default is unsigned
 	message := payload
 
 	if publisher.signingMethod == SigningMethodJWS {
-		message, err = messenger.CreateJWSSignature(string(payload), publisher.privateKeySigning)
+		message, err = messenger.CreateJWSSignature(string(payload), publisher.identityPrivateKey)
 		if err != nil {
 			publisher.logger.Errorf("Publisher.publishMessage: Error signing message for address %s: %s", address, err)
 		}

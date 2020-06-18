@@ -4,6 +4,8 @@
 package publisher
 
 import (
+	"crypto/ecdsa"
+
 	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/nodes"
 )
@@ -69,6 +71,12 @@ func (publisher *Publisher) GetOutputByType(nodeID string, outputType string, in
 	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	output := publisher.Outputs.GetOutputByAddress(outputAddr)
 	return output
+}
+
+// GetPublisherKey returns the public key of the publisher contained in the given address
+// The address must at least contain a domain, publisherId and message type
+func (publisher *Publisher) GetPublisherKey(address string) *ecdsa.PublicKey {
+	return publisher.domainPublishers.GetPublisherKey(address)
 }
 
 // MakeNodeDiscoveryAddress makes the node discovery address using the publisher domain and publisherID

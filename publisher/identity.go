@@ -5,9 +5,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -22,7 +21,8 @@ import (
 
 // CreateIdentity creates a new identity for a domain publisher
 // The validity is 1 year
-func CreateIdentity(domain string, publisherID string) (identityMessage *iotc.PublisherIdentityMessage, privSigningKey *ecdsa.PrivateKey) {
+func CreateIdentity(domain string, publisherID string) (
+	fullIdentity *iotc.PublisherFullIdentity, privKey *ecdsa.PrivateKey) {
 	// No identity could be loaded, Create a new one and sign it.
 	timestampStr := time.Now().Format(iotc.TimeFormat)
 	validUntil := time.Now().Add(time.Hour * 24 * 365) // valid for 1 year
@@ -40,7 +40,7 @@ func CreateIdentity(domain string, publisherID string) (identityMessage *iotc.Pu
 
 	addr := nodes.MakePublisherIdentityAddress(domain, publisherID)
 
-	identity := iotc.PublisherIdentity{
+	publicIdentity := iotc.PublisherPublicIdentity{
 		Domain:       domain,
 		IssuerName:   publisherID, // self issued, will be replaced by ZCAS
 		Location:     "local",
@@ -52,64 +52,65 @@ func CreateIdentity(domain string, publisherID string) (identityMessage *iotc.Pu
 		ValidUntil:  validUntilStr,
 	}
 	// self signed identity
-	identitySignature := messenger.SignEncodeIdentity(&identity, privKey)
-	identityMessage = &iotc.PublisherIdentityMessage{
-		Address:           addr,
-		Identity:          identity,
-		IdentitySignature: identitySignature,
-		SignerName:        publisherID,
-		Timestamp:         timestampStr,
+	identitySignature := messenger.SignEncodeIdentity(&publicIdentity, privKey)
+	fullIdentity = &iotc.PublisherFullIdentity{
+		PublisherIdentityMessage: iotc.PublisherIdentityMessage{
+			Address:           addr,
+			Public:            publicIdentity,
+			IdentitySignature: identitySignature,
+			SignerName:        publisherID,
+			Timestamp:         timestampStr,
+		},
+		PrivateKey: messenger.PrivateKeyToPem(privKey),
 	}
-	return identityMessage, privKey
+	return fullIdentity, privKey
 }
 
 // IsIdentityExpired tests if the given identity is expired
-func IsIdentityExpired(identity *iotc.PublisherIdentity) bool {
+func IsIdentityExpired(identity *iotc.PublisherPublicIdentity) bool {
 	timestampStr := time.Now().Format(iotc.TimeFormat)
 	nowIsGreater := strings.Compare(timestampStr, identity.ValidUntil)
 	return (nowIsGreater > 0)
 }
 
 // LoadIdentity loads the publisher identity and private key from file in the given folder.
-// The expected identity file is named <publisherID>-identity.json, the private key file is
-// named <publisherID>-private.pem.
+// The expected identity file is named <publisherID>-identity.json.
 // Returns the identity with corresponding ECDSA private key, or nil if no identity is found
 // If anything goes wrong, err will contain the error and nil identity is returned
-func LoadIdentity(folder string, publisherID string) (identityMsg *iotc.PublisherIdentityMessage, privKey *ecdsa.PrivateKey, err error) {
+func LoadIdentity(folder string, publisherID string) (fullIdentity *iotc.PublisherFullIdentity, privateKey *ecdsa.PrivateKey, err error) {
 	identityFile := fmt.Sprintf("%s/%s-identity.json", folder, publisherID)
-	privFile := fmt.Sprintf("%s/%s-private.pem", folder, publisherID)
 
 	// load the identity
 	identityJSON, err := ioutil.ReadFile(identityFile)
 	if err != nil {
 		return nil, nil, err
 	}
-	identityMsg = &iotc.PublisherIdentityMessage{}
-	err = json.Unmarshal(identityJSON, identityMsg)
+	fullIdentity = &iotc.PublisherFullIdentity{}
+	err = json.Unmarshal(identityJSON, fullIdentity)
 	if err != nil {
 		msg := fmt.Sprintf("Error unmarshalling identity file: %s", err)
 		print(msg)
 		return nil, nil, err
 	}
-
-	// load the private key pem file
-	pemEncodedPriv, err := ioutil.ReadFile(privFile)
-	if err != nil {
-		return nil, nil, err
+	// sanity check in case the file was edited
+	addr := nodes.MakePublisherIdentityAddress(fullIdentity.Public.Domain, publisherID)
+	if fullIdentity.Public.Domain == "" ||
+		fullIdentity.Public.PublisherID != publisherID ||
+		fullIdentity.Address != addr ||
+		fullIdentity.Public.PublicKey == "" ||
+		fullIdentity.PrivateKey == "" {
+		msg := fmt.Sprintf("Identity file is inconsistent. Maybe it was edited")
+		return nil, nil, errors.New(msg)
 	}
-	blockPriv, _ := pem.Decode(pemEncodedPriv)
-	x509Encoded := blockPriv.Bytes
-	privateKey, _ := x509.ParseECPrivateKey(x509Encoded)
-
-	return identityMsg, privateKey, nil
+	// TODO verify signature with public part
+	privateKey = messenger.PrivateKeyFromPem(fullIdentity.PrivateKey)
+	return fullIdentity, privateKey, nil
 }
 
-// SaveIdentity save the identity message of the publisher and its keys in the given folder.
-// The identity is saved as a json file. The keys are saved as <publisherId>-private.pem.
+// SaveIdentity save the full identity of the publisher and its keys in the given folder.
+// The identity is saved as a json file.
 // see also https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
-func SaveIdentity(folder string, publisherID string,
-	identity *iotc.PublisherIdentityMessage, privKey *ecdsa.PrivateKey) error {
-	privFile := fmt.Sprintf("%s/%s-private.pem", folder, publisherID)
+func SaveIdentity(folder string, publisherID string, identity *iotc.PublisherFullIdentity) error {
 	identityFile := fmt.Sprintf("%s/%s-identity.json", folder, publisherID)
 
 	// save the identity as JSON. Remove first as they are read-only
@@ -120,42 +121,41 @@ func SaveIdentity(folder string, publisherID string,
 		err := fmt.Errorf("SaveIdentity: Unable to save the publisher's identity at %s: %s", identityFile, err)
 		return err
 	}
-
-	// save the private key pem file
-	x509Encoded, _ := x509.MarshalECPrivateKey(privKey)
-	pemEncodedPriv := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509Encoded})
-	os.Remove(privFile)
-	err = ioutil.WriteFile(privFile, pemEncodedPriv, 0400)
-	if err != nil {
-		err := fmt.Errorf("SaveIdentity: Unable to save the publisher's identity private key at %s: %s", privFile, err)
-		panic(err)
-	}
-
 	return err
 }
 
 // SetupPublisherIdentity loads the publisher identity and keys from file in the identityFolder.
-// If no identity and keys are found, a self signed identity is created.
+// If no identity and keys are found, a self signed identity is created. If the loaded identity is invalid,
+// due to a domain/publisher/address mismatch, or its public key is missing, a new identity is also created.
 // See SaveIdentity for info on how the identity is saved.
 //
 // identityFolder contains the folder with the identity files, use "" for default config folder (.config/iotc)
-//   if you're paranoid, this can be on a USB key that is inserted on startup and removed once running.
 // domain and publisherID are used to define the identity address
-func SetupPublisherIdentity(identityFolder string, domain string, publisherID string) (identityMessage *iotc.PublisherIdentityMessage, privateKey *ecdsa.PrivateKey) {
-	// var identity *iotc.PublisherIdentityMessage
+func SetupPublisherIdentity(identityFolder string, domain string, publisherID string) (
+	fullIdentity *iotc.PublisherFullIdentity, privKey *ecdsa.PrivateKey) {
 
 	if identityFolder == "" {
 		identityFolder = persist.DefaultConfigFolder
 	}
 	// If an identity is saved, load it
-	identityMessage, privKey, err := LoadIdentity(identityFolder, publisherID)
-	if err == nil {
-		return identityMessage, privKey
+	fullIdentity, privKey, err := LoadIdentity(identityFolder, publisherID)
+	identityAddress := nodes.MakePublisherIdentityAddress(domain, publisherID)
+
+	// validity check on identity, recreate a new one if changed
+	if err != nil ||
+		fullIdentity.Public.Domain != domain ||
+		fullIdentity.Public.PublisherID != publisherID ||
+		fullIdentity.Address != identityAddress ||
+		fullIdentity.Public.PublicKey == "" {
+		// invalid identity or none exists, create a new one
+		fullIdentity, privKey = CreateIdentity(domain, publisherID)
+		SaveIdentity(identityFolder, publisherID, fullIdentity)
+	} else {
+		expired := IsIdentityExpired(&fullIdentity.Public)
+		if expired {
+			// assume the DSS will re-issue an updated identitiy
+		}
 	}
 
-	identityMessage, privKey = CreateIdentity(domain, publisherID)
-
-	SaveIdentity(identityFolder, publisherID, identityMessage, privKey)
-
-	return identityMessage, privKey
+	return fullIdentity, privKey
 }

@@ -30,20 +30,21 @@ func CreateEcdsaSignature(payload string, privateKey *ecdsa.PrivateKey) string {
 	return base64.URLEncoding.EncodeToString(sig)
 }
 
-// CreateJWSSignature signs the payload using JSE ES256 and return the JSE full serialized message
+// CreateJWSSignature signs the payload using JSE ES256 and return the JSE compact serialized message
 func CreateJWSSignature(payload string, privateKey *ecdsa.PrivateKey) (string, error) {
 	joseSigner, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: privateKey}, nil)
 	signedObject, err := joseSigner.Sign([]byte(payload))
 	if err != nil {
 		return "", err
 	}
-	serialized := signedObject.FullSerialize()
+	// serialized := signedObject.FullSerialize()
+	serialized, err := signedObject.CompactSerialize()
 	return serialized, err
 }
 
 // SignEncodeIdentity returns a base64URL encoded ECDSA256 signature of the publisher identity.
 // Used in creating or updating a publisher's identity.
-func SignEncodeIdentity(ident *iotc.PublisherIdentity, privKey *ecdsa.PrivateKey) string {
+func SignEncodeIdentity(ident *iotc.PublisherPublicIdentity, privKey *ecdsa.PrivateKey) string {
 	signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
 	signer, _ := jose.NewSigner(signingKey, nil)
 	payload, _ := json.Marshal(ident)
@@ -82,13 +83,13 @@ func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload strin
 	return string(payloadB), err
 }
 
-// VerifySender verifies if a message is JWS signed and if so, verifies using the 'Sender' Attribute to
-// get the public key to verify with.
-// param message must contain a json attribute named 'Sender'.
-// param getPublicKey lookup function that provides the public key from the given sender address.
-// param object is the address of the expected object in the message where it will be unmarshalled.
+// VerifySender verifies if a message is JWS signed. If signed then the signature is verified
+// using the 'Sender' Attribute to determine the public key to verify with.
+// getPublicKey is a lookup function for providing the public key from the given sender address.
+// The message is json unmarshalled in the given object.
 // This returns a flag if the message was signed and if so, an error if the verification failed
 func VerifySender(message string, object interface{}, getPublicKey func(address string) *ecdsa.PublicKey) (isSigned bool, err error) {
+
 	jwsSignature, err := jose.ParseSigned(message)
 	if err != nil {
 		// message is not signed, try to unmarshal it directly

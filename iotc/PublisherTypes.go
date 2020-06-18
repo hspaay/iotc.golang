@@ -13,14 +13,14 @@ const LWTStatusDisconnected = "disconnected"
 // LWTStatusLost when connection unexpectedly drops
 const LWTStatusLost = "lost"
 
-// PublisherIdentity public record
-type PublisherIdentity struct {
+// PublisherPublicIdentity public record
+type PublisherPublicIdentity struct {
 	Certificate  string `json:"certificate,omitempty"` // optional x509 cert base64 encoded
 	Domain       string `json:"domain"`                // IoT domain name for this publisher
 	IssuerName   string `json:"issuerName"`            // Issuer of the identity, usually the ZCAS
 	Location     string `json:"location,omitempty"`    // city, province, country
 	Organization string `json:"organization"`          // publishing organization
-	PublicKey    string `json:"publicKey"`             // public key for signing and and encryption
+	PublicKey    string `json:"publicKey"`             // public key in PEM format for signature verification and encryption
 	PublisherID  string `json:"publisherId"`           // This publisher's ID for this zone
 	Timestamp    string `json:"timestamp"`             // timestamp this identity was signed
 	ValidUntil   string `json:"validUntil"`            // timestamp this identity expires
@@ -28,11 +28,19 @@ type PublisherIdentity struct {
 
 // PublisherIdentityMessage for publisher discovery
 type PublisherIdentityMessage struct {
-	Address           string            `json:"address"`   // publication address of this identity, eg domain/publisherId/\$identity
-	Identity          PublisherIdentity `json:"identity"`  // public identity
-	IdentitySignature string            `json:"signature"` // base64 encoded signature of this identity
-	SignerName        string            `json:"signer"`    // name of the signer of this identity, eg 'DSS' or 'Lets Encrypt'
-	Timestamp         string            `json:"timestamp"` // timestamp this message was created
+	Address           string                  `json:"address"`   // publication address of this identity, eg domain/publisherId/\$identity
+	Public            PublisherPublicIdentity `json:"public"`    // public identity
+	IdentitySignature string                  `json:"signature"` // base64 encoded signature of this identity
+	SignerName        string                  `json:"signer"`    // name of the signer of this identity, eg 'DSS' or 'Lets Encrypt'
+	Timestamp         string                  `json:"timestamp"` // timestamp this message was created
+}
+
+// PublisherFullIdentity containing the public identity, DSS signature and private key
+// Also used by the DSS to renew a publisher's identity.
+// This message MUST be encrypted and signed by the DSS
+type PublisherFullIdentity struct {
+	PublisherIdentityMessage
+	PrivateKey string `json:"privateKey"` // private key for signing (PEM format)
 }
 
 // PublisherLWTMessage containing 'alive' status
