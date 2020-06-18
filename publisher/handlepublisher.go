@@ -8,12 +8,12 @@ import (
 
 	"github.com/hspaay/iotc.golang/iotc"
 	"github.com/hspaay/iotc.golang/messenger"
+	"github.com/hspaay/iotc.golang/nodes"
 	"gopkg.in/square/go-jose.v2"
 )
 
 // handleIdentityUpdate handles the set command for an update to this publisher identity.
-// Intended to be set by the DSS to issue renewed keys and signature.
-// This message must be encrypted and signed or it will be discarded.
+// The message must be encrypted and signed by the DSS or it will be discarded.
 func (publisher *Publisher) handleIdentityUpdate(address string, message string) {
 	var fullIdentity iotc.PublisherFullIdentity
 
@@ -28,7 +28,7 @@ func (publisher *Publisher) handleIdentityUpdate(address string, message string)
 		return
 	}
 
-	// Verify the message using the public key of the sender (should be the DSS)
+	// Verify the message is send by and signed by the DSS
 	isSigned, err := messenger.VerifySender(dmessage, &fullIdentity, publisher.domainPublishers.GetPublisherKey)
 	if !isSigned {
 		// commands must use signed messages
@@ -39,9 +39,15 @@ func (publisher *Publisher) handleIdentityUpdate(address string, message string)
 		publisher.logger.Warnf("handleIdentityUpdate: Signature verification failed for  %s. Message discarded.", address)
 		return
 	}
+	dssAddress := nodes.MakePublisherIdentityAddress(publisher.Domain(), iotc.DSSPublisherID)
+	if fullIdentity.Sender != dssAddress {
+		publisher.logger.Warnf("handleIdentityUpdate: Sender is %s instead of the DSS. Identity update discarded.", fullIdentity.Sender)
+
+	}
+
 	privKey := messenger.PrivateKeyFromPem(fullIdentity.PrivateKey)
 	publisher.identityPrivateKey = privKey
-	publisher.identity = &fullIdentity
+	publisher.fullIdentity = &fullIdentity
 }
 
 // handleDSSDiscovery discoveres the identity of the domain security service

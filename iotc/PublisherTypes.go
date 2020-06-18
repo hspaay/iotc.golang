@@ -17,11 +17,11 @@ const LWTStatusLost = "lost"
 type PublisherPublicIdentity struct {
 	Certificate  string `json:"certificate,omitempty"` // optional x509 cert base64 encoded
 	Domain       string `json:"domain"`                // IoT domain name for this publisher
-	IssuerName   string `json:"issuerName"`            // Issuer of the identity, usually the ZCAS
+	IssuerName   string `json:"issuerName"`            // Issuer of the identity, usually the DSS
 	Location     string `json:"location,omitempty"`    // city, province, country
 	Organization string `json:"organization"`          // publishing organization
 	PublicKey    string `json:"publicKey"`             // public key in PEM format for signature verification and encryption
-	PublisherID  string `json:"publisherId"`           // This publisher's ID for this zone
+	PublisherID  string `json:"publisherId"`           // This publisher's ID for this domain
 	Timestamp    string `json:"timestamp"`             // timestamp this identity was signed
 	ValidUntil   string `json:"validUntil"`            // timestamp this identity expires
 }
@@ -41,6 +41,7 @@ type PublisherIdentityMessage struct {
 type PublisherFullIdentity struct {
 	PublisherIdentityMessage
 	PrivateKey string `json:"privateKey"` // private key for signing (PEM format)
+	Sender     string `json:"sender"`     // sender of this update, usually the DSS
 }
 
 // PublisherLWTMessage containing 'alive' status

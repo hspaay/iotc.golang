@@ -1,0 +1,17 @@
+{
+  "address": "test/publisher2/$identity",
+  "public": {
+   "domain": "test",
+   "issuerName": "publisher2",
+   "location": "local",
+   "organization": "",
+   "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYdfQ/sYp5IRCBtIXCaKJnebvl2Gj\ns7L2KvOScvNrBJfnUcBRVFhvCuRAPZ3qbCOlZh7M/1FXFbbzS7Bp0bRw8w==\n-----END PUBLIC KEY-----\n",
+   "publisherId": "publisher2",
+   "timestamp": "2020-06-18T09:29:08.189-0700",
+   "validUntil": "2021-06-18T09:29:08.189-0700"
+  },
+  "signature": "4zjJu5BlsA6Ry2VpRmwzJQtGyq1u9S0uj3eJXtjWaF0AaY4UkCRT-BvbnQ6vOYhUcjVm7hK6haWb5KQYqrXykQ==",
+  "signer": "publisher2",
+  "timestamp": "2020-06-18T09:29:08.189-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEILX41JXsqUACAJ+eeqEEphXXDmnGKk4upXZGE+GqRNHaoAoGCCqGSM49\nAwEHoUQDQgAEYdfQ/sYp5IRCBtIXCaKJnebvl2Gjs7L2KvOScvNrBJfnUcBRVFhv\nCuRAPZ3qbCOlZh7M/1FXFbbzS7Bp0bRw8w==\n-----END PRIVATE KEY-----\n"
+ }

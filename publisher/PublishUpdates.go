@@ -16,9 +16,9 @@ import (
 
 // PublishIdentity publishes this publisher's identity on startup or update
 func (publisher *Publisher) PublishIdentity() {
-	identity := publisher.identity
-	publisher.logger.Infof("Publisher.PublishIdentity: publish identity: %s", publisher.identity.Address)
-	publisher.publishObject(identity.Address, true, identity, nil)
+	identity := publisher.fullIdentity
+	publisher.logger.Infof("Publisher.PublishIdentity: publish identity: %s", publisher.fullIdentity.Address)
+	publisher.publishObject(identity.Address, true, identity.PublisherIdentityMessage, nil)
 }
 
 // PublishUpdatedDiscoveries publishes updated nodes, inputs and outputs discovery messages

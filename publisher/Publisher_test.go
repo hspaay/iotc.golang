@@ -44,24 +44,24 @@ var pubAddr = fmt.Sprintf("%s/%s/$identity", domain1ID, publisher1ID)
 var pub2Addr = fmt.Sprintf("%s/%s/$identity", domain1ID, publisher2ID)
 
 var msgConfig *messenger.MessengerConfig = &messenger.MessengerConfig{Domain: domain1ID}
+var signingMethod = "jws"
 
 // TestNew publisher instance
 func TestNewPublisher(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 	if !assert.NotNil(t, pub1, "Failed creating publisher") {
 		return
 	}
-	assert.NotNil(t, pub1.identity, "Missing publisher identity")
+	assert.NotNil(t, pub1.fullIdentity, "Missing publisher identity")
 	assert.NotEmpty(t, pub1.Address(), "Missing publisher address")
-	assert.NotEmpty(t, pub1.identity.Address, "Missing publisher identity address")
+	assert.NotEmpty(t, pub1.fullIdentity.Address, "Missing publisher identity address")
 }
 
 // TestDiscover tests if discovered nodes, input and output are propery accessible via the publisher
 func TestDiscover(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 	pub1.Nodes.UpdateNode(node1)
 	tmpNode := pub1.Nodes.GetNodeByAddress(node1Addr)
 	if !(assert.NotNil(t, tmpNode, "Failed getting discovered node") &&
@@ -93,8 +93,7 @@ func TestDiscover(t *testing.T) {
 // TestNodePublication tests if discoveries are published and properly signed
 func TestNodePublication(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	// Start synchroneous publications to verify publications in order
 	pub1.Start()                            // publisher is first publication [0]
@@ -131,8 +130,7 @@ func TestNodePublication(t *testing.T) {
 // TestAlias tests if the the alias is used in the inout address publication
 func TestAlias(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
@@ -173,8 +171,7 @@ func TestAlias(t *testing.T) {
 // TestConfigure tests if the node configuration is handled
 func TestConfigure(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
@@ -211,8 +208,7 @@ func TestConfigure(t *testing.T) {
 // TestOutputValue tests publication of output values
 func TestOutputValue(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	// assert.Nilf(t, node1.Config["alias"], "Alias set for node 1, unexpected")
 	node1 = nodes.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
@@ -266,8 +262,7 @@ func TestOutputValue(t *testing.T) {
 // TestReceiveInput tests receiving input control commands
 func TestReceiveInput(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
@@ -311,8 +306,7 @@ func TestReceiveInput(t *testing.T) {
 func TestSetInput(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
 	var receivedInputValue = ""
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	// pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
 		receivedInputValue = message.Value
@@ -330,14 +324,13 @@ func TestSetInput(t *testing.T) {
 // TestDiscoverPublishers tests receiving other publishers
 func TestDiscoverPublishers(t *testing.T) {
 	var testMessenger = messenger.NewDummyMessenger(msgConfig, nil)
-	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, testMessenger)
-	pub1.signingMethod = SigningMethodJWS
+	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, SigningMethodNone, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
 
 	// Use the dummy messenger for multiple publishers
-	pub2 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher2ID, testMessenger)
+	pub2 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher2ID, signingMethod, testMessenger)
 	pub2.signingMethod = SigningMethodJWS
 	pub2.Start()
 	// wait for incoming messages to be processed

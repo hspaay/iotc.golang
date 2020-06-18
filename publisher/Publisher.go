@@ -58,7 +58,7 @@ type Publisher struct {
 	discoveryHandler  func(publisher *Publisher) // function that performs discovery
 	domainPublishers  *nodes.PublisherList       // publishers on the network by discovery address
 
-	identity            *iotc.PublisherFullIdentity // identity for signing messages
+	fullIdentity        *iotc.PublisherFullIdentity // this publishers identity
 	identityPrivateKey  *ecdsa.PrivateKey           // key for signing and encryption
 	isRunning           bool                        // publisher was started and is running
 	logger              *log.Logger                 // logger for all publisher's logging
@@ -79,22 +79,22 @@ type Publisher struct {
 func (publisher *Publisher) Address() string {
 	// identityAddr := nodes.MakePublisherIdentityAddress(publisher.Domain(), publisher.PublisherID())
 	// return identityAddr
-	return publisher.identity.Address
+	return publisher.fullIdentity.Address
 }
 
 // PublisherID returns the publisher's ID
 func (publisher *Publisher) PublisherID() string {
-	return publisher.identity.Public.PublisherID
+	return publisher.fullIdentity.Public.PublisherID
 }
 
 // Domain returns the publication domain
 func (publisher *Publisher) Domain() string {
-	return publisher.identity.Public.Domain
+	return publisher.fullIdentity.Public.Domain
 }
 
 // Identity return this publisher's full identity
 func (publisher *Publisher) Identity() *iotc.PublisherFullIdentity {
-	return publisher.identity
+	return publisher.fullIdentity
 }
 
 // Logger returns the publication logger
@@ -339,43 +339,38 @@ func (publisher *Publisher) heartbeatLoop() {
 	publisher.logger.Infof("Publisher.heartbeatLoop: Ending loop of publisher %s", publisher.PublisherID())
 }
 
-// // VerifyMessageSignature Verify a received message is signed by the sender
-// // The node of the sender must have been received for its public key
-// func (publisher *Publisher) VerifyMessageSignature(
-// 	sender string, message string, base64signature string) bool {
-
-// 	if node == nil {
-// 		publisher.Logger.Warningf("Publisher.VerifyMessageSignature: unknown sender %s", sender)
-// 		return false
-// 	}
-// 	var pubKey *ecdsa.PublicKey = messenger.DecodePublicKey(publisher.identity.PublicKeySigning)
-// 	valid := messenger.VerifyEcdsaSignature(message, base64signature, pubKey)
-// 	return valid
-// }
-
-// NewPublisher creates a publisher instance and node for use in publications
+// NewPublisher creates a publisher instance. This is used for all publications.
 //
-// appID is the application ID used to load the publisher configuration and nodes
-//     <appID.yaml> for the publisher configuration -> publisherID
-//     <appID-nodes.json> for the nodes
-// messenger to use fo publications and for the domain to publish in
-// logger is the optional logger to use.
+// The identityFolder contains the publisher identity file <publisherID>-identity.json. "" for default config folder.
+// The identity is written here when it is first created or is renewed by the domain security service.
+// This file only needs to be accessible during publisher startup.
 //
-// identityFolder where to store this publisher's identity and keys, "" for default config folder
-// cacheFolder where to store discovered nodes, inputs, outputs and external publishers
-// domain the publisher uses to create addresses. If not provided iotc.LocalDomain is used
-// publisherID of this publisher, unique within the domain. See also SetPublisherID
+// The cacheFolder contains stored discovered nodes, inputs, outputs, and external publishers. It also
+// contains node configuration so deleting these files will remove custom node configuration, for example
+// configuration of alias and name.
+//
+// domain and publisherID identity this publisher. If the identity file does not match these, it
+// is discarded and a new identity is created. If the publisher has joined the domain and the DSS has issued
+// the identity then changing domain or publisherID invalidates the publisher and it has to rejoin
+// the domain. If no domain is provided, the default 'local' is used.
+//
+// signingMethod indicates if and how publications must be signed. The default is jws. For testing 'none' can be used.
+//
 // messenger for publishing onto the message bus
 func NewPublisher(
 	identityFolder string,
 	cacheFolder string,
 	domain string,
 	publisherID string,
+	signingMethod string,
 	messenger messenger.IMessenger,
 ) *Publisher {
 
 	if domain == "" {
 		domain = iotc.LocalDomainID
+	}
+	if signingMethod == "" {
+		signingMethod = SigningMethodJWS
 	}
 
 	var publisher = &Publisher{
@@ -391,16 +386,16 @@ func NewPublisher(
 		messenger:         messenger,
 		pollCountdown:     1, // run discovery before poll
 		pollInterval:      DefaultPollInterval,
-		signingMethod:     SigningMethodJWS, // by default sign with JWS
+		signingMethod:     signingMethod,
 		updateMutex:       &sync.Mutex{},
 	}
 	publisher.SetLogging("debug", "")
 
 	// create a default publisher node with identity and signatures
 	identity, privKey := SetupPublisherIdentity(identityFolder, domain, publisherID)
-	publisher.identity = identity
+	publisher.fullIdentity = identity
 	publisher.identityPrivateKey = privKey
-	publisher.domainPublishers.UpdatePublisher(&publisher.identity.PublisherIdentityMessage)
+	publisher.domainPublishers.UpdatePublisher(&publisher.fullIdentity.PublisherIdentityMessage)
 
 	return publisher
 }

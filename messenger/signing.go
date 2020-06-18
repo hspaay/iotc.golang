@@ -84,9 +84,15 @@ func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload strin
 }
 
 // VerifySender verifies if a message is JWS signed. If signed then the signature is verified
-// using the 'Sender' Attribute to determine the public key to verify with.
+// using the 'Sender' Attribute to determine the public key to verify with. To verify correctly,
+// the sender has to be a known publisher and verified with the DSS.
+//
 // getPublicKey is a lookup function for providing the public key from the given sender address.
-// The message is json unmarshalled in the given object.
+//  it should only provide a public key if the publisher is known and verified by the DSS, or
+//  if this zone does not use a DSS (publisher are protected through message bus ACLs)
+//
+// The message is json unmarshalled into the given object.
+//
 // This returns a flag if the message was signed and if so, an error if the verification failed
 func VerifySender(message string, object interface{}, getPublicKey func(address string) *ecdsa.PublicKey) (isSigned bool, err error) {
 
