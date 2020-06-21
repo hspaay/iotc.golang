@@ -76,8 +76,8 @@ func TestConfigure(t *testing.T) {
 	nodeList := NewNodeList()
 	nodeAddr := nodeList.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
 
-	config := NewNodeConfig(iotc.NodeAttrName, iotc.DataTypeString, "Friendly Name", "")
-	nodeList.UpdateNodeConfig(nodeAddr, config)
+	config := NewNodeConfig(iotc.DataTypeString, "Friendly Name", "")
+	nodeList.UpdateNodeConfig(nodeAddr, iotc.NodeAttrName, config)
 
 	newValues := map[iotc.NodeAttr]string{iotc.NodeAttrName: "NewName"}
 	nodeList.SetNodeConfigValues(nodeAddr, newValues)

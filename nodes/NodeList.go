@@ -33,10 +33,9 @@ func (nodes *NodeList) Clone(node *iotc.NodeDiscoveryMessage) *iotc.NodeDiscover
 	for key, value := range node.Attr {
 		newNode.Attr[key] = value
 	}
-	newNode.Config = make(map[iotc.NodeAttr]iotc.ConfigAttr)
-	for key, value := range node.Config {
-		newNode.Config[key] = value
-	}
+	// Shallow copy of the config list
+	newNode.Config = node.Config
+
 	newNode.Status = make(map[iotc.NodeStatus]string)
 	for key, value := range node.Status {
 		newNode.Status[key] = value
@@ -67,38 +66,112 @@ func (nodes *NodeList) GetNodeByAddress(address string) *iotc.NodeDiscoveryMessa
 	return node
 }
 
-// GetNodeConfigInt returns the node configuration value as an integer
-// address starts with the node's address
-// This retuns the 'default' value if no value is set
-func (nodes *NodeList) GetNodeConfigInt(address string, attrName iotc.NodeAttr) (value int, err error) {
-	valueStr, configExists := nodes.GetNodeConfigValue(address, attrName)
-	if !configExists {
-		return 0, errors.New("NodeList.GetNodeConfigInt: Configuration does not exist")
-	}
-	return strconv.Atoi(valueStr)
-}
-
-// GetNodeConfigValue returns the attribute value of a node in this list
-// address must starts with the node's address: domain/publisher/nodeid. Any suffix is ignored.
-// attrName is the name of the attribute to look up
-// This retuns the 'default' value if no value is set
-func (nodes *NodeList) GetNodeConfigValue(address string, attrName iotc.NodeAttr) (value string, configExists bool) {
+// GetNodeAttr returns a node attribute value
+func (nodes *NodeList) GetNodeAttr(address string, attrName iotc.NodeAttr) string {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
+	var node = nodes.getNode(address)
+	attrValue, _ := node.Attr[attrName]
+	return attrValue
+}
 
+// GetNodeConfigBool returns the node configuration value as a boolean
+// address starts with the node's address
+// This retuns the provided default value if no value is set or no default is configured, or the value is not an integer
+// An error is returned when the node or configuration doesn't exist
+func (nodes *NodeList) GetNodeConfigBool(
+	address string, attrName iotc.NodeAttr, defaultValue bool) (value bool, err error) {
+
+	valueStr, err := nodes.GetNodeConfigString(address, attrName, "")
+	if err != nil {
+		return defaultValue, err
+	}
+	if valueStr == "" {
+		return defaultValue, nil
+	}
+	value, err = strconv.ParseBool(valueStr)
+	if err != nil {
+		msg := fmt.Sprintf("NodeList.GetNodeConfigBool: Node '%s' configuration '%s' is not a boolean: %s", address, attrName, err)
+		return defaultValue, errors.New(msg)
+	}
+	return value, nil
+}
+
+// GetNodeConfigFloat returns the node configuration value as an floating point number
+// address starts with the node's address
+// This retuns the provided default value if no value is set or no default is configured, or the value is not an integer
+// An error is returned when the node or configuration doesn't exist or is not an integer
+func (nodes *NodeList) GetNodeConfigFloat(
+	address string, attrName iotc.NodeAttr, defaultValue float32) (value float32, err error) {
+
+	valueStr, err := nodes.GetNodeConfigString(address, attrName, "")
+	if err != nil {
+		return defaultValue, err
+	}
+	if valueStr == "" {
+		return defaultValue, nil
+	}
+	value64, err := strconv.ParseFloat(valueStr, 32)
+	value = float32(value64)
+	if err != nil {
+		msg := fmt.Sprintf("NodeList.GetNodeConfigFloat: Node '%s' configuration '%s' is not a float: %s", address, attrName, err)
+		return defaultValue, errors.New(msg)
+	}
+	return value, nil
+}
+
+// GetNodeConfigInt returns the node configuration value as an integer
+// address starts with the node's address
+// This retuns the provided default value if no value is set or no default is configured, or the value is not an integer
+// An error is returned when the node or configuration doesn't exist or is not an integer
+func (nodes *NodeList) GetNodeConfigInt(
+	address string, attrName iotc.NodeAttr, defaultValue int) (value int, err error) {
+
+	valueStr, err := nodes.GetNodeConfigString(address, attrName, "")
+	if err != nil {
+		return defaultValue, err
+	}
+	if valueStr == "" {
+		return defaultValue, nil
+	}
+	value, err = strconv.Atoi(valueStr)
+	if err != nil {
+		msg := fmt.Sprintf("NodeList.GetNodeConfigInt: Node '%s' configuration '%s' is not an integer: %s", address, attrName, err)
+		return defaultValue, errors.New(msg)
+	}
+	return value, nil
+}
+
+// GetNodeConfigString returns the attribute value of a node in this list
+// address must starts with the node's address: domain/publisher/nodeid. Any suffix is ignored.
+// This retuns the provided default value if no value is set and no default is configured.
+// An error is returned when the node or configuration doesn't exist.
+func (nodes *NodeList) GetNodeConfigString(
+	address string, attrName iotc.NodeAttr, defaultValue string) (value string, err error) {
+
+	nodes.updateMutex.Lock()
+	defer nodes.updateMutex.Unlock()
+	// in case of error, always return defaultValue
 	node := nodes.getNode(address)
 	if node == nil {
-		return "", false
+		msg := fmt.Sprintf("NodeList.GetNodeConfigString: Node '%s' not found", address)
+		return defaultValue, errors.New(msg)
 	}
 	config, configExists := node.Config[attrName]
 	if !configExists {
-		return "", configExists
+		msg := fmt.Sprintf("NodeList.GetNodeConfigString: Node '%s' configuration '%s' does not exist", address, attrName)
+		return defaultValue, errors.New(msg)
 	}
+	// if no value is known, use the configuration default
 	attrValue, exists := node.Attr[attrName]
 	if !exists || attrValue == "" {
-		return config.Default, configExists
+		attrValue = config.Default
 	}
-	return attrValue, configExists
+	// if still no value is known, use the provided default
+	if attrValue == "" {
+		return defaultValue, nil
+	}
+	return attrValue, nil
 }
 
 // GetNodeByID returns a node by its domain, publisher and node ID
@@ -196,7 +269,6 @@ func (nodes *NodeList) NewNodeConfig(nodeAddr string, attrName iotc.NodeAttr, da
 		// update existing config or create a new one
 		if !configExists {
 			config = iotc.ConfigAttr{
-				ID:          attrName,
 				Datatype:    dataType,
 				Description: description,
 				Default:     defaultValue,
@@ -338,26 +410,17 @@ func (nodes *NodeList) UpdateNode(node *iotc.NodeDiscoveryMessage) {
 }
 
 // UpdateNodeConfig updates a node's configuration and publishes the updated node
-// If a config already exists then its value is retained.
+// If a config already exists then its value is retained but its configuration parameters are replaced.
 // Nodes are immutable. A new node is created and published and the old node instance is discarded.
-// Use this when a device configuration has been identified, or when the config value updates.
-// - address of the node to update
-// - config is the config struct with description and value
-// Returns a new node instance
-func (nodes *NodeList) UpdateNodeConfig(address string, configAttr *iotc.ConfigAttr) {
+func (nodes *NodeList) UpdateNodeConfig(address string, attrName iotc.NodeAttr, configAttr *iotc.ConfigAttr) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 	node := nodes.getNode(address)
 	if node == nil {
 		return
 	}
-	// existingAttr, found := node.Config[configAttr.ID]
-	newAttr := *configAttr
-	// if found {
-	// newAttr.Value = existingAttr.Value
-	// }
 	newNode := nodes.Clone(node)
-	newNode.Config[configAttr.ID] = newAttr
+	newNode.Config[attrName] = *configAttr
 	nodes.updateNode(newNode)
 }
 
@@ -434,14 +497,12 @@ func MakeNodeDiscoveryAddress(domain string, publisherID string, nodeID string) 
 // Intended for updating additional attributes before updating the actual configuration
 // Use UpdateNodeConfig to update the node with this configuration
 //
-// attrName is the configuration attribute ID. See also iotc.NodeAttr for standard IDs
 // dataType of the value. See also iotc.DataType for standard types.
 // description of the value for humans
 // defaultValue to use as default configuration value
 // returns a new Configuration Attribute instance.
-func NewNodeConfig(attrName iotc.NodeAttr, dataType iotc.DataType, description string, defaultValue string) *iotc.ConfigAttr {
+func NewNodeConfig(dataType iotc.DataType, description string, defaultValue string) *iotc.ConfigAttr {
 	config := iotc.ConfigAttr{
-		ID:          attrName,
 		Datatype:    dataType,
 		Description: description,
 		Default:     defaultValue,
@@ -462,8 +523,8 @@ func NewNode(domain string, publisherID string, nodeID string, nodeType iotc.Nod
 		Status: make(map[iotc.NodeStatus]string),
 		Type:   nodeType,
 	}
-	newNode.Config[iotc.NodeAttrAlias] = *NewNodeConfig(iotc.NodeAttrAlias, iotc.DataTypeString, "Alias node ID for inputs and outputs", "")
-	newNode.Config[iotc.NodeAttrName] = *NewNodeConfig(iotc.NodeAttrName, iotc.DataTypeString, "Human friendly node name", "")
+	newNode.Config[iotc.NodeAttrAlias] = *NewNodeConfig(iotc.DataTypeString, "Alias node ID for inputs and outputs", "")
+	newNode.Config[iotc.NodeAttrName] = *NewNodeConfig(iotc.DataTypeString, "Human friendly node name", "")
 	return newNode
 }
 

@@ -32,7 +32,7 @@ func (inputs *InputList) GetAllInputs() []*iotc.InputDiscoveryMessage {
 // Returns nil if address has no known input
 // address with node type and instance. The command will be ignored.
 func (inputs *InputList) GetInput(
-	nodeAddress string, inputType string, instance string) *iotc.InputDiscoveryMessage {
+	nodeAddress string, inputType iotc.InputType, instance string) *iotc.InputDiscoveryMessage {
 	// segments := strings.Split(address, "/")
 	// segments[3] = standard.CommandInputDiscovery
 	// inputAddr := strings.Join(segments, "/")
@@ -86,7 +86,7 @@ func (inputs *InputList) UpdateInput(input *iotc.InputDiscoveryMessage) {
 }
 
 // MakeInputDiscoveryAddress creates the address for the input discovery
-func MakeInputDiscoveryAddress(nodeAddress string, inputType string, instance string) string {
+func MakeInputDiscoveryAddress(nodeAddress string, inputType iotc.InputType, instance string) string {
 	segments := strings.Split(nodeAddress, "/")
 	zone := segments[0]
 	publisherID := segments[1]
@@ -112,7 +112,7 @@ func MakeInputSetAddress(nodeAddress string, ioType string, instance string) str
 
 // NewInput instance
 // To add it to the inputlist use 'UpdateInput'
-func NewInput(nodeAddr string, inputType string, instance string) *iotc.InputDiscoveryMessage {
+func NewInput(nodeAddr string, inputType iotc.InputType, instance string) *iotc.InputDiscoveryMessage {
 	address := MakeInputDiscoveryAddress(nodeAddr, inputType, instance)
 	// segments := strings.Split(nodeAddress, "/")
 	input := &iotc.InputDiscoveryMessage{

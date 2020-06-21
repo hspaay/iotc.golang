@@ -2,7 +2,7 @@
 package iotc
 
 // DSSPublisherID contains the publisherID of a domain's security service
-const DSSPublisherID = "dss"
+const DSSPublisherID = "$dss"
 
 // LWTStatusConnected when currently connectioned
 const LWTStatusConnected = "connected"

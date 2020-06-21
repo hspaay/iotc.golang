@@ -23,27 +23,36 @@ import (
 // 	return config.Value
 // }
 
-// GetNodeConfigInt convenience function to get a node configuration value as an integer
-// This retuns the 'default' value if no value is set
-func (publisher *Publisher) GetNodeConfigInt(nodeID string, attrName iotc.NodeAttr) (value int, err error) {
+// GetNodeConfigBool convenience function to get a node configuration value as a boolean
+// This retuns the given default if no configuration value exists and no configuration default is set
+func (publisher *Publisher) GetNodeConfigBool(
+	nodeID string, attrName iotc.NodeAttr, defaultValue bool) (value bool, err error) {
 	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
-	value, err = publisher.Nodes.GetNodeConfigInt(nodeAddr, attrName)
-	return value, err
+	return publisher.Nodes.GetNodeConfigBool(nodeAddr, attrName, defaultValue)
 }
 
-// GetNodeConfigValue convenience function to get a node configuration value
-// nodeID is the node to read from
-// attrName identifies the configuration attribute to get
-// retuns the 'defaultValue' if no value is set
-func (publisher *Publisher) GetNodeConfigValue(
-	nodeID string, attrName iotc.NodeAttr, defaultValue string) (value string, exists bool) {
-
+// GetNodeConfigFloat convenience function to get a node configuration value as a float number
+// This retuns the given default if no configuration value exists and no configuration default is set
+func (publisher *Publisher) GetNodeConfigFloat(
+	nodeID string, attrName iotc.NodeAttr, defaultValue float32) (value float32, err error) {
 	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
-	value, exists = publisher.Nodes.GetNodeConfigValue(nodeAddr, attrName)
-	if value == "" {
-		value = defaultValue
-	}
-	return value, exists
+	return publisher.Nodes.GetNodeConfigFloat(nodeAddr, attrName, defaultValue)
+}
+
+// GetNodeConfigInt convenience function to get a node configuration value as an integer
+// This retuns the given default if no configuration value exists and no configuration default is set
+func (publisher *Publisher) GetNodeConfigInt(
+	nodeID string, attrName iotc.NodeAttr, defaultValue int) (value int, err error) {
+	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
+	return publisher.Nodes.GetNodeConfigInt(nodeAddr, attrName, defaultValue)
+}
+
+// GetNodeConfigString convenience function to get a node configuration value as a string
+// This retuns the given default if no configuration value exists and no configuration default is set
+func (publisher *Publisher) GetNodeConfigString(
+	nodeID string, attrName iotc.NodeAttr, defaultValue string) (value string, err error) {
+	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
+	return publisher.Nodes.GetNodeConfigString(nodeAddr, attrName, defaultValue)
 }
 
 // GetNodeByID returns a node from this publisher or nil if the id isn't found in this publisher
@@ -66,7 +75,7 @@ func (publisher *Publisher) GetNodeStatus(nodeID string, attrName iotc.NodeStatu
 
 // GetOutputByType returns a node output object using node id and output type and instance
 // This is a convenience function using the publisher's output list
-func (publisher *Publisher) GetOutputByType(nodeID string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
+func (publisher *Publisher) GetOutputByType(nodeID string, outputType iotc.OutputType, instance string) *iotc.OutputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	output := publisher.Outputs.GetOutputByAddress(outputAddr)
@@ -95,7 +104,7 @@ func (publisher *Publisher) NewNode(nodeID string, nodeType iotc.NodeType) strin
 
 // NewNodeConfig creates a new node configuration for a node of this publisher and update the node
 // If the configuration already exists, its dataType, description and defaultValue are updated but
-// the value is retained.
+// the value is retained. This updates the attribute value with the default, if currently no value is set.
 // See NodeList.NewNodeConfig for more details
 // Returns the node config object which can be used with UpdateNodeConfig
 func (publisher *Publisher) NewNodeConfig(
@@ -112,7 +121,7 @@ func (publisher *Publisher) NewNodeConfig(
 
 // NewInput creates a new node input and adds it to this publisher inputs list
 // returns the input to allow for easy update
-func (publisher *Publisher) NewInput(nodeID string, inputType string, instance string) *iotc.InputDiscoveryMessage {
+func (publisher *Publisher) NewInput(nodeID string, inputType iotc.InputType, instance string) *iotc.InputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	input := nodes.NewInput(nodeAddr, inputType, instance)
 	publisher.Inputs.UpdateInput(input)
@@ -122,11 +131,19 @@ func (publisher *Publisher) NewInput(nodeID string, inputType string, instance s
 // NewOutput creates a new node output adds it to this publisher outputs list
 // This is a convenience function for the publisher.Outputs list
 // returns the output object to allow for easy updates
-func (publisher *Publisher) NewOutput(nodeID string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
+func (publisher *Publisher) NewOutput(nodeID string, outputType iotc.OutputType, instance string) *iotc.OutputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	output := nodes.NewOutput(nodeAddr, outputType, instance)
 	publisher.Outputs.UpdateOutput(output)
 	return output
+}
+
+// PublishRaw immediately publishes the given value of a node, output type and instance on the
+// $raw output address. The content can be signed but is not encrypted.
+// This is intended for publishing large values that should not be stored, for example images
+func (publisher *Publisher) PublishRaw(output *iotc.OutputDiscoveryMessage, sign bool, value []byte) {
+	aliasAddress := publisher.getOutputAliasAddress(output.Address, iotc.MessageTypeRaw)
+	publisher.publishSigned(aliasAddress, sign, string(value))
 }
 
 // SetNodeAttr sets one or more attributes of the node
@@ -153,7 +170,7 @@ func (publisher *Publisher) SetNodeErrorStatus(nodeID string, status string, las
 
 // UpdateOutputValue adds the new node output value to the front of the value history
 // See NodeList.UpdateOutputValue for more details
-func (publisher *Publisher) UpdateOutputValue(nodeID string, outputType string, instance string, newValue string) bool {
+func (publisher *Publisher) UpdateOutputValue(nodeID string, outputType iotc.OutputType, instance string, newValue string) bool {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	return publisher.OutputValues.UpdateOutputValue(outputAddr, newValue)

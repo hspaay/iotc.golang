@@ -4,7 +4,7 @@ package iotc
 // Predefined node attribute names that describe the node.
 // When they are configurable they also appear in Node Config section.
 const (
-	NodeAttrAddress         NodeAttr = "address"         // the node's internal address. Can be used as the nodeID
+	NodeAttrAddress         NodeAttr = "address"         // device domain or ip address
 	NodeAttrAlias           NodeAttr = "alias"           // node alias for publishing inputs and outputs
 	NodeAttrColor           NodeAttr = "color"           // color in hex notation
 	NodeAttrDescription     NodeAttr = "description"     // device description
@@ -13,8 +13,8 @@ const (
 	NodeAttrGatewayAddress  NodeAttr = "gatewayAddress"  // the node gateway address
 	NodeAttrHostname        NodeAttr = "hostname"        // network device hostname
 	NodeAttrIotcVersion     NodeAttr = "iotcVersion"     // IotConnect version
-	NodeAttrLocalIP         NodeAttr = "localIP"         // for IP nodes
 	NodeAttrLatLon          NodeAttr = "latlon"          // latitude, longitude of the device for display on a map r/w
+	NodeAttrLocalIP         NodeAttr = "localIP"         // for IP nodes
 	NodeAttrLocationName    NodeAttr = "locationName"    // name of a location
 	NodeAttrLoginName       NodeAttr = "loginName"       // login name to connect to the device. Value is not published
 	NodeAttrMAC             NodeAttr = "mac"             // MAC address for IP nodes
@@ -31,6 +31,7 @@ const (
 	NodeAttrPublicKey       NodeAttr = "publicKey"       // public key for encrypting sensitive configuration settings
 	NodeAttrSoftwareVersion NodeAttr = "softwareVersion" // version of the software running the node
 	NodeAttrSubnet          NodeAttr = "subnet"          // IP subnets configuration
+	NodeAttrURL             NodeAttr = "url"             // device URL
 )
 
 // Various NodeStatus attributes that describe the recent status of the node
@@ -107,17 +108,18 @@ type NodeAttrMap map[NodeAttr]string
 // NodeStatus various node status attributes
 type NodeStatus string
 
+// NodeStatusMap for storing status attributes
+type NodeStatusMap map[NodeStatus]string
+
 // ConfigAttrMap for storing node configuration
-type ConfigAttrMap map[string]ConfigAttr
+type ConfigAttrMap map[NodeAttr]ConfigAttr
 
 // ConfigAttr describes the attributes that are configurable
 type ConfigAttr struct {
-	Name        string   `json:"name"`                  // Name of the attribute as used in the attr section
 	Datatype    DataType `json:"datatype,omitempty"`    // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
 	Default     string   `json:"default,omitempty"`     // Default value
 	Description string   `json:"description,omitempty"` // Description of the attribute
 	Enum        []string `json:"enum,omitempty"`        // Possible valid enum values
-	ID          NodeAttr `json:"id,omitempty"`          // Unique ID of this config
 	Max         float64  `json:"max,omitempty"`         // Max value for numbers
 	Min         float64  `json:"min,omitempty"`         // Min value for numbers
 	Secret      bool     `json:"secret,omitempty"`      // The configuration attribute is secret. Don't show with attributes.
@@ -133,11 +135,11 @@ type NodeConfigureMessage struct {
 
 // NodeDiscoveryMessage definition published in node discovery
 type NodeDiscoveryMessage struct {
-	Address     string                  `json:"address"`          // Node discovery address
-	Attr        NodeAttrMap             `json:"attr,omitempty"`   // Attributes describing this node
-	Config      map[NodeAttr]ConfigAttr `json:"config,omitempty"` // Description of configurable attributes
-	NodeID      string                  `json:"nodeId"`           // The node immutable ID
-	PublisherID string                  `json:"publisher"`        // publisher managing this node
-	Status      map[NodeStatus]string   `json:"status,omitempty"` // Node performance status information
-	Type        NodeType                `json:"type"`             // node type
+	Address     string        `json:"address"`          // Node discovery address
+	Attr        NodeAttrMap   `json:"attr,omitempty"`   // Attributes describing this node
+	Config      ConfigAttrMap `json:"config,omitempty"` // Description of configurable attributes
+	NodeID      string        `json:"nodeId"`           // The node immutable ID
+	PublisherID string        `json:"publisher"`        // publisher managing this node
+	Status      NodeStatusMap `json:"status,omitempty"` // Node performance status information
+	Type        NodeType      `json:"type"`             // node type
 }

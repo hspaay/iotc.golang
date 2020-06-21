@@ -97,11 +97,11 @@ func (publisher *Publisher) getOutputAliasAddress(address string, messageType io
 	if node == nil {
 		return address
 	}
-	alias, hasAlias := publisher.Nodes.GetNodeConfigValue(address, iotc.NodeAttrAlias)
+	alias, _ := publisher.Nodes.GetNodeConfigString(address, iotc.NodeAttrAlias, "")
 	// alias, hasAlias := nodes.GetNodeAlias(node)
 	// zone/pub/node/outtype/instance/messagetype
 	parts := strings.Split(address, "/")
-	if !hasAlias || alias == "" {
+	if alias == "" {
 		alias = parts[2]
 	}
 	parts[2] = alias
@@ -125,7 +125,7 @@ func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	for _, output := range outputs {
 		latest := publisher.OutputValues.GetOutputValueByAddress(output.Address)
-		attrID := output.OutputType + "/" + output.Instance
+		attrID := string(output.OutputType) + "/" + output.Instance
 		event[attrID] = latest.Value
 	}
 	eventMessage := &iotc.OutputEventMessage{
@@ -202,8 +202,8 @@ func (publisher *Publisher) publishHistory(outputAddress string, unit iotc.Unit)
 // address of the publication
 // object to publish. This will be marshalled to JSON and signed by this publisher
 func (publisher *Publisher) publishObject(address string, retained bool, object interface{}, encryptionKey *ecdsa.PublicKey) error {
-	payload, err := json.Marshal(object)
-	// buffer, err := json.MarshalIndent(object, " ", " ")
+	// payload, err := json.Marshal(object)
+	payload, err := json.MarshalIndent(object, " ", " ")
 	if err != nil {
 		publisher.logger.Errorf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
 		return err
@@ -223,8 +223,7 @@ func (publisher *Publisher) publishRawValue(outputAddress string) error {
 	// output values are published using their alias address, if any
 	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeRaw)
 
-	// publish raw value with the $value command
-	// zone/publisher/node/$value/iotype/instance
+	// publish raw value with the $raw command
 	latest := publisher.OutputValues.GetOutputValueByAddress(outputAddress)
 	if latest == nil {
 		errMsg := fmt.Sprintf("Publisher.publishRawValue:, no latest value for %s. This is unexpected", outputAddress)

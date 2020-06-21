@@ -46,7 +46,8 @@ func (outputValues *OutputValueList) GetOutputValueByAddress(address string) *io
 }
 
 // GetOutputValueByType returns the current output value by output type and instance
-func (outputValues *OutputValueList) GetOutputValueByType(node *iotc.NodeDiscoveryMessage, outputType string, instance string) *iotc.OutputValue {
+func (outputValues *OutputValueList) GetOutputValueByType(
+	node *iotc.NodeDiscoveryMessage, outputType iotc.OutputType, instance string) *iotc.OutputValue {
 	addr := MakeOutputDiscoveryAddress(node.Address, outputType, instance)
 	return outputValues.GetOutputValueByAddress(addr)
 }

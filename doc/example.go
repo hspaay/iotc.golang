@@ -107,7 +107,7 @@ func SetupNodes(pub *publisher.Publisher, city string) {
 func UpdateWeather(pub *publisher.Publisher) {
 	nodeID := weatherCity
 	// allow custom weather URL from a node configuration, fall back to the default URL
-	requestURL, _ := pub.GetNodeConfigValue(nodeID, "url", DefaultWeatherServiceURL)
+	requestURL, _ := pub.GetNodeConfigString(nodeID, "url", DefaultWeatherServiceURL)
 	resp, err := http.Get(requestURL)
 
 	if err == nil {

@@ -4,69 +4,72 @@ package iotc
 // DefaultOutputInstance is the output instance identifier when only a single instance exists
 const DefaultOutputInstance = "0"
 
+// OutputType defines the convention names for output types
+type OutputType string
+
 // NodeOutput and actuator types
 // These determine the available units and the datatype.
 const (
 	OutputTypeUnknown string = "" // Not a known property type
 
-	OutputTypeAcceleration           string = "acceleration"
-	OutputTypeAirQuality             string = "airquality"
-	OutputTypeAlarm                  string = "alarm"
-	OutputTypeAtmosphericPressure    string = "atmosphericpressure"
-	OutputTypeBattery                string = "battery"
-	OutputTypeCarbonDioxideLevel     string = "co2level"
-	OutputTypeCarbonMonoxideDetector string = "codetector"
-	OutputTypeCarbonMonoxideLevel    string = "colevel"
-	OutputTypeChannel                string = "avchannel"
-	OutputTypeColor                  string = "color"
-	OutputTypeColorTemperature       string = "colortemperature"
-	OutputTypeConnections            string = "connections"
-	OutputTypeCPULevel               string = "cpulevel"
-	OutputTypeDewpoint               string = "dewpoint"
-	OutputTypeDimmer                 string = "dimmer"
-	OutputTypeDoorWindowSensor       string = "doorwindowsensor"
-	OutputTypeElectricCurrent        string = "current"
-	OutputTypeElectricEnergy         string = "energy"
-	OutputTypeElectricPower          string = "power"
-	OutputTypeErrors                 string = "errors"
-	OutputTypeHeatIndex              string = "heatindex"
-	OutputTypeHue                    string = "hue"
-	OutputTypeHumidex                string = "humidex"
-	OutputTypeHumidity               string = "humidity"
-	OutputTypeImage                  string = "image"
-	OutputTypeLatency                string = "Latency"
-	OutputTypeLevel                  string = "level" // multilevel sensor
-	OutputTypeLocation               string = "location"
-	OutputTypeLock                   string = "lock"
-	OutputTypeLuminance              string = "luminance"
-	OutputTypeMotion                 string = "motion"
-	OutputTypeMute                   string = "avmute"
-	OutputTypeOnOffSwitch            string = "switch"
-	OutputTypePlay                   string = "avplay"
-	OutputTypePushButton             string = "pushbutton" // with nr of pushes
-	OutputTypeRain                   string = "rain"
-	OutputTypeRelay                  string = "relay"
-	OutputTypeSaturation             string = "saturation"
-	OutputTypeScale                  string = "scale"
-	OutputTypeSignalStrength         string = "signalstrength"
-	OutputTypeSmokeDetector          string = "smokedetector"
-	OutputTypeSnow                   string = "snow"
-	OutputTypeSoundDetector          string = "sounddetector"
-	OutputTypeTemperature            string = "temperature"
-	OutputTypeUltraviolet            string = "ultraviolet"
-	OutputTypeVibrationDetector      string = "vibrationdetector"
-	OutputTypeValue                  string = "value" // generic value
-	OutputTypeVoltage                string = "voltage"
-	OutputTypeVolume                 string = "volume"
-	OutputTypeWaterLevel             string = "waterlevel"
-	OutputTypeWeather                string = "weather" // description of weather, eg sunny
-	OutputTypeWindHeading            string = "windheading"
-	OutputTypeWindSpeed              string = "windspeed"
+	OutputTypeAcceleration           OutputType = "acceleration"
+	OutputTypeAirQuality             OutputType = "airquality"
+	OutputTypeAlarm                  OutputType = "alarm"
+	OutputTypeAtmosphericPressure    OutputType = "atmosphericpressure"
+	OutputTypeBattery                OutputType = "battery"
+	OutputTypeCarbonDioxideLevel     OutputType = "co2level"
+	OutputTypeCarbonMonoxideDetector OutputType = "codetector"
+	OutputTypeCarbonMonoxideLevel    OutputType = "colevel"
+	OutputTypeChannel                OutputType = "avchannel"
+	OutputTypeColor                  OutputType = "color"
+	OutputTypeColorTemperature       OutputType = "colortemperature"
+	OutputTypeConnections            OutputType = "connections"
+	OutputTypeCPULevel               OutputType = "cpulevel"
+	OutputTypeDewpoint               OutputType = "dewpoint"
+	OutputTypeDimmer                 OutputType = "dimmer"
+	OutputTypeDoorWindowSensor       OutputType = "doorwindowsensor"
+	OutputTypeElectricCurrent        OutputType = "current"
+	OutputTypeElectricEnergy         OutputType = "energy"
+	OutputTypeElectricPower          OutputType = "power"
+	OutputTypeErrors                 OutputType = "errors"
+	OutputTypeHeatIndex              OutputType = "heatindex"
+	OutputTypeHue                    OutputType = "hue"
+	OutputTypeHumidex                OutputType = "humidex"
+	OutputTypeHumidity               OutputType = "humidity"
+	OutputTypeImage                  OutputType = "image"
+	OutputTypeLatency                OutputType = "latency"
+	OutputTypeLevel                  OutputType = "level" // multilevel sensor
+	OutputTypeLocation               OutputType = "location"
+	OutputTypeLock                   OutputType = "lock"
+	OutputTypeLuminance              OutputType = "luminance"
+	OutputTypeMotion                 OutputType = "motion"
+	OutputTypeMute                   OutputType = "avmute"
+	OutputTypeOnOffSwitch            OutputType = "switch"
+	OutputTypePlay                   OutputType = "avplay"
+	OutputTypePushButton             OutputType = "pushbutton" // with nr of pushes
+	OutputTypeRain                   OutputType = "rain"
+	OutputTypeRelay                  OutputType = "relay"
+	OutputTypeSaturation             OutputType = "saturation"
+	OutputTypeScale                  OutputType = "scale"
+	OutputTypeSignalStrength         OutputType = "signalstrength"
+	OutputTypeSmokeDetector          OutputType = "smokedetector"
+	OutputTypeSnow                   OutputType = "snow"
+	OutputTypeSoundDetector          OutputType = "sounddetector"
+	OutputTypeTemperature            OutputType = "temperature"
+	OutputTypeUltraviolet            OutputType = "ultraviolet"
+	OutputTypeVibrationDetector      OutputType = "vibrationdetector"
+	OutputTypeValue                  OutputType = "value" // generic value
+	OutputTypeVoltage                OutputType = "voltage"
+	OutputTypeVolume                 OutputType = "volume"
+	OutputTypeWaterLevel             OutputType = "waterlevel"
+	OutputTypeWeather                OutputType = "weather" // description of weather, eg sunny
+	OutputTypeWindHeading            OutputType = "windheading"
+	OutputTypeWindSpeed              OutputType = "windspeed"
 )
 
 // OutputTypeMap defines data type and unit for an IOType
 // Todo: option to download from file
-// var OutputTypeMap = map[string]struct {
+// var OutputTypeMap = map[OutputType]struct {
 // 	DataType    DataType
 // 	DefaultUnit Unit
 // 	UnitValues  string
@@ -138,16 +141,16 @@ type OutputBatchMessage struct {
 
 // OutputDiscoveryMessage with node output description
 type OutputDiscoveryMessage struct {
-	Address     string   `json:"address"`               // Address of the publication: zone/publisher/node/$output/type/instance
-	DataType    DataType `json:"datatype,omitempty"`    // output value data type, default is string
-	Description string   `json:"description,omitempty"` // optional description for humans
-	EnumValues  []string `json:"enumValues,omitempty"`  // possible enum output values for enum datatype
-	Instance    string   `json:"instance"`              // instance identifier for multi-I/O nodes
-	Max         float32  `json:"max,omitempty"`         // optional max value of output for numeric data types
-	Min         float32  `json:"min,omitempty"`         // optional min value of output for numeric data types
-	Timestamp   string   `json:"timestamp"`             // time the record is created
-	OutputType  string   `json:"outputtype"`            // type of output as per OutputTypeXyz
-	Unit        Unit     `json:"unit,omitempty"`        // unit of output value
+	Address     string     `json:"address"`               // Address of the publication: zone/publisher/node/$output/type/instance
+	DataType    DataType   `json:"dataType,omitempty"`    // output value data type, default is string
+	Description string     `json:"description,omitempty"` // optional description for humans
+	EnumValues  []string   `json:"enumValues,omitempty"`  // possible enum output values for enum datatype
+	Instance    string     `json:"instance"`              // instance identifier for multi-I/O nodes
+	Max         float32    `json:"max,omitempty"`         // optional max value of output for numeric data types
+	Min         float32    `json:"min,omitempty"`         // optional min value of output for numeric data types
+	OutputType  OutputType `json:"outputType"`            // type of output as per OutputTypeXyz
+	Timestamp   string     `json:"timestamp"`             // time the record is created
+	Unit        Unit       `json:"unit,omitempty"`        // unit of output value
 }
 
 // OutputEventMessage message with multiple output values

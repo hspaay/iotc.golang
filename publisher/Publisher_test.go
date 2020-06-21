@@ -176,8 +176,8 @@ func TestConfigure(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
 	pub1.Nodes.UpdateNode(node1)
-	config := nodes.NewNodeConfig("name", iotc.DataTypeString, "Friendly Name", "")
-	pub1.Nodes.UpdateNodeConfig(node1Addr, config)
+	config := nodes.NewNodeConfig(iotc.DataTypeString, "Friendly Name", "")
+	pub1.Nodes.UpdateNodeConfig(node1Addr, "name", config)
 
 	// time.Sleep(time.Second * 1) // receive publications
 

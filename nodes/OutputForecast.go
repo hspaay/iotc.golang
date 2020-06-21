@@ -51,7 +51,7 @@ func (forecastList *OutputForecastList) GetUpdatedForecasts(clearUpdates bool) [
 // UpdateForecast publishes the output forecast list of values
 // outputAddress is the discovery address of the output
 func (forecastList *OutputForecastList) UpdateForecast(
-	nodeAddress string, outputType string, instance string, forecast OutputForecast) {
+	nodeAddress string, outputType iotc.OutputType, instance string, forecast OutputForecast) {
 
 	outputAddress := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 

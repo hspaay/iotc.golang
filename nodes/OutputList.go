@@ -32,7 +32,7 @@ func (outputs *OutputList) GetAllOutputs() []*iotc.OutputDiscoveryMessage {
 // This method is concurrent safe
 // Returns nil if address has no known output
 func (outputs *OutputList) GetOutput(
-	nodeAddress string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
+	nodeAddress string, outputType iotc.OutputType, instance string) *iotc.OutputDiscoveryMessage {
 
 	outputAddr := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 
@@ -100,14 +100,14 @@ func (outputs *OutputList) UpdateOutput(output *iotc.OutputDiscoveryMessage) {
 
 // MakeOutputDiscoveryAddress for publishing or subscribing
 // nodeAddress is the address containing the node. Any node, input or output address will do
-func MakeOutputDiscoveryAddress(nodeAddress string, ioType string, instance string) string {
+func MakeOutputDiscoveryAddress(nodeAddress string, outputType iotc.OutputType, instance string) string {
 	segments := strings.Split(nodeAddress, "/")
 	zone := segments[0]
 	publisherID := segments[1]
 	nodeID := segments[2]
 
 	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+iotc.MessageTypeOutputDiscovery,
-		zone, publisherID, nodeID, ioType, instance)
+		zone, publisherID, nodeID, outputType, instance)
 	return address
 }
 
@@ -117,7 +117,7 @@ func MakeOutputDiscoveryAddress(nodeAddress string, ioType string, instance stri
 // node is the node that contains the output
 // outputType is one of the predefined output types. See constants in the standard
 // instance is the output instance in case of multiple instances of the same type. Use
-func NewOutput(nodeAddress string, outputType string, instance string) *iotc.OutputDiscoveryMessage {
+func NewOutput(nodeAddress string, outputType iotc.OutputType, instance string) *iotc.OutputDiscoveryMessage {
 	// output := NewOutput(node, outputType, instance)
 	address := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 	// segments := strings.Split(nodeAddress, "/")
