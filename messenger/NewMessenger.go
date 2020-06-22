@@ -9,15 +9,17 @@ import (
 //    "DummyMessenger" (default)
 //    MQTTMessenger, requires server, login and credentials properties set
 //
-// config messenger configuration.
-// logger to use. nil to use the internal logger
-//
+// config holds the messenger configuration. If no server is given, 'localhost' will be used.
+// logger is optional in case you want to use a predefined logging. Default is a default logger.
 func NewMessenger(messengerConfig *MessengerConfig, logger *logrus.Logger) IMessenger {
 	var m IMessenger
 	if logger == nil {
 		logger = logrus.New()
 	}
 
+	if messengerConfig.Server == "" {
+		messengerConfig.Server = "localhost"
+	}
 	if messengerConfig.Messenger == "MQTTMessenger" {
 		m = NewMqttMessenger(messengerConfig, logger)
 	} else {

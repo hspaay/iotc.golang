@@ -288,9 +288,10 @@ func (nodes *NodeList) NewNodeConfig(nodeAddr string, attrName iotc.NodeAttr, da
 
 // SetNodeAttr updates node's attributes and publishes the updated node.
 // Node is marked as modified for publication only if one of the attrParams has changes
+//
 // Use when additional node attributes has been discovered.
-// - address of the node to update
-// - param is the map with key-value pairs of attribute values to update
+//  address of the node to update
+//  param is the map with key-value pairs of attribute values to update
 // returns true when node has changed, false if node doesn't exist or attributes haven't changed
 func (nodes *NodeList) SetNodeAttr(address string, attrParams map[iotc.NodeAttr]string) (changed bool) {
 	nodes.updateMutex.Lock()
@@ -315,11 +316,11 @@ func (nodes *NodeList) SetNodeAttr(address string, attrParams map[iotc.NodeAttr]
 	return changed
 }
 
-// SetNodeConfigValues applies an update to a node's existing configuration
+// SetNodeConfigValues applies an update to a node's existing configuration.
 // Nodes are immutable. If one or more configuration values have changed then a new node is created and
 // published and the old node instance is discarded.
-// - address is the node discovery address
-// - param is the map with key-value pairs of configuration values to update
+//  address is the node discovery address
+//  param is the map with key-value pairs of configuration values to update
 // returns true if configuration changes, false if configuration doesn't exist
 func (nodes *NodeList) SetNodeConfigValues(address string, params map[iotc.NodeAttr]string) (changed bool) {
 	nodes.updateMutex.Lock()
@@ -353,30 +354,11 @@ func (nodes *NodeList) SetNodeConfigValues(address string, params map[iotc.NodeA
 	return changed
 }
 
-// // SetNodeRunState updates the node's runstate status
-// func (nodes *NodeList) SetNodeRunState(address string, runState iotc.NodeRunState) (changed bool) {
-// 	nodes.updateMutex.Lock()
-// 	defer nodes.updateMutex.Unlock()
-
-// 	node := nodes.getNode(address)
-// 	if node == nil {
-// 		return false
-// 	}
-
-// 	changed = (node.RunState != runState)
-// 	if changed {
-// 		newNode := nodes.Clone(node)
-// 		newNode.RunState = runState
-// 		nodes.updateNode(newNode)
-// 	}
-// 	return changed
-// }
-
-// SetNodeStatus updates one or more node's status attributes
+// SetNodeStatus updates one or more node's status attributes.
 // Nodes are immutable. If one or more status values have changed then a new node is created and
 // published. The old node instance is discarded.
-// - address of the node to update
-// - statusAttr is the map with key-value pairs of updated node statusses
+//  address of the node to update
+//  statusAttr is the map with key-value pairs of updated node statusses
 func (nodes *NodeList) SetNodeStatus(address string, statusAttr map[iotc.NodeStatus]string) (changed bool) {
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
@@ -399,7 +381,8 @@ func (nodes *NodeList) SetNodeStatus(address string, statusAttr map[iotc.NodeSta
 	return changed
 }
 
-// UpdateNode replaces a node or adds a new node based on node.Address
+// UpdateNode replaces a node or adds a new node based on node.Address.
+//
 // Intended to support Node immutability by making changes to a copy of a node and replacing
 // the existing node with the updated node
 // The updated node will be published
@@ -409,7 +392,8 @@ func (nodes *NodeList) UpdateNode(node *iotc.NodeDiscoveryMessage) {
 	nodes.updateNode(node)
 }
 
-// UpdateNodeConfig updates a node's configuration and publishes the updated node
+// UpdateNodeConfig updates a node's configuration and publishes the updated node.
+//
 // If a config already exists then its value is retained but its configuration parameters are replaced.
 // Nodes are immutable. A new node is created and published and the old node instance is discarded.
 func (nodes *NodeList) UpdateNodeConfig(address string, attrName iotc.NodeAttr, configAttr *iotc.ConfigAttr) {
@@ -424,7 +408,8 @@ func (nodes *NodeList) UpdateNodeConfig(address string, attrName iotc.NodeAttr, 
 	nodes.updateNode(newNode)
 }
 
-// UpdateNodes updates a list of nodes
+// UpdateNodes updates a list of nodes.
+//
 // Intended to update the list with nodes from persistent storage
 func (nodes *NodeList) UpdateNodes(updates []*iotc.NodeDiscoveryMessage) {
 	nodes.updateMutex.Lock()
@@ -445,7 +430,8 @@ func (nodes *NodeList) UpdateNodes(updates []*iotc.NodeDiscoveryMessage) {
 	}
 }
 
-// getNode returns a node by its node address using the domain, publisherID and nodeID
+// getNode returns a node by its node address using the domain, publisherID and nodeID.
+//
 // address must contain the domain, publisher and nodeID. Any other fields are ignored.
 // Intended for use within a locked section for updating, eg lock - read - update - write - unlock
 // Returns nil if address has no known node
@@ -460,8 +446,9 @@ func (nodes *NodeList) getNode(address string) *iotc.NodeDiscoveryMessage {
 	return node
 }
 
-// updateNode replaces a node and adds it to the list of updated nodes
-// Intended for use within a locked section
+// updateNode replaces a node and adds it to the list of updated nodes.
+//
+// Use within a locked section.
 func (nodes *NodeList) updateNode(node *iotc.NodeDiscoveryMessage) {
 	nodes.nodeMap[node.Address] = node
 	if nodes.updatedNodes == nil {
@@ -470,11 +457,11 @@ func (nodes *NodeList) updateNode(node *iotc.NodeDiscoveryMessage) {
 	nodes.updatedNodes[node.Address] = node
 }
 
-// MakeNodeAddress generates the address of a node: domain/publisherID/nodeID[/messageType]
-// domain of the domain the node lives in.
-// publisherID of the publisher for this node, unique for the domain
-// nodeID of the node itself, unique for the publisher
-// messageType is optional
+// MakeNodeAddress generates the address of a node: domain/publisherID/nodeID[/messageType].
+//
+// As per standard, the domain of the domain the node lives in; publisherID of the publisher for this node,
+// unique for the domain; nodeID of the node itself, unique for the publisher; messageType is optional,
+// use "" if it doesn't apply.
 func MakeNodeAddress(domain string, publisherID string, nodeID string, messageType string) string {
 	address := fmt.Sprintf("%s/%s/%s", domain, publisherID, nodeID)
 	if messageType != "" {
@@ -483,11 +470,8 @@ func MakeNodeAddress(domain string, publisherID string, nodeID string, messageTy
 	return address
 }
 
-// MakeNodeDiscoveryAddress generates the address of a node: domain/publisherID/nodeID/$node
+// MakeNodeDiscoveryAddress generates the address of a node: domain/publisherID/nodeID/$node.
 // Intended for lookup of nodes in the node list.
-// domain of the domain the node lives in.
-// publisherID of the publisher for this node, unique for the domain
-// nodeID of the node itself, unique for the publisher
 func MakeNodeDiscoveryAddress(domain string, publisherID string, nodeID string) string {
 	address := fmt.Sprintf("%s/%s/%s/%s", domain, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	return address
@@ -510,8 +494,8 @@ func NewNodeConfig(dataType iotc.DataType, description string, defaultValue stri
 	return &config
 }
 
-// NewNode returns a new instance of a node
-// This node will have default configurations for name and alias
+// NewNode returns a new instance of a node.
+// This node will have default configurations for name and alias.
 func NewNode(domain string, publisherID string, nodeID string, nodeType iotc.NodeType) *iotc.NodeDiscoveryMessage {
 	address := MakeNodeAddress(domain, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	newNode := &iotc.NodeDiscoveryMessage{
@@ -528,7 +512,7 @@ func NewNode(domain string, publisherID string, nodeID string, nodeType iotc.Nod
 	return newNode
 }
 
-// NewNodeList creates a new instance for node management
+// NewNodeList creates a new instance for node management.
 func NewNodeList() *NodeList {
 	nodes := NodeList{
 		nodeMap:     make(map[string]*iotc.NodeDiscoveryMessage),

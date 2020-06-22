@@ -102,23 +102,6 @@ func (publisher *Publisher) NewNode(nodeID string, nodeType iotc.NodeType) strin
 	return addr
 }
 
-// NewNodeConfig creates a new node configuration for a node of this publisher and update the node
-// If the configuration already exists, its dataType, description and defaultValue are updated but
-// the value is retained. This updates the attribute value with the default, if currently no value is set.
-// See NodeList.NewNodeConfig for more details
-// Returns the node config object which can be used with UpdateNodeConfig
-func (publisher *Publisher) NewNodeConfig(
-	nodeID string,
-	attrName iotc.NodeAttr,
-	dataType iotc.DataType,
-	description string,
-	defaultValue string) *iotc.ConfigAttr {
-
-	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
-	config := publisher.Nodes.NewNodeConfig(nodeAddr, attrName, dataType, description, defaultValue)
-	return config
-}
-
 // NewInput creates a new node input and adds it to this publisher inputs list
 // returns the input to allow for easy update
 func (publisher *Publisher) NewInput(nodeID string, inputType iotc.InputType, instance string) *iotc.InputDiscoveryMessage {
@@ -166,6 +149,15 @@ func (publisher *Publisher) SetNodeStatus(nodeID string, status map[iotc.NodeSta
 func (publisher *Publisher) SetNodeErrorStatus(nodeID string, status string, lastError string) {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	publisher.Nodes.SetErrorStatus(nodeAddr, status, lastError)
+}
+
+// UpdateNodeConfig updates a node's configuration and publishes the updated node.
+//
+// If a config already exists then its value is retained but its configuration parameters are replaced.
+// Nodes are immutable. A new node is created and published and the old node instance is discarded.
+func (publisher *Publisher) UpdateNodeConfig(nodeID string, attrName iotc.NodeAttr, configAttr *iotc.ConfigAttr) {
+	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
+	publisher.Nodes.UpdateNodeConfig(nodeAddr, attrName, configAttr)
 }
 
 // UpdateOutputValue adds the new node output value to the front of the value history
