@@ -41,7 +41,7 @@ const (
 	NodeStatusHealth        NodeStatus = "health"        // health status of the device 0-100%
 	NodeStatusLastError     NodeStatus = "lastError"     // most recent error message, or "" if no error
 	NodeStatusLastSeen      NodeStatus = "lastSeen"      // ISO time the device was last seen
-	NodeStatusLatencyMSec   NodeStatus = "latencyMSec"   // duration connect to sensor in milliseconds
+	NodeStatusLatencyMSec   NodeStatus = "latencymsec"   // duration connect to sensor in milliseconds
 	NodeStatusNeighborCount NodeStatus = "neighborCount" // mesh network nr of neighbors
 	NodeStatusNeighborIDs   NodeStatus = "neighborIDs"   // mesh network device neighbors ID list [id,id,...]
 	NodeStatusRxCount       NodeStatus = "rxCount"       // Nr of messages received from device
@@ -116,7 +116,7 @@ type ConfigAttrMap map[NodeAttr]ConfigAttr
 
 // ConfigAttr describes the attributes that are configurable
 type ConfigAttr struct {
-	Datatype    DataType `json:"datatype,omitempty"`    // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
+	DataType    DataType `json:"datatype,omitempty"`    // Data type of the attribute. [integer, float, boolean, string, bytes, enum, ...]
 	Default     string   `json:"default,omitempty"`     // Default value
 	Description string   `json:"description,omitempty"` // Description of the attribute
 	Enum        []string `json:"enum,omitempty"`        // Possible valid enum values
@@ -139,7 +139,7 @@ type NodeDiscoveryMessage struct {
 	Attr        NodeAttrMap   `json:"attr,omitempty"`   // Attributes describing this node
 	Config      ConfigAttrMap `json:"config,omitempty"` // Description of configurable attributes
 	NodeID      string        `json:"nodeId"`           // The node immutable ID
-	PublisherID string        `json:"publisher"`        // publisher managing this node
+	PublisherID string        `json:"publisherId"`      // publisher managing this node
 	Status      NodeStatusMap `json:"status,omitempty"` // Node performance status information
 	Type        NodeType      `json:"type"`             // node type
 }

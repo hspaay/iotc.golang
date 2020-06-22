@@ -269,12 +269,12 @@ func (nodes *NodeList) NewNodeConfig(nodeAddr string, attrName iotc.NodeAttr, da
 		// update existing config or create a new one
 		if !configExists {
 			config = iotc.ConfigAttr{
-				Datatype:    dataType,
+				DataType:    dataType,
 				Description: description,
 				Default:     defaultValue,
 			}
 		} else {
-			config.Datatype = dataType
+			config.DataType = dataType
 			config.Default = defaultValue
 			config.Description = description
 		}
@@ -503,7 +503,7 @@ func MakeNodeDiscoveryAddress(domain string, publisherID string, nodeID string) 
 // returns a new Configuration Attribute instance.
 func NewNodeConfig(dataType iotc.DataType, description string, defaultValue string) *iotc.ConfigAttr {
 	config := iotc.ConfigAttr{
-		Datatype:    dataType,
+		DataType:    dataType,
 		Description: description,
 		Default:     defaultValue,
 	}
@@ -515,13 +515,13 @@ func NewNodeConfig(dataType iotc.DataType, description string, defaultValue stri
 func NewNode(domain string, publisherID string, nodeID string, nodeType iotc.NodeType) *iotc.NodeDiscoveryMessage {
 	address := MakeNodeAddress(domain, publisherID, nodeID, iotc.MessageTypeNodeDiscovery)
 	newNode := &iotc.NodeDiscoveryMessage{
-		Address: address,
-		Attr:    map[iotc.NodeAttr]string{},
-		Config:  map[iotc.NodeAttr]iotc.ConfigAttr{},
-		NodeID:  nodeID,
-		// PublisherID: publisherID,
-		Status: make(map[iotc.NodeStatus]string),
-		Type:   nodeType,
+		Address:     address,
+		Attr:        map[iotc.NodeAttr]string{},
+		Config:      map[iotc.NodeAttr]iotc.ConfigAttr{},
+		NodeID:      nodeID,
+		PublisherID: publisherID,
+		Status:      make(map[iotc.NodeStatus]string),
+		Type:        nodeType,
 	}
 	newNode.Config[iotc.NodeAttrAlias] = *NewNodeConfig(iotc.DataTypeString, "Alias node ID for inputs and outputs", "")
 	newNode.Config[iotc.NodeAttrName] = *NewNodeConfig(iotc.DataTypeString, "Human friendly node name", "")

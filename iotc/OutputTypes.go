@@ -55,6 +55,7 @@ const (
 	OutputTypeSmokeDetector          OutputType = "smokedetector"
 	OutputTypeSnow                   OutputType = "snow"
 	OutputTypeSoundDetector          OutputType = "sounddetector"
+	OutputTypeSwitch                 OutputType = "switch" // on/off switch: "on" "off"
 	OutputTypeTemperature            OutputType = "temperature"
 	OutputTypeUltraviolet            OutputType = "ultraviolet"
 	OutputTypeVibrationDetector      OutputType = "vibrationdetector"
