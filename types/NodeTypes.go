@@ -1,5 +1,5 @@
-// Package iotc with IoTConnect node message type definitions
-package iotc
+// Package types with IoTDomain node message type definitions
+package types
 
 // Predefined node attribute names that describe the node.
 // When they are configurable they also appear in Node Config section.
@@ -12,7 +12,7 @@ const (
 	NodeAttrFilename        NodeAttr = "filename"        // filename to write images or other values to
 	NodeAttrGatewayAddress  NodeAttr = "gatewayAddress"  // the node gateway address
 	NodeAttrHostname        NodeAttr = "hostname"        // network device hostname
-	NodeAttrIotcVersion     NodeAttr = "iotcVersion"     // IotConnect version
+	NodeAttrIotcVersion     NodeAttr = "iotcVersion"     // IoTDomain version
 	NodeAttrLatLon          NodeAttr = "latlon"          // latitude, longitude of the device for display on a map r/w
 	NodeAttrLocalIP         NodeAttr = "localIP"         // for IP nodes
 	NodeAttrLocationName    NodeAttr = "locationName"    // name of a location

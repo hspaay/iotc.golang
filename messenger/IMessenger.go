@@ -35,7 +35,7 @@ type IMessenger interface {
 
 	// Publish a message. The publisher must sign and optionally encrypt the message before
 	// publishing, using the Signing method specified in the config.
-	//  address to subscribe to as per IotConnect standard
+	//  address to subscribe to as per IoTDomain standard
 	//  retained to have MQTT persists the last message
 	//  message is a serialized message to send
 	Publish(address string, retained bool, message string) error

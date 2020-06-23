@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // OutputHistory with history values
-type OutputHistory []iotc.OutputValue
+type OutputHistory []types.OutputValue
 
 // OutputValueList with output values for all outputs
 type OutputValueList struct {
@@ -30,8 +30,8 @@ func (outputValues *OutputValueList) GetHistory(address string) OutputHistory {
 
 // GetOutputValueByAddress returns the most recent output value by output discovery address
 // This returns a HistoryValue object with the latest value and timestamp it was updated
-func (outputValues *OutputValueList) GetOutputValueByAddress(address string) *iotc.OutputValue {
-	var latest *iotc.OutputValue
+func (outputValues *OutputValueList) GetOutputValueByAddress(address string) *types.OutputValue {
+	var latest *types.OutputValue
 
 	outputValues.updateMutex.Lock()
 	defer outputValues.updateMutex.Unlock()
@@ -47,7 +47,7 @@ func (outputValues *OutputValueList) GetOutputValueByAddress(address string) *io
 
 // GetOutputValueByType returns the current output value by output type and instance
 func (outputValues *OutputValueList) GetOutputValueByType(
-	node *iotc.NodeDiscoveryMessage, outputType iotc.OutputType, instance string) *iotc.OutputValue {
+	node *types.NodeDiscoveryMessage, outputType types.OutputType, instance string) *types.OutputValue {
 	addr := MakeOutputDiscoveryAddress(node.Address, outputType, instance)
 	return outputValues.GetOutputValueByAddress(addr)
 }
@@ -95,7 +95,7 @@ func (outputValues *OutputValueList) UpdateOutputStringList(address string, valu
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
 func (outputValues *OutputValueList) UpdateOutputValue(address string, newValue string) bool {
-	var previous *iotc.OutputValue
+	var previous *types.OutputValue
 	var repeatDelay = 3600 // default repeat delay is 1 hour
 	var ageSeconds = -1
 	var hasUpdated = false
@@ -145,9 +145,9 @@ func (outputValues *OutputValueList) UpdateOutputValue(address string, newValue 
 func updateHistory(history OutputHistory, newValue string, maxHistorySize int) OutputHistory {
 
 	timeStamp := time.Now()
-	timeStampStr := timeStamp.Format(iotc.TimeFormat)
+	timeStampStr := timeStamp.Format(types.TimeFormat)
 
-	latest := iotc.OutputValue{
+	latest := types.OutputValue{
 		Timestamp: timeStampStr,
 		EpochTime: timeStamp.Unix(),
 		Value:     newValue,

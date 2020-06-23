@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
-	"github.com/hspaay/iotc.golang/nodes"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/types"
 	log "github.com/sirupsen/logrus"
 	"github.com/square/go-jose"
 )
@@ -63,7 +63,7 @@ func (subscriber *Subscriber) Stop() {
 // address contains the publisher's identity address: domain/publisherId/$identity
 // message is the LWS signed message containing the publisher identity
 func (subscriber *Subscriber) handlePublisherDiscovery(address string, message string) {
-	var pubIdentityMsg iotc.PublisherIdentityMessage
+	var pubIdentityMsg types.PublisherIdentityMessage
 	var payload string
 
 	// message can be signed or not signed so start with trying to parse

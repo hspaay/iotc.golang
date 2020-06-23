@@ -4,8 +4,8 @@ package publisher
 import (
 	"strings"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // handle an incoming a set command for input of one of our nodes. This:
@@ -13,7 +13,7 @@ import (
 // - checks if the node is valid
 // - pass the input value update to the adapter's onNodeInputHandler callback
 func (publisher *Publisher) handleNodeInput(address string, message string) {
-	var setMessage iotc.SetInputMessage
+	var setMessage types.SetInputMessage
 
 	// Check that address is one of our inputs
 	segments := strings.Split(address, "/")
@@ -22,7 +22,7 @@ func (publisher *Publisher) handleNodeInput(address string, message string) {
 		return
 	}
 	// domain/pub/node/inputtype/instance/$input
-	segments[5] = iotc.MessageTypeInputDiscovery
+	segments[5] = types.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
 	input := publisher.Inputs.GetInputByAddress(inputAddr)
 

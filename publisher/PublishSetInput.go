@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // PublishSetInput sets the input of a remote node by this publisher
@@ -20,12 +20,12 @@ func (publisher *Publisher) PublishSetInput(remoteNodeInputAddress string, value
 		return
 	}
 	// zone/pub/node/inputtype/instance/$set
-	segments[5] = iotc.MessageTypeSet
+	segments[5] = types.MessageTypeSet
 	inputAddr := strings.Join(segments, "/")
 
 	// Encecode the SetMessage
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
-	var setMessage = iotc.SetInputMessage{
+	var setMessage = types.SetInputMessage{
 		Address:   inputAddr,
 		Sender:    publisher.Address(),
 		Timestamp: timeStampStr,

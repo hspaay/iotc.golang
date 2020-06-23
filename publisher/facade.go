@@ -6,13 +6,13 @@ package publisher
 import (
 	"crypto/ecdsa"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/nodes"
+	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // GetConfigValue convenience function to get a configuration value
 // This retuns the 'default' value if no value is set
-// func GetConfigValue(configMap map[string]iotc.ConfigAttr, attrName string) string {
+// func GetConfigValue(configMap map[string]iotd.ConfigAttr, attrName string) string {
 // 	config, configExists := configMap[attrName]
 // 	if !configExists {
 // 		return ""
@@ -26,7 +26,7 @@ import (
 // GetNodeConfigBool convenience function to get a node configuration value as a boolean
 // This retuns the given default if no configuration value exists and no configuration default is set
 func (publisher *Publisher) GetNodeConfigBool(
-	nodeID string, attrName iotc.NodeAttr, defaultValue bool) (value bool, err error) {
+	nodeID string, attrName types.NodeAttr, defaultValue bool) (value bool, err error) {
 	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
 	return publisher.Nodes.GetNodeConfigBool(nodeAddr, attrName, defaultValue)
 }
@@ -34,7 +34,7 @@ func (publisher *Publisher) GetNodeConfigBool(
 // GetNodeConfigFloat convenience function to get a node configuration value as a float number
 // This retuns the given default if no configuration value exists and no configuration default is set
 func (publisher *Publisher) GetNodeConfigFloat(
-	nodeID string, attrName iotc.NodeAttr, defaultValue float32) (value float32, err error) {
+	nodeID string, attrName types.NodeAttr, defaultValue float32) (value float32, err error) {
 	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
 	return publisher.Nodes.GetNodeConfigFloat(nodeAddr, attrName, defaultValue)
 }
@@ -42,7 +42,7 @@ func (publisher *Publisher) GetNodeConfigFloat(
 // GetNodeConfigInt convenience function to get a node configuration value as an integer
 // This retuns the given default if no configuration value exists and no configuration default is set
 func (publisher *Publisher) GetNodeConfigInt(
-	nodeID string, attrName iotc.NodeAttr, defaultValue int) (value int, err error) {
+	nodeID string, attrName types.NodeAttr, defaultValue int) (value int, err error) {
 	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
 	return publisher.Nodes.GetNodeConfigInt(nodeAddr, attrName, defaultValue)
 }
@@ -50,21 +50,21 @@ func (publisher *Publisher) GetNodeConfigInt(
 // GetNodeConfigString convenience function to get a node configuration value as a string
 // This retuns the given default if no configuration value exists and no configuration default is set
 func (publisher *Publisher) GetNodeConfigString(
-	nodeID string, attrName iotc.NodeAttr, defaultValue string) (value string, err error) {
+	nodeID string, attrName types.NodeAttr, defaultValue string) (value string, err error) {
 	nodeAddr := publisher.MakeNodeDiscoveryAddress(nodeID)
 	return publisher.Nodes.GetNodeConfigString(nodeAddr, attrName, defaultValue)
 }
 
 // GetNodeByID returns a node from this publisher or nil if the id isn't found in this publisher
 // This is a convenience function as publishers tend to do this quite often
-func (publisher *Publisher) GetNodeByID(nodeID string) (node *iotc.NodeDiscoveryMessage) {
+func (publisher *Publisher) GetNodeByID(nodeID string) (node *types.NodeDiscoveryMessage) {
 	node = publisher.Nodes.GetNodeByID(publisher.Domain(), publisher.PublisherID(), nodeID)
 	return node
 }
 
 // GetNodeStatus returns a node's status attribute
 // This is a convenience function. See NodeList.GetNodeStatus for details
-func (publisher *Publisher) GetNodeStatus(nodeID string, attrName iotc.NodeStatus) (value string, exists bool) {
+func (publisher *Publisher) GetNodeStatus(nodeID string, attrName types.NodeStatus) (value string, exists bool) {
 	node := publisher.Nodes.GetNodeByID(publisher.Domain(), publisher.PublisherID(), nodeID)
 	if node == nil {
 		return "", false
@@ -75,7 +75,7 @@ func (publisher *Publisher) GetNodeStatus(nodeID string, attrName iotc.NodeStatu
 
 // GetOutputByType returns a node output object using node id and output type and instance
 // This is a convenience function using the publisher's output list
-func (publisher *Publisher) GetOutputByType(nodeID string, outputType iotc.OutputType, instance string) *iotc.OutputDiscoveryMessage {
+func (publisher *Publisher) GetOutputByType(nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	output := publisher.Outputs.GetOutputByAddress(outputAddr)
@@ -97,14 +97,14 @@ func (publisher *Publisher) MakeNodeDiscoveryAddress(nodeID string) string {
 // NewNode creates a new node and add it to this publisher's discovered nodes
 // This is a convenience function that uses the publisher domain and id to create a node in its node list.
 // returns the node's address
-func (publisher *Publisher) NewNode(nodeID string, nodeType iotc.NodeType) string {
+func (publisher *Publisher) NewNode(nodeID string, nodeType types.NodeType) string {
 	addr := publisher.Nodes.NewNode(publisher.Domain(), publisher.PublisherID(), nodeID, nodeType)
 	return addr
 }
 
 // NewInput creates a new node input and adds it to this publisher inputs list
 // returns the input to allow for easy update
-func (publisher *Publisher) NewInput(nodeID string, inputType iotc.InputType, instance string) *iotc.InputDiscoveryMessage {
+func (publisher *Publisher) NewInput(nodeID string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	input := nodes.NewInput(nodeAddr, inputType, instance)
 	publisher.Inputs.UpdateInput(input)
@@ -114,7 +114,7 @@ func (publisher *Publisher) NewInput(nodeID string, inputType iotc.InputType, in
 // NewOutput creates a new node output adds it to this publisher outputs list
 // This is a convenience function for the publisher.Outputs list
 // returns the output object to allow for easy updates
-func (publisher *Publisher) NewOutput(nodeID string, outputType iotc.OutputType, instance string) *iotc.OutputDiscoveryMessage {
+func (publisher *Publisher) NewOutput(nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	output := nodes.NewOutput(nodeAddr, outputType, instance)
 	publisher.Outputs.UpdateOutput(output)
@@ -124,21 +124,21 @@ func (publisher *Publisher) NewOutput(nodeID string, outputType iotc.OutputType,
 // PublishRaw immediately publishes the given value of a node, output type and instance on the
 // $raw output address. The content can be signed but is not encrypted.
 // This is intended for publishing large values that should not be stored, for example images
-func (publisher *Publisher) PublishRaw(output *iotc.OutputDiscoveryMessage, sign bool, value []byte) {
-	aliasAddress := publisher.getOutputAliasAddress(output.Address, iotc.MessageTypeRaw)
+func (publisher *Publisher) PublishRaw(output *types.OutputDiscoveryMessage, sign bool, value []byte) {
+	aliasAddress := publisher.getOutputAliasAddress(output.Address, types.MessageTypeRaw)
 	publisher.publishSigned(aliasAddress, sign, string(value))
 }
 
 // SetNodeAttr sets one or more attributes of the node
 // This only updates the node if the status or lastError message changes
-func (publisher *Publisher) SetNodeAttr(nodeID string, attrParams map[iotc.NodeAttr]string) (changed bool) {
+func (publisher *Publisher) SetNodeAttr(nodeID string, attrParams map[types.NodeAttr]string) (changed bool) {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	return publisher.Nodes.SetNodeAttr(nodeAddr, attrParams)
 }
 
 // SetNodeStatus sets one or more status attributes of the node
 // This only updates the node if the status or lastError message changes
-func (publisher *Publisher) SetNodeStatus(nodeID string, status map[iotc.NodeStatus]string) (changed bool) {
+func (publisher *Publisher) SetNodeStatus(nodeID string, status map[types.NodeStatus]string) (changed bool) {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	return publisher.Nodes.SetNodeStatus(nodeAddr, status)
 }
@@ -155,14 +155,14 @@ func (publisher *Publisher) SetNodeErrorStatus(nodeID string, status string, las
 //
 // If a config already exists then its value is retained but its configuration parameters are replaced.
 // Nodes are immutable. A new node is created and published and the old node instance is discarded.
-func (publisher *Publisher) UpdateNodeConfig(nodeID string, attrName iotc.NodeAttr, configAttr *iotc.ConfigAttr) {
+func (publisher *Publisher) UpdateNodeConfig(nodeID string, attrName types.NodeAttr, configAttr *types.ConfigAttr) {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	publisher.Nodes.UpdateNodeConfig(nodeAddr, attrName, configAttr)
 }
 
 // UpdateOutputValue adds the new node output value to the front of the value history
 // See NodeList.UpdateOutputValue for more details
-func (publisher *Publisher) UpdateOutputValue(nodeID string, outputType iotc.OutputType, instance string, newValue string) bool {
+func (publisher *Publisher) UpdateOutputValue(nodeID string, outputType types.OutputType, instance string, newValue string) bool {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
 	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	return publisher.OutputValues.UpdateOutputValue(outputAddr, newValue)

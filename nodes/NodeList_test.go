@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,7 +12,7 @@ const node1ID = "node1"
 const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
 const publisher2ID = "publisher2"
-const domain1ID = iotc.LocalDomainID
+const domain1ID = types.LocalDomainID
 
 var node1Base = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1AliasID)
@@ -36,7 +36,7 @@ var node1historyAddr = node1Base + "/switch/0/$history"
 // TestNewNode instance
 func TestNewNode(t *testing.T) {
 	nodeList := NewNodeList()
-	node := nodeList.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+	node := nodeList.NewNode(domain1ID, publisher1ID, node1ID, types.NodeTypeUnknown)
 
 	if !assert.NotNil(t, node, "Failed creating node") {
 		return
@@ -50,12 +50,12 @@ func TestNewNode(t *testing.T) {
 // Test updating of node atributes and status
 func TestAttrStatus(t *testing.T) {
 	nodeList := NewNodeList()
-	nodeList.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+	nodeList.NewNode(domain1ID, publisher1ID, node1ID, types.NodeTypeUnknown)
 
-	newAttr := map[iotc.NodeAttr]string{"Manufacturer": "Bob"}
+	newAttr := map[types.NodeAttr]string{"Manufacturer": "Bob"}
 	nodeList.SetNodeAttr(node1Addr, newAttr)
 
-	newStatus := map[iotc.NodeStatus]string{"LastUpdated": "now"}
+	newStatus := map[types.NodeStatus]string{"LastUpdated": "now"}
 	nodeList.SetNodeStatus(node1Addr, newStatus)
 
 	node1 := nodeList.GetNodeByAddress(node1Addr)
@@ -74,17 +74,17 @@ func TestAttrStatus(t *testing.T) {
 // TestConfigure tests if the node configuration is handled
 func TestConfigure(t *testing.T) {
 	nodeList := NewNodeList()
-	nodeAddr := nodeList.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+	nodeAddr := nodeList.NewNode(domain1ID, publisher1ID, node1ID, types.NodeTypeUnknown)
 
-	config := NewNodeConfig(iotc.DataTypeString, "Friendly Name", "")
-	nodeList.UpdateNodeConfig(nodeAddr, iotc.NodeAttrName, config)
+	config := NewNodeConfig(types.DataTypeString, "Friendly Name", "")
+	nodeList.UpdateNodeConfig(nodeAddr, types.NodeAttrName, config)
 
-	newValues := map[iotc.NodeAttr]string{iotc.NodeAttrName: "NewName"}
+	newValues := map[types.NodeAttr]string{types.NodeAttrName: "NewName"}
 	nodeList.SetNodeConfigValues(nodeAddr, newValues)
 	// node1 must match the newly added node
 	node := nodeList.GetNodeByAddress(node1Addr)
-	config2 := node.Config[iotc.NodeAttrName]
-	value2 := node.Attr[iotc.NodeAttrName]
+	config2 := node.Config[types.NodeAttrName]
+	value2 := node.Attr[types.NodeAttrName]
 	if !assert.NotNil(t, config2, "Can't find configuration for name") {
 		return
 	}

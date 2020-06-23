@@ -2,8 +2,8 @@
 package publisher
 
 import (
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // handle an incoming a configuration command for one of our nodes. This:
@@ -13,7 +13,7 @@ import (
 // - save node configuration if persistence is set
 // TODO: support for authorization per node
 func (publisher *Publisher) handleNodeConfigCommand(address string, message string) {
-	var configureMessage iotc.NodeConfigureMessage
+	var configureMessage types.NodeConfigureMessage
 
 	// Expect the message to be encrypted
 	isEncrypted, dmessage, err := messenger.DecryptMessage(message, publisher.identityPrivateKey)

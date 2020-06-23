@@ -4,11 +4,11 @@ package nodes
 import (
 	"sync"
 
-	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // OutputForecast with forecasted values
-type OutputForecast []iotc.OutputValue
+type OutputForecast []types.OutputValue
 
 // OutputForecastList with management of forecasts for outputs
 // A forecast is a list of timestamps with projected values
@@ -51,7 +51,7 @@ func (forecastList *OutputForecastList) GetUpdatedForecasts(clearUpdates bool) [
 // UpdateForecast publishes the output forecast list of values
 // outputAddress is the discovery address of the output
 func (forecastList *OutputForecastList) UpdateForecast(
-	nodeAddress string, outputType iotc.OutputType, instance string, forecast OutputForecast) {
+	nodeAddress string, outputType types.OutputType, instance string, forecast OutputForecast) {
 
 	outputAddress := MakeOutputDiscoveryAddress(nodeAddress, outputType, instance)
 

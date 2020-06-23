@@ -1,5 +1,5 @@
-// Package iotc with units for input and outputs and time format
-package iotc
+// Package types with units for input and outputs and time format
+package types
 
 // TimeFormat for publishing messages
 const TimeFormat = "2006-01-02T15:04:05.000-0700"

@@ -3,8 +3,8 @@ package publisher
 import (
 	"reflect"
 
-	"github.com/hspaay/iotc.golang/messenger"
-	"github.com/hspaay/iotc.golang/persist"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/persist"
 	"github.com/sirupsen/logrus"
 )
 

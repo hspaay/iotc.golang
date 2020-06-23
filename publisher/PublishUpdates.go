@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
-	"github.com/hspaay/iotc.golang/persist"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/persist"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // PublishIdentity publishes this publisher's identity on startup or update
@@ -92,12 +92,12 @@ func (publisher *Publisher) PublishUpdatedOutputValues() {
 //  message type for publication.
 // If the node doesn't have an alias then its nodeId will be kept.
 // messageType to substitute in the address. Use "" to keep the original message type (usually discovery message)
-func (publisher *Publisher) getOutputAliasAddress(address string, messageType iotc.MessageType) string {
+func (publisher *Publisher) getOutputAliasAddress(address string, messageType types.MessageType) string {
 	node := publisher.Nodes.GetNodeByAddress(address)
 	if node == nil {
 		return address
 	}
-	alias, _ := publisher.Nodes.GetNodeConfigString(address, iotc.NodeAttrAlias, "")
+	alias, _ := publisher.Nodes.GetNodeConfigString(address, types.NodeAttrAlias, "")
 	// alias, hasAlias := nodes.GetNodeAlias(node)
 	// zone/pub/node/outtype/instance/messagetype
 	parts := strings.Split(address, "/")
@@ -115,9 +115,9 @@ func (publisher *Publisher) getOutputAliasAddress(address string, messageType io
 // publish all node output values in the $event command
 // zone/publisher/nodealias/$event
 // TODO: decide when to invoke this
-func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
+func (publisher *Publisher) publishEvent(node *types.NodeDiscoveryMessage) {
 	// output values are published using their alias address, if any
-	aliasAddress := publisher.getOutputAliasAddress(node.Address, iotc.MessageTypeEvent)
+	aliasAddress := publisher.getOutputAliasAddress(node.Address, types.MessageTypeEvent)
 	publisher.logger.Infof("Publisher.publishEvent: %s", aliasAddress)
 
 	outputs := publisher.Outputs.GetNodeOutputs(node)
@@ -128,7 +128,7 @@ func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 		attrID := string(output.OutputType) + "/" + output.Instance
 		event[attrID] = latest.Value
 	}
-	eventMessage := &iotc.OutputEventMessage{
+	eventMessage := &types.OutputEventMessage{
 		Address:   aliasAddress,
 		Event:     event,
 		Timestamp: timeStampStr,
@@ -138,9 +138,9 @@ func (publisher *Publisher) publishEvent(node *iotc.NodeDiscoveryMessage) {
 
 // publish the $latest output value
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishLatest(outputAddress string, unit iotc.Unit) {
+func (publisher *Publisher) publishLatest(outputAddress string, unit types.Unit) {
 	// output values are published using their alias address, if any
-	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeLatest)
+	aliasAddress := publisher.getOutputAliasAddress(outputAddress, types.MessageTypeLatest)
 
 	// zone/publisher/node/iotype/instance/$latest
 	latest := publisher.OutputValues.GetOutputValueByAddress(outputAddress)
@@ -149,7 +149,7 @@ func (publisher *Publisher) publishLatest(outputAddress string, unit iotc.Unit) 
 		return
 	}
 	publisher.logger.Infof("Publisher.publishLatest: %s", aliasAddress)
-	latestMessage := &iotc.OutputLatestMessage{
+	latestMessage := &types.OutputLatestMessage{
 		Address:   aliasAddress,
 		Timestamp: latest.Timestamp,
 		// Timestamp: latest.TimeStamp,
@@ -161,13 +161,13 @@ func (publisher *Publisher) publishLatest(outputAddress string, unit iotc.Unit) 
 
 // publish the $forecast output values retained=true
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishForecast(outputAddress string, unit iotc.Unit) {
+func (publisher *Publisher) publishForecast(outputAddress string, unit types.Unit) {
 	// output values are published using their alias address, if any
-	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeForecast)
+	aliasAddress := publisher.getOutputAliasAddress(outputAddress, types.MessageTypeForecast)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	forecast := publisher.OutputForecasts.GetForecast(outputAddress)
 
-	forecastMessage := &iotc.OutputForecastMessage{
+	forecastMessage := &types.OutputForecastMessage{
 		Address:   aliasAddress,
 		Duration:  0, // tbd
 		Timestamp: timeStampStr,
@@ -180,13 +180,13 @@ func (publisher *Publisher) publishForecast(outputAddress string, unit iotc.Unit
 
 // publish the $history output values retained=true
 // not thread-safe, using within a locked section
-func (publisher *Publisher) publishHistory(outputAddress string, unit iotc.Unit) {
+func (publisher *Publisher) publishHistory(outputAddress string, unit types.Unit) {
 	// output values are published using their alias address, if any
-	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeHistory)
+	aliasAddress := publisher.getOutputAliasAddress(outputAddress, types.MessageTypeHistory)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	history := publisher.OutputValues.GetHistory(outputAddress)
 
-	historyMessage := &iotc.OutputHistoryMessage{
+	historyMessage := &types.OutputHistoryMessage{
 		Address:   aliasAddress,
 		Duration:  0, // tbd
 		Timestamp: timeStampStr,
@@ -221,7 +221,7 @@ func (publisher *Publisher) publishObject(address string, retained bool, object 
 func (publisher *Publisher) publishRawValue(outputAddress string) error {
 
 	// output values are published using their alias address, if any
-	aliasAddress := publisher.getOutputAliasAddress(outputAddress, iotc.MessageTypeRaw)
+	aliasAddress := publisher.getOutputAliasAddress(outputAddress, types.MessageTypeRaw)
 
 	// publish raw value with the $raw command
 	latest := publisher.OutputValues.GetOutputValueByAddress(outputAddress)

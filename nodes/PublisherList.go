@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // const DSSAddress = ""
@@ -16,17 +16,17 @@ import (
 // PublisherList with discovered and verified publishers
 type PublisherList struct {
 	// don't access directly. This is only accessible for serialization
-	publisherMap  map[string]*iotc.PublisherIdentityMessage
+	publisherMap  map[string]*types.PublisherIdentityMessage
 	publisherKeys map[string]*ecdsa.PublicKey
 	updateMutex   *sync.Mutex // mutex for async updating of nodes
 }
 
 // GetAllPublishers returns a list of discovered publishers
-func (pubList *PublisherList) GetAllPublishers() []*iotc.PublisherIdentityMessage {
+func (pubList *PublisherList) GetAllPublishers() []*types.PublisherIdentityMessage {
 	pubList.updateMutex.Lock()
 	defer pubList.updateMutex.Unlock()
 
-	var identList = make([]*iotc.PublisherIdentityMessage, 0)
+	var identList = make([]*types.PublisherIdentityMessage, 0)
 	for _, identity := range pubList.publisherMap {
 		identList = append(identList, identity)
 	}
@@ -35,8 +35,8 @@ func (pubList *PublisherList) GetAllPublishers() []*iotc.PublisherIdentityMessag
 
 // GetDSSIdentity returns the Domain Security Service publisher identity
 // Returns nil if no DSS was received
-func (pubList *PublisherList) GetDSSIdentity(domain string) *iotc.PublisherPublicIdentity {
-	addr := MakePublisherIdentityAddress(domain, iotc.DSSPublisherID)
+func (pubList *PublisherList) GetDSSIdentity(domain string) *types.PublisherPublicIdentity {
+	addr := MakePublisherIdentityAddress(domain, types.DSSPublisherID)
 	dssMessage := pubList.GetPublisherByAddress(addr)
 	if dssMessage == nil {
 		// DSS for the domain wasn't received
@@ -47,7 +47,7 @@ func (pubList *PublisherList) GetDSSIdentity(domain string) *iotc.PublisherPubli
 
 // GetPublisherByAddress returns a publisher Identity by its identity discovery address
 // Returns nil if address has no known node
-func (pubList *PublisherList) GetPublisherByAddress(address string) *iotc.PublisherIdentityMessage {
+func (pubList *PublisherList) GetPublisherByAddress(address string) *types.PublisherIdentityMessage {
 	pubList.updateMutex.Lock()
 	defer pubList.updateMutex.Unlock()
 
@@ -64,7 +64,7 @@ func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.Pu
 		// missing publisherId
 		return nil
 	}
-	identityAddress := fmt.Sprintf("%s/%s/%s", segments[0], segments[1], iotc.MessageTypeIdentity)
+	identityAddress := fmt.Sprintf("%s/%s/%s", segments[0], segments[1], types.MessageTypeIdentity)
 
 	// Use cached key instead of regenerating them each time
 	pubKey := pubList.publisherKeys[identityAddress]
@@ -82,7 +82,7 @@ func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.Pu
 
 // // SignIdentity returns a base64URL encoded signature of the given identity
 // // used to sign the identity.
-// func (pubList *PublisherList) SignIdentity(ident *iotc.PublisherIdentity, privKey *jose.SigningKey) string {
+// func (pubList *PublisherList) SignIdentity(ident *types.PublisherIdentity, privKey *jose.SigningKey) string {
 // 	signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
 // 	signer, _ := jose.NewSigner(signingKey, nil)
 // 	payload, _ := json.Marshal(ident)
@@ -94,7 +94,7 @@ func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.Pu
 
 // UpdatePublisher replaces a publisher identity
 // Intended for use within a locked section
-func (pubList *PublisherList) UpdatePublisher(pub *iotc.PublisherIdentityMessage) {
+func (pubList *PublisherList) UpdatePublisher(pub *types.PublisherIdentityMessage) {
 	pubList.updateMutex.Lock()
 	defer pubList.updateMutex.Unlock()
 
@@ -108,14 +108,14 @@ func (pubList *PublisherList) UpdatePublisher(pub *iotc.PublisherIdentityMessage
 // domain of the domain the node lives in.
 // publisherID of the publisher for this node, unique for the domain
 func MakePublisherIdentityAddress(domain string, publisherID string) string {
-	address := fmt.Sprintf("%s/%s/%s", domain, publisherID, iotc.MessageTypeIdentity)
+	address := fmt.Sprintf("%s/%s/%s", domain, publisherID, types.MessageTypeIdentity)
 	return address
 }
 
 // NewPublisherList creates a new list of discovered publishers
 func NewPublisherList() *PublisherList {
 	pubList := &PublisherList{
-		publisherMap:  make(map[string]*iotc.PublisherIdentityMessage),
+		publisherMap:  make(map[string]*types.PublisherIdentityMessage),
 		publisherKeys: make(map[string]*ecdsa.PublicKey),
 		updateMutex:   &sync.Mutex{},
 	}

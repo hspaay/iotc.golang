@@ -1,5 +1,5 @@
-// Package iotc with IoTConnect message types used in message addressing
-package iotc
+// Package types with IoTDomain message types used in message addressing
+package types
 
 // MessageType used in message addressing
 type MessageType string

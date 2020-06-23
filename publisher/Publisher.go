@@ -16,10 +16,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
-	"github.com/hspaay/iotc.golang/nodes"
-	"github.com/hspaay/iotc.golang/persist"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/persist"
+	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
@@ -39,10 +39,10 @@ const (
 )
 
 // NodeConfigHandler callback when command to update node config is received
-type NodeConfigHandler func(node *iotc.NodeDiscoveryMessage, config iotc.NodeAttrMap) iotc.NodeAttrMap
+type NodeConfigHandler func(node *types.NodeDiscoveryMessage, config types.NodeAttrMap) types.NodeAttrMap
 
 // NodeInputHandler callback when command to update node input is received
-type NodeInputHandler func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage)
+type NodeInputHandler func(input *types.InputDiscoveryMessage, message *types.SetInputMessage)
 
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
@@ -58,16 +58,16 @@ type Publisher struct {
 	discoveryHandler  func(publisher *Publisher) // function that performs discovery
 	domainPublishers  *nodes.PublisherList       // publishers on the network by discovery address
 
-	fullIdentity        *iotc.PublisherFullIdentity // this publishers identity
-	identityPrivateKey  *ecdsa.PrivateKey           // key for signing and encryption
-	isRunning           bool                        // publisher was started and is running
-	logger              *log.Logger                 // logger for all publisher's logging
-	messenger           messenger.IMessenger        // Message bus messenger to use
-	onNodeConfigHandler NodeConfigHandler           // handle before applying configuration
-	onNodeInputHandler  NodeInputHandler            // handle to update device/service input
-	pollHandler         func(publisher *Publisher)  // function that performs value polling
-	pollCountdown       int                         // countdown each heartbeat
-	pollInterval        int                         // value polling interval in seconds
+	fullIdentity        *types.PublisherFullIdentity // this publishers identity
+	identityPrivateKey  *ecdsa.PrivateKey            // key for signing and encryption
+	isRunning           bool                         // publisher was started and is running
+	logger              *log.Logger                  // logger for all publisher's logging
+	messenger           messenger.IMessenger         // Message bus messenger to use
+	onNodeConfigHandler NodeConfigHandler            // handle before applying configuration
+	onNodeInputHandler  NodeInputHandler             // handle to update device/service input
+	pollHandler         func(publisher *Publisher)   // function that performs value polling
+	pollCountdown       int                          // countdown each heartbeat
+	pollInterval        int                          // value polling interval in seconds
 
 	// background publications require a mutex to prevent concurrent access
 	exitChannel   chan bool
@@ -93,7 +93,7 @@ func (publisher *Publisher) Domain() string {
 }
 
 // Identity return this publisher's full identity
-func (publisher *Publisher) Identity() *iotc.PublisherFullIdentity {
+func (publisher *Publisher) Identity() *types.PublisherFullIdentity {
 	return publisher.fullIdentity
 }
 
@@ -165,13 +165,13 @@ func (publisher *Publisher) SetLogging(levelName string, filename string) {
 
 // SetNodeConfigHandler set the handler for updating node configuration
 func (publisher *Publisher) SetNodeConfigHandler(
-	handler func(node *iotc.NodeDiscoveryMessage, config iotc.NodeAttrMap) iotc.NodeAttrMap) {
+	handler func(node *types.NodeDiscoveryMessage, config types.NodeAttrMap) types.NodeAttrMap) {
 	publisher.onNodeConfigHandler = handler
 }
 
 // SetNodeInputHandler set the handler for updating node inputs
 func (publisher *Publisher) SetNodeInputHandler(
-	handler func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage)) {
+	handler func(input *types.InputDiscoveryMessage, message *types.SetInputMessage)) {
 	publisher.onNodeInputHandler = handler
 }
 
@@ -192,7 +192,7 @@ func (publisher *Publisher) LoadFromCache(folder string, autosave bool) error {
 		publisher.cacheFolder = folder
 	}
 	if folder != "" {
-		nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
+		nodeList := make([]*types.NodeDiscoveryMessage, 0)
 		err = persist.LoadNodesFromCache(folder, publisher.PublisherID(), &nodeList)
 		if err == nil {
 			publisher.Nodes.UpdateNodes(nodeList)
@@ -250,7 +250,7 @@ func (publisher *Publisher) Start() {
 		publisher.messenger.Connect("", "")
 
 		// Subscribe to receive configuration and set messages for any of our nodes
-		configAddr := nodes.MakeNodeAddress(publisher.Domain(), publisher.PublisherID(), "+", iotc.MessageTypeConfigure)
+		configAddr := nodes.MakeNodeAddress(publisher.Domain(), publisher.PublisherID(), "+", types.MessageTypeConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
 		inputAddr := nodes.MakeInputSetAddress(configAddr, "+", "+")
@@ -367,7 +367,7 @@ func NewPublisher(
 ) *Publisher {
 
 	if domain == "" {
-		domain = iotc.LocalDomainID
+		domain = types.LocalDomainID
 	}
 	if signingMethod == "" {
 		signingMethod = SigningMethodJWS

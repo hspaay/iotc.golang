@@ -11,7 +11,7 @@ import (
 	"errors"
 	"reflect"
 
-	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/iotdomain/iotdomain-go/types"
 	"gopkg.in/square/go-jose.v2"
 )
 
@@ -44,7 +44,7 @@ func CreateJWSSignature(payload string, privateKey *ecdsa.PrivateKey) (string, e
 
 // SignEncodeIdentity returns a base64URL encoded ECDSA256 signature of the publisher identity.
 // Used in creating or updating a publisher's identity.
-func SignEncodeIdentity(ident *iotc.PublisherPublicIdentity, privKey *ecdsa.PrivateKey) string {
+func SignEncodeIdentity(ident *types.PublisherPublicIdentity, privKey *ecdsa.PrivateKey) string {
 	signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
 	signer, _ := jose.NewSigner(signingKey, nil)
 	payload, _ := json.Marshal(ident)

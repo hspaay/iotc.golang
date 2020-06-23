@@ -1,5 +1,5 @@
-// Package iotc with IOTConnect data types used in input and output messages
-package iotc
+// Package types with IoTDomain data types used in input and output messages
+package types
 
 // DataType of configuration, input and ouput values.
 type DataType string

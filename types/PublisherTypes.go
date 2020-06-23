@@ -1,5 +1,5 @@
-// Package iotc with IoTConnect publisher message type definitions
-package iotc
+// Package types with publisher message type definitions
+package types
 
 // DSSPublisherID contains the publisherID of a domain's security service
 const DSSPublisherID = "$dss"

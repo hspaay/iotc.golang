@@ -6,22 +6,22 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/iotdomain/iotdomain-go/types"
 )
 
 // InputList with input management
 type InputList struct {
-	inputMap      map[string]*iotc.InputDiscoveryMessage
-	updateMutex   *sync.Mutex                            // mutex for async updating of inputs
-	updatedInputs map[string]*iotc.InputDiscoveryMessage // inputs that have been rediscovered/updated since last publication
+	inputMap      map[string]*types.InputDiscoveryMessage
+	updateMutex   *sync.Mutex                             // mutex for async updating of inputs
+	updatedInputs map[string]*types.InputDiscoveryMessage // inputs that have been rediscovered/updated since last publication
 }
 
 // GetAllInputs returns the list of inputs
-func (inputs *InputList) GetAllInputs() []*iotc.InputDiscoveryMessage {
+func (inputs *InputList) GetAllInputs() []*types.InputDiscoveryMessage {
 	inputs.updateMutex.Lock()
 	defer inputs.updateMutex.Unlock()
 
-	var inputList = make([]*iotc.InputDiscoveryMessage, 0)
+	var inputList = make([]*types.InputDiscoveryMessage, 0)
 	for _, input := range inputs.inputMap {
 		inputList = append(inputList, input)
 	}
@@ -32,7 +32,7 @@ func (inputs *InputList) GetAllInputs() []*iotc.InputDiscoveryMessage {
 // Returns nil if address has no known input
 // address with node type and instance. The command will be ignored.
 func (inputs *InputList) GetInput(
-	nodeAddress string, inputType iotc.InputType, instance string) *iotc.InputDiscoveryMessage {
+	nodeAddress string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
 	// segments := strings.Split(address, "/")
 	// segments[3] = standard.CommandInputDiscovery
 	// inputAddr := strings.Join(segments, "/")
@@ -48,7 +48,7 @@ func (inputs *InputList) GetInput(
 // inputAddr must contain the full input address, eg <zone>/<publisher>/<node>/"$input"/<type>/<instance>
 // Returns nil if address has no known input
 // This method is concurrent safe
-func (inputs *InputList) GetInputByAddress(inputAddr string) *iotc.InputDiscoveryMessage {
+func (inputs *InputList) GetInputByAddress(inputAddr string) *types.InputDiscoveryMessage {
 	inputs.updateMutex.Lock()
 	var input = inputs.inputMap[inputAddr]
 	inputs.updateMutex.Unlock()
@@ -57,8 +57,8 @@ func (inputs *InputList) GetInputByAddress(inputAddr string) *iotc.InputDiscover
 
 // GetUpdatedInputs returns the list of discovered inputs that have been updated
 // clear the update on return
-func (inputs *InputList) GetUpdatedInputs(clearUpdates bool) []*iotc.InputDiscoveryMessage {
-	var updateList []*iotc.InputDiscoveryMessage = make([]*iotc.InputDiscoveryMessage, 0)
+func (inputs *InputList) GetUpdatedInputs(clearUpdates bool) []*types.InputDiscoveryMessage {
+	var updateList []*types.InputDiscoveryMessage = make([]*types.InputDiscoveryMessage, 0)
 
 	inputs.updateMutex.Lock()
 	if inputs.updatedInputs != nil {
@@ -75,24 +75,24 @@ func (inputs *InputList) GetUpdatedInputs(clearUpdates bool) []*iotc.InputDiscov
 
 // UpdateInput replaces the input using the node.Address
 // This method is concurrent safe
-func (inputs *InputList) UpdateInput(input *iotc.InputDiscoveryMessage) {
+func (inputs *InputList) UpdateInput(input *types.InputDiscoveryMessage) {
 	inputs.updateMutex.Lock()
 	inputs.inputMap[input.Address] = input
 	if inputs.updatedInputs == nil {
-		inputs.updatedInputs = make(map[string]*iotc.InputDiscoveryMessage)
+		inputs.updatedInputs = make(map[string]*types.InputDiscoveryMessage)
 	}
 	inputs.updatedInputs[input.Address] = input
 	inputs.updateMutex.Unlock()
 }
 
 // MakeInputDiscoveryAddress creates the address for the input discovery
-func MakeInputDiscoveryAddress(nodeAddress string, inputType iotc.InputType, instance string) string {
+func MakeInputDiscoveryAddress(nodeAddress string, inputType types.InputType, instance string) string {
 	segments := strings.Split(nodeAddress, "/")
 	zone := segments[0]
 	publisherID := segments[1]
 	nodeID := segments[2]
 
-	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+iotc.MessageTypeInputDiscovery,
+	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+types.MessageTypeInputDiscovery,
 		zone, publisherID, nodeID, inputType, instance)
 	return address
 }
@@ -105,17 +105,17 @@ func MakeInputSetAddress(nodeAddress string, ioType string, instance string) str
 	publisherID := segments[1]
 	nodeID := segments[2]
 
-	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+iotc.MessageTypeSet,
+	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+types.MessageTypeSet,
 		zone, publisherID, nodeID, ioType, instance)
 	return address
 }
 
 // NewInput instance
 // To add it to the inputlist use 'UpdateInput'
-func NewInput(nodeAddr string, inputType iotc.InputType, instance string) *iotc.InputDiscoveryMessage {
+func NewInput(nodeAddr string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
 	address := MakeInputDiscoveryAddress(nodeAddr, inputType, instance)
 	// segments := strings.Split(nodeAddress, "/")
-	input := &iotc.InputDiscoveryMessage{
+	input := &types.InputDiscoveryMessage{
 		Address:   address,
 		Instance:  instance,
 		InputType: inputType,
@@ -127,7 +127,7 @@ func NewInput(nodeAddr string, inputType iotc.InputType, instance string) *iotc.
 // NewInputList creates a new instance for input management
 func NewInputList() *InputList {
 	inputs := InputList{
-		inputMap:    make(map[string]*iotc.InputDiscoveryMessage),
+		inputMap:    make(map[string]*types.InputDiscoveryMessage),
 		updateMutex: &sync.Mutex{},
 	}
 	return &inputs

@@ -1,5 +1,5 @@
-// Package iotc with IoTConnect output message type definitions and constants
-package iotc
+// Package types with output message type definitions and constants
+package types
 
 // DefaultOutputInstance is the output instance identifier when only a single instance exists
 const DefaultOutputInstance = "0"

@@ -5,14 +5,14 @@
    "issuerName": "publisher1",
    "location": "local",
    "organization": "",
-   "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIDuB1Y3yXHlr4HwuMgbhxJZzUt+y\nAKWA9dae5wTR8isNgzYBxV2mri1y0AJYpZsAEgbDdKs1swdUAuMHQDmB2w==\n-----END PUBLIC KEY-----\n",
+   "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEH701q/UVQ0WPH135P/T0LKoOcI9Z\nbC4RHKAS+HjgxU9VH4Zk/NQVMbQoTLdSCqeCellnKFKmL5h8Ac77fyHK2w==\n-----END PUBLIC KEY-----\n",
    "publisherId": "publisher1",
-   "timestamp": "2020-06-18T10:01:35.383-0700",
-   "validUntil": "2021-06-18T10:01:35.383-0700"
+   "timestamp": "2020-06-22T20:14:48.785-0700",
+   "validUntil": "2021-06-22T20:14:48.785-0700"
   },
-  "signature": "1THszr1Dj2KY1uD5egpzaqCJpswb26Fv76s-7L4iCrnrIJb2X6GJ25mG6iLElszJOh06X7hAm2uKjPwtYZ1A9Q==",
+  "signature": "8Mw-euPk4BgZWlJr4lioz3TC9MxVbhSJjoAihNf3L748vUroYYP6S0IdTx9r5hx2rs7a0LvIMru3cB8DOePUtw==",
   "signer": "publisher1",
-  "timestamp": "2020-06-18T10:01:35.383-0700",
-  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIHT28MVhpr1JPNt50mk74ZvVaxaINiHfTTQuVv75m0GRoAoGCCqGSM49\nAwEHoUQDQgAEIDuB1Y3yXHlr4HwuMgbhxJZzUt+yAKWA9dae5wTR8isNgzYBxV2m\nri1y0AJYpZsAEgbDdKs1swdUAuMHQDmB2w==\n-----END PRIVATE KEY-----\n",
+  "timestamp": "2020-06-22T20:14:48.785-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIGS0kRd1y/fcU/HA+D1K0Jh8j77DO/u/h3PEKWDoIRRloAoGCCqGSM49\nAwEHoUQDQgAEH701q/UVQ0WPH135P/T0LKoOcI9ZbC4RHKAS+HjgxU9VH4Zk/NQV\nMbQoTLdSCqeCellnKFKmL5h8Ac77fyHK2w==\n-----END PRIVATE KEY-----\n",
   "sender": ""
  }

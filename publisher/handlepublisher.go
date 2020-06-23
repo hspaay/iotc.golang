@@ -6,16 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
-	"github.com/hspaay/iotc.golang/nodes"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/types"
 	"gopkg.in/square/go-jose.v2"
 )
 
 // handleIdentityUpdate handles the set command for an update to this publisher identity.
 // The message must be encrypted and signed by the DSS or it will be discarded.
 func (publisher *Publisher) handleIdentityUpdate(address string, message string) {
-	var fullIdentity iotc.PublisherFullIdentity
+	var fullIdentity types.PublisherFullIdentity
 
 	// Expect the message to be encrypted
 	isEncrypted, dmessage, err := messenger.DecryptMessage(message, publisher.identityPrivateKey)
@@ -39,7 +39,7 @@ func (publisher *Publisher) handleIdentityUpdate(address string, message string)
 		publisher.logger.Warnf("handleIdentityUpdate: Signature verification failed for  %s. Message discarded.", address)
 		return
 	}
-	dssAddress := nodes.MakePublisherIdentityAddress(publisher.Domain(), iotc.DSSPublisherID)
+	dssAddress := nodes.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
 	if fullIdentity.Sender != dssAddress {
 		publisher.logger.Warnf("handleIdentityUpdate: Sender is %s instead of the DSS. Identity update discarded.", fullIdentity.Sender)
 
@@ -53,8 +53,8 @@ func (publisher *Publisher) handleIdentityUpdate(address string, message string)
 // handleDSSDiscovery discoveres the identity of the domain security service
 // The DSS publish signing key is used to verify the identity of all publishers
 // Without a DSS, all publishers are unverified.
-func (publisher *Publisher) handleDSSDiscovery(dssIdentityMsg *iotc.PublisherIdentityMessage) {
-	var dssIdentity *iotc.PublisherIdentityMessage
+func (publisher *Publisher) handleDSSDiscovery(dssIdentityMsg *types.PublisherIdentityMessage) {
+	var dssIdentity *types.PublisherIdentityMessage
 	// Verify the identity of the DSS
 	// TODO: CA support. For now assume address protection is used so this is trusted.
 
@@ -75,7 +75,7 @@ func (publisher *Publisher) handleDSSDiscovery(dssIdentityMsg *iotc.PublisherIde
 // address contains the publisher's identity address: <domain>/<publisher>/$identity
 // message contains the publisher identity message
 func (publisher *Publisher) handlePublisherDiscovery(address string, message string) {
-	var pubIdentityMsg *iotc.PublisherIdentityMessage
+	var pubIdentityMsg *types.PublisherIdentityMessage
 	var payload string
 
 	// message can be signed or not signed so start with trying to parse
@@ -102,7 +102,7 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	}
 
 	// Handle the DSS publisher separately
-	dssAddress := fmt.Sprintf("%s/%s/%s", publisher.Domain(), iotc.DSSPublisherID, iotc.MessageTypeIdentity)
+	dssAddress := fmt.Sprintf("%s/%s/%s", publisher.Domain(), types.DSSPublisherID, types.MessageTypeIdentity)
 	if address == dssAddress {
 		publisher.handleDSSDiscovery(pubIdentityMsg)
 		return

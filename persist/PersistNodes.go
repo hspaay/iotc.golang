@@ -1,4 +1,4 @@
-// Package persist with configuration for IoTConnect publishers and/or subscribers
+// Package persist with configuration for publishers and/or subscribers
 package persist
 
 import (
@@ -57,7 +57,7 @@ func SaveNodesToCache(cacheFolder string, publisherID string, nodeList interface
 
 // SaveInputs saves the discovered inputs to cache
 // cacheFolder is  the location for the files
-//   Use "" for default, which is <userhome>/.cache/iotconnect
+//   Use "" for default, which is <userhome>/.cache/iotdomain
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the object to hold list of nodes
 func SaveInputs(cacheFolder string, publisherID string, inputList interface{}) error {
@@ -66,7 +66,7 @@ func SaveInputs(cacheFolder string, publisherID string, inputList interface{}) e
 
 // SaveOutputs saves the discovered outputs to cache
 // cacheFolder contains the location for the files
-//   Use "" for default, which is <userhome>/.config/iotconnect
+//   Use "" for default, which is <userhome>/.config/iotdomain
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the object to hold list of nodes
 func SaveOutputs(cacheFolder string, publisherID string, outputList interface{}) error {

@@ -4,8 +4,8 @@ package persist
 import (
 	"testing"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/nodes"
+	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -50,9 +50,9 @@ func TestSave(t *testing.T) {
 	logger := logrus.New()
 	logger.SetReportCaller(true) // publisher logging includes caller and file:line#
 
-	nodeList := make([]*iotc.NodeDiscoveryMessage, 0)
-	nodeList2 := make([]*iotc.NodeDiscoveryMessage, 0)
-	nodeList = append(nodeList, nodes.NewNode("zone1", "publisher1", "node1", iotc.NodeTypeAdapter))
+	nodeList := make([]*types.NodeDiscoveryMessage, 0)
+	nodeList2 := make([]*types.NodeDiscoveryMessage, 0)
+	nodeList = append(nodeList, nodes.NewNode("zone1", "publisher1", "node1", types.NodeTypeAdapter))
 
 	err := SaveNodesToCache(cacheFolder, PublisherID, nodeList)
 	assert.NoError(t, err, "Failed saving config")

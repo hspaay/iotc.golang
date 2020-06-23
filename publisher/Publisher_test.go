@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/messenger"
-	"github.com/hspaay/iotc.golang/nodes"
+	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ const cacheFolder = "../test/cache"
 var node1Base = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1ID)
 var node1Alias = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
-var node1 = nodes.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+var node1 = nodes.NewNode(domain1ID, publisher1ID, node1ID, types.NodeTypeUnknown)
 var node1ConfigureAddr = node1Base + "/$configure"
 var node1InputAddr = node1Base + "/switch/0/$input"
 var node1InputSetAddr = node1Base + "/switch/0/$set"
@@ -78,7 +78,7 @@ func TestDiscover(t *testing.T) {
 		return
 	}
 	assert.Equalf(t, node1InputAddr, tmpIn.Address, "Input address doesn't match")
-	assert.Equalf(t, "switch", tmpIn.InputType, "Input Type doesn't match")
+	assert.Equalf(t, types.InputTypeSwitch, tmpIn.InputType, "Input Type doesn't match")
 	assert.Equalf(t, "0", tmpIn.Instance, "Input Instance doesn't match")
 
 	pub1.Outputs.UpdateOutput(node1Output1)
@@ -112,7 +112,7 @@ func TestNodePublication(t *testing.T) {
 	assert.NoError(t, err, "Publication signing not valid %s", pubAddr)
 
 	// assert.NotEmpty(t, p0.Signature, "Missing signature in publication")
-	var p0Node iotc.NodeDiscoveryMessage
+	var p0Node types.NodeDiscoveryMessage
 	err = json.Unmarshal([]byte(payload), &p0Node)
 	assert.NoError(t, err, "Failed parsing node message publication")
 	assert.Equal(t, node1Addr, p0Node.Address, "published node doesn't match address")
@@ -140,7 +140,7 @@ func TestAlias(t *testing.T) {
 
 	// Stress concurrency, run test with -race
 	for i := 1; i < 10; i++ {
-		go pub1.Nodes.SetNodeConfigValues(node1Addr, map[iotc.NodeAttr]string{"alias": node1AliasID})
+		go pub1.Nodes.SetNodeConfigValues(node1Addr, map[types.NodeAttr]string{"alias": node1AliasID})
 		time.Sleep(130 * time.Millisecond)
 		node := pub1.Nodes.GetNodeByAddress(node1Addr)
 		_, _ = json.Marshal(node)
@@ -159,13 +159,13 @@ func TestAlias(t *testing.T) {
 		return
 	}
 
-	var out iotc.OutputDiscoveryMessage
+	var out types.OutputDiscoveryMessage
 	err = json.Unmarshal([]byte(payload), &out)
 	if !assert.NoError(t, err, "Failed to unmarshal published message") {
 		return
 	}
 	assert.Equal(t, node1Output1Addr, out.Address, "published output has unexpected address")
-	assert.Equal(t, iotc.OutputTypeOnOffSwitch, out.OutputType, "published output has unexpected iotype")
+	assert.Equal(t, types.OutputTypeOnOffSwitch, out.OutputType, "published output has unexpected iotype")
 }
 
 // TestConfigure tests if the node configuration is handled
@@ -176,21 +176,21 @@ func TestConfigure(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
 	pub1.Nodes.UpdateNode(node1)
-	config := nodes.NewNodeConfig(iotc.DataTypeString, "Friendly Name", "")
+	config := nodes.NewNodeConfig(types.DataTypeString, "Friendly Name", "")
 	pub1.Nodes.UpdateNodeConfig(node1Addr, "name", config)
 
 	// time.Sleep(time.Second * 1) // receive publications
 
 	// publish a configuration update for the name -> NewName
 	// var payload = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "attr": {"name":"NewName"} }`,
-	// node1ConfigureAddr, pubAddr, time.Now().Format(iotc.TimeFormat))
+	// node1ConfigureAddr, pubAddr, time.Now().Format(types.TimeFormat))
 	// // signatureBase64 := messenger.CreateEcdsaSignature(m, pub1.identityPrivateKey)
 	// // payload := fmt.Sprintf(`{"signature": "%s", "message": %s }`, signatureBase64, message)
 	// message, _ := messenger.CreateJWSSignature(payload, pub1.identityPrivateKey)
 	// testMessenger.OnReceive(node1ConfigureAddr, message)
 
 	pubKey := pub1.domainPublishers.GetPublisherKey(node1ConfigureAddr)
-	attrMap := iotc.NodeAttrMap{"name": "NewName"}
+	attrMap := types.NodeAttrMap{"name": "NewName"}
 	pub1.PublishConfigureNode(node1ConfigureAddr, attrMap, pubKey)
 
 	// config := map[string]string{"alias": "myalias"}
@@ -211,7 +211,7 @@ func TestOutputValue(t *testing.T) {
 	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	// assert.Nilf(t, node1.Config["alias"], "Alias set for node 1, unexpected")
-	node1 = nodes.NewNode(domain1ID, publisher1ID, node1ID, iotc.NodeTypeUnknown)
+	node1 = nodes.NewNode(domain1ID, publisher1ID, node1ID, types.NodeTypeUnknown)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
@@ -235,7 +235,7 @@ func TestOutputValue(t *testing.T) {
 
 	// test $latest publication
 	p2 := testMessenger.FindLastPublication(node1latestAddr)
-	var latest iotc.OutputLatestMessage
+	var latest types.OutputLatestMessage
 	if !assert.NotNil(t, p2) {
 		return
 	}
@@ -246,7 +246,7 @@ func TestOutputValue(t *testing.T) {
 	// test $history publication
 	p3 := testMessenger.FindLastPublication(node1historyAddr)
 	payload, _ = messenger.VerifyJWSMessage(p3, &pub1.identityPrivateKey.PublicKey)
-	var history iotc.OutputHistoryMessage
+	var history types.OutputHistoryMessage
 	json.Unmarshal([]byte(payload), &history)
 	assert.Len(t, history.History, 1, "History length differs")
 
@@ -265,7 +265,7 @@ func TestReceiveInput(t *testing.T) {
 	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
+	pub1.SetNodeInputHandler(func(input *types.InputDiscoveryMessage, message *types.SetInputMessage) {
 		pub1.logger.Infof("Received message: '%s'", message.Value)
 		pub1.OutputValues.UpdateOutputValue(node1Output1Addr, message.Value)
 	})
@@ -279,7 +279,7 @@ func TestReceiveInput(t *testing.T) {
 
 	// Pass a set input command to the onreceive handler
 	var payload = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
-		node1InputSetAddr, pubAddr, time.Now().Format(iotc.TimeFormat))
+		node1InputSetAddr, pubAddr, time.Now().Format(types.TimeFormat))
 
 	// sign the command
 	message, err := messenger.CreateJWSSignature(payload, pub1.identityPrivateKey)
@@ -308,7 +308,7 @@ func TestSetInput(t *testing.T) {
 	var receivedInputValue = ""
 	pub1 := NewPublisher(identityFolder, cacheFolder, domain1ID, publisher1ID, signingMethod, testMessenger)
 
-	pub1.SetNodeInputHandler(func(input *iotc.InputDiscoveryMessage, message *iotc.SetInputMessage) {
+	pub1.SetNodeInputHandler(func(input *types.InputDiscoveryMessage, message *types.SetInputMessage) {
 		receivedInputValue = message.Value
 	})
 	pub1.Inputs.UpdateInput(node1Input1)

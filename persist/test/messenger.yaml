@@ -1,4 +1,4 @@
-# Test yaml configuration for iotconnect messenger
+# Test yaml configuration for messenger
 
 type: "DummyMessenger"
 

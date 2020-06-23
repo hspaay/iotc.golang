@@ -1,4 +1,4 @@
-// Package persist with configuration for IoTConnect publishers and/or subscribers
+// Package persist with configuration for publishers and/or subscribers
 package persist
 
 import (
@@ -20,11 +20,11 @@ const MessengerConfigFile = "messenger.yaml"
 // UserHomeDir is the user's home folder for default config
 var UserHomeDir, _ = os.UserHomeDir()
 
-// DefaultConfigFolder for IoTConnect publisher configuration files: ~/.config/iotc
-var DefaultConfigFolder = path.Join(UserHomeDir, ".config", "iotc")
+// DefaultConfigFolder for publisher configuration files: ~/.config/iotc
+var DefaultConfigFolder = path.Join(UserHomeDir, ".config", "iotdomain")
 
 // DefaultCacheFolder for caching discovered nodes and other publishers
-var DefaultCacheFolder = path.Join(UserHomeDir, ".cache", "iotc")
+var DefaultCacheFolder = path.Join(UserHomeDir, ".cache", "iotdomain")
 
 // LoadAppConfig loads the application configuration from a configuration file
 //
@@ -51,7 +51,7 @@ func LoadMessengerConfig(configFolder string, messengerConfig interface{}) error
 // It performs template substitution of expressions {publisher} and {hostname}
 //
 // altConfigFolder contains the location for the configuration files.
-//   Use "" for default, which is <userhome>/.config/iotconnect
+//   Use "" for default, which is <userhome>/.config/iotdomain
 // filename has the name of the file to load
 // publisherID is used for possible substitution use in the config file
 // target is the destination object. This must have a yaml encoding set for the fields

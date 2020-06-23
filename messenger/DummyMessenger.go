@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hspaay/iotc.golang/iotc"
+	"github.com/iotdomain/iotdomain-go/types"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,11 +42,11 @@ func (messenger *DummyMessenger) FindLastPublication(addr string) (message strin
 }
 
 // GetDomain returns the domain in which this messenger operates
-// This is provided via the messenger config file or defaults to iotc.LocalDomainID
+// This is provided via the messenger config file or defaults to types.LocalDomainID
 func (messenger *DummyMessenger) GetDomain() string {
 	domain := messenger.config.Domain
 	if domain == "" {
-		return iotc.LocalDomainID
+		return types.LocalDomainID
 	}
 	return domain
 }

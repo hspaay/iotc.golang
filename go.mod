@@ -1,8 +1,8 @@
-module github.com/hspaay/iotc.golang
+module github.com/iotdomain/iotdomain-go
 
 go 1.13
 
-// replace github.com/hspaay/iotc.golang => ../iotc.golang
+// replace github.com/iotdomain/iotdomain-go => ../iotdomain-go
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.2.0
@@ -14,4 +14,4 @@ require (
 	gopkg.in/yaml.v2 v2.3.0
 )
 
-// replace github.com/hspaay/iotc.golang/standard => ../standard
+// replace github.com/iotdomain/iotdomain-go/standard => ../standard

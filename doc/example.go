@@ -6,11 +6,11 @@ This example assumes you have a MQTT broker running locally.
 
 ## Step 1: Create A New Project
 
-This uses golang modules so you can use the folder of your choice. The project folder used here is *~/Projects/iotc/myweather*. More info on go modules can be found here: https://blog.golang.org/using-go-modules
+This uses golang modules so you can use the folder of your choice. The project folder used here is *~/Projects/iotd/myweather*. More info on go modules can be found here: https://blog.golang.org/using-go-modules
 
 ~~~bash
-mkdir -p ~/Projects/iotc/myweather
-cd ~/Projects/iotc/myweather
+mkdir -p ~/Projects/iotd/myweather
+cd ~/Projects/iotd/myweather
 go mod init myweather
    > go: creating new go.mod: module myweather
 ~~~
@@ -18,7 +18,7 @@ go mod init myweather
 Create a file named 'myweather.go' that looks like:
 ~~~golang
 package main
-import "github.com/hspaay/iotc.golang"
+import "github.com/iotdomain/iotdomain-go"
 import "fmt"
 func main() {
   fmt.Printf("hello, myweather\n")
@@ -52,14 +52,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hspaay/iotc.golang/iotc"
-	"github.com/hspaay/iotc.golang/publisher"
+	"github.com/iotdomain/iotdomain-go/publisher"
+	"github.com/iotdomain/iotdomain-go/types"
 	"io/ioutil"
 	"net/http"
 )
 
 const appID = "myweather"
-const domain = iotc.LocalDomainID
+const domain = types.LocalDomainID
 const mqttServerAddress = "localhost"
 const outputTypeForecast = "forecast"
 
@@ -95,15 +95,15 @@ var appConfig = &AppConfig{
 
 // SetupNodes creates a node for each city with outputs for temperature and humidity
 func SetupNodes(pub *publisher.Publisher, city string) {
-	pub.NewNode(city, iotc.NodeTypeWeatherService)
-	output := pub.NewOutput(city, iotc.OutputTypeTemperature, iotc.DefaultOutputInstance)
-	output.Unit = iotc.UnitCelcius
+	pub.NewNode(city, types.NodeTypeWeatherService)
+	output := pub.NewOutput(city, types.OutputTypeTemperature, types.DefaultOutputInstance)
+	output.Unit = types.UnitCelcius
 	pub.Outputs.UpdateOutput(output)
-	pub.NewOutput(city, iotc.OutputTypeHumidity, iotc.DefaultOutputInstance)
+	pub.NewOutput(city, types.OutputTypeHumidity, types.DefaultOutputInstance)
 }
 
 // UpdateWeather obtains the forecast and updates the output value.
-// The iotc library will automatically publish the output discovery and values.
+// The iotd library will automatically publish the output discovery and values.
 func UpdateWeather(pub *publisher.Publisher) {
 	nodeID := weatherCity
 	// allow custom weather URL from a node configuration, fall back to the default URL
@@ -118,18 +118,18 @@ func UpdateWeather(pub *publisher.Publisher) {
 		// This publishes the forecast on local/myweather/amsterdam/$value/forecast/0
 		temp := fmt.Sprintf("%0.1f", weather.Main.Temperature)
 		hum := fmt.Sprintf("%d", weather.Main.Humidity)
-		pub.UpdateOutputValue(nodeID, iotc.OutputTypeTemperature, iotc.DefaultOutputInstance, temp)
-		pub.UpdateOutputValue(nodeID, iotc.OutputTypeHumidity, iotc.DefaultOutputInstance, hum)
-		pub.SetNodeErrorStatus(nodeID, iotc.NodeRunStateReady, "Forecast loaded successfully")
+		pub.UpdateOutputValue(nodeID, types.OutputTypeTemperature, types.DefaultOutputInstance, temp)
+		pub.UpdateOutputValue(nodeID, types.OutputTypeHumidity, types.DefaultOutputInstance, hum)
+		pub.SetNodeErrorStatus(nodeID, types.NodeRunStateReady, "Forecast loaded successfully")
 	} else {
 		// pub.SetOutputError(nodeID, OutputType, OutputTypeTemperature, "Forecast not available")
-		pub.SetNodeErrorStatus(nodeID, iotc.NodeRunStateError, "Forecast not available")
+		pub.SetNodeErrorStatus(nodeID, types.NodeRunStateError, "Forecast not available")
 	}
 }
 
 // Run the example
 func main() {
-	// this auto loads the messenger.yaml and myweather.yaml from ~/.config/iotc
+	// this auto loads the messenger.yaml and myweather.yaml from ~/.config/iotd
 	pub, _ := publisher.NewAppPublisher(appID, "", "", appConfig, false)
 
 	SetupNodes(pub, weatherCity)
