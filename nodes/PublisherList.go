@@ -64,7 +64,7 @@ func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.Pu
 		// missing publisherId
 		return nil
 	}
-	identityAddress := fmt.Sprintf("%s/%s/%s", segments[0], segments[1], types.MessageTypeIdentity)
+	identityAddress := MakePublisherIdentityAddress(segments[0], segments[1])
 
 	// Use cached key instead of regenerating them each time
 	pubKey := pubList.publisherKeys[identityAddress]
@@ -109,7 +109,7 @@ func (pubList *PublisherList) UpdatePublisher(pub *types.PublisherIdentityMessag
 // publisherID of the publisher for this node, unique for the domain
 func MakePublisherIdentityAddress(domain string, publisherID string) string {
 	address := fmt.Sprintf("%s/%s/%s", domain, publisherID, types.MessageTypeIdentity)
-	return address
+	return strings.ToLower(address)
 }
 
 // NewPublisherList creates a new list of discovered publishers

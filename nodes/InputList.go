@@ -1,8 +1,9 @@
-// Package nodes with handling of node inputs
+// Package nodes with handling of various node inputs
 package nodes
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -62,8 +63,8 @@ func (inputs *InputList) GetUpdatedInputs(clearUpdates bool) []*types.InputDisco
 
 	inputs.updateMutex.Lock()
 	if inputs.updatedInputs != nil {
-		for _, output := range inputs.updatedInputs {
-			updateList = append(updateList, output)
+		for _, input := range inputs.updatedInputs {
+			updateList = append(updateList, input)
 		}
 		if clearUpdates {
 			inputs.updatedInputs = nil
@@ -74,7 +75,6 @@ func (inputs *InputList) GetUpdatedInputs(clearUpdates bool) []*types.InputDisco
 }
 
 // UpdateInput replaces the input using the node.Address
-// This method is concurrent safe
 func (inputs *InputList) UpdateInput(input *types.InputDiscoveryMessage) {
 	inputs.updateMutex.Lock()
 	inputs.inputMap[input.Address] = input
@@ -94,7 +94,7 @@ func MakeInputDiscoveryAddress(nodeAddress string, inputType types.InputType, in
 
 	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+types.MessageTypeInputDiscovery,
 		zone, publisherID, nodeID, inputType, instance)
-	return address
+	return strings.ToLower(address)
 }
 
 // MakeInputSetAddress creates the address used to update a node input value
@@ -107,19 +107,59 @@ func MakeInputSetAddress(nodeAddress string, ioType string, instance string) str
 
 	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+types.MessageTypeSet,
 		zone, publisherID, nodeID, ioType, instance)
-	return address
+	return strings.ToLower(address)
 }
 
-// NewInput instance
+// NewInput instance for input from the message bus.
 // To add it to the inputlist use 'UpdateInput'
 func NewInput(nodeAddr string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
 	address := MakeInputDiscoveryAddress(nodeAddr, inputType, instance)
 	// segments := strings.Split(nodeAddress, "/")
 	input := &types.InputDiscoveryMessage{
 		Address:   address,
+		Attr:      make(types.NodeAttrMap),
+		Config:    make(types.ConfigAttrMap),
 		Instance:  instance,
 		InputType: inputType,
 		// NodeID:     segments[2],
+	}
+	return input
+}
+
+// NewFileInput watches the file as the input to listen on
+func NewFileInput(nodeAddr string, inputType types.InputType, instance string, path string) *types.InputDiscoveryMessage {
+	input := NewInput(nodeAddr, inputType, instance)
+	input.Config[types.NodeAttrFilename] = types.ConfigAttr{
+		DataType:    types.DataTypeString,
+		Default:     path,
+		Description: "File to watch for input updates",
+	}
+	return input
+}
+
+// NewHTTPInput periodically queries the http address for input
+func NewHTTPInput(nodeAddr string, inputType types.InputType, instance string, httpAddress string, intervalSec int, handler func()) *types.InputDiscoveryMessage {
+	input := NewInput(nodeAddr, inputType, instance)
+	input.Config[types.NodeAttrURL] = types.ConfigAttr{
+		DataType:    types.DataTypeString,
+		Default:     httpAddress,
+		Description: "Http(s) addres to query for input updates",
+	}
+	input.Config[types.NodeAttrURL] = types.ConfigAttr{
+		DataType:    types.DataTypeInt,
+		Default:     strconv.Itoa(intervalSec),
+		Description: "Query interval in seconds",
+	}
+	return input
+}
+
+// NewTopicInput uses the address as the input to listen on
+func NewTopicInput(nodeAddr string, inputType types.InputType, instance string, topicAddress string, handler func()) *types.InputDiscoveryMessage {
+	input := NewInput(nodeAddr, inputType, instance)
+	input.Config[types.NodeAttrAddress] = types.ConfigAttr{
+		DataType:    types.DataTypeString,
+		Default:     topicAddress,
+		Description: "Message addres to subscribe to for input updates",
 	}
 	return input
 }

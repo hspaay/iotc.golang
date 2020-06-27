@@ -65,6 +65,6 @@ func TestSave(t *testing.T) {
 	}
 	assert.Equal(t, "node1", nodeList2Node1.NodeID)
 	// assert.Equal(t, "zone1", nodeList2Node1.Zone)
-	assert.Equal(t, "adapter", nodeList2Node1.Type)
+	assert.Equal(t, "adapter", nodeList2Node1.NodeType)
 
 }

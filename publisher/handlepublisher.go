@@ -4,7 +4,6 @@ package publisher
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 
 	"github.com/iotdomain/iotdomain-go/messenger"
 	"github.com/iotdomain/iotdomain-go/nodes"
@@ -102,7 +101,7 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	}
 
 	// Handle the DSS publisher separately
-	dssAddress := fmt.Sprintf("%s/%s/%s", publisher.Domain(), types.DSSPublisherID, types.MessageTypeIdentity)
+	dssAddress := nodes.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
 	if address == dssAddress {
 		publisher.handleDSSDiscovery(pubIdentityMsg)
 		return

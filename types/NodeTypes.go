@@ -139,7 +139,8 @@ type NodeDiscoveryMessage struct {
 	Attr        NodeAttrMap   `json:"attr,omitempty"`   // Attributes describing this node
 	Config      ConfigAttrMap `json:"config,omitempty"` // Description of configurable attributes
 	NodeID      string        `json:"nodeId"`           // The node immutable ID
+	NodeType    NodeType      `json:"nodeType"`         // node type see NodeTypeXxx
 	PublisherID string        `json:"publisherId"`      // publisher managing this node
 	Status      NodeStatusMap `json:"status,omitempty"` // Node performance status information
-	Type        NodeType      `json:"type"`             // node type
+	Timestamp   string        `json:"timestamp"`        // time the record is last updated
 }

@@ -177,8 +177,7 @@ func (nodes *NodeList) GetNodeConfigString(
 // GetNodeByID returns a node by its domain, publisher and node ID
 // Returns nil if address has no known node
 func (nodes *NodeList) GetNodeByID(domain string, publisherID string, nodeID string) *types.NodeDiscoveryMessage {
-	nodeAddr := fmt.Sprintf("%s/%s/%s/%s", domain, publisherID, nodeID, types.MessageTypeNodeDiscovery)
-
+	nodeAddr := MakeNodeAddress(domain, publisherID, nodeID, types.MessageTypeNodeDiscovery)
 	nodes.updateMutex.Lock()
 	defer nodes.updateMutex.Unlock()
 
@@ -467,14 +466,14 @@ func MakeNodeAddress(domain string, publisherID string, nodeID string, messageTy
 	if messageType != "" {
 		address = address + "/" + messageType
 	}
-	return address
+	return strings.ToLower(address)
 }
 
 // MakeNodeDiscoveryAddress generates the address of a node: domain/publisherID/nodeID/$node.
 // Intended for lookup of nodes in the node list.
 func MakeNodeDiscoveryAddress(domain string, publisherID string, nodeID string) string {
 	address := fmt.Sprintf("%s/%s/%s/%s", domain, publisherID, nodeID, types.MessageTypeNodeDiscovery)
-	return address
+	return strings.ToLower(address)
 }
 
 // NewNodeConfig creates a new node configuration instance.
@@ -505,7 +504,7 @@ func NewNode(domain string, publisherID string, nodeID string, nodeType types.No
 		NodeID:      nodeID,
 		PublisherID: publisherID,
 		Status:      make(map[types.NodeStatus]string),
-		Type:        nodeType,
+		NodeType:    nodeType,
 	}
 	newNode.Config[types.NodeAttrAlias] = *NewNodeConfig(types.DataTypeString, "Alias node ID for inputs and outputs", "")
 	newNode.Config[types.NodeAttrName] = *NewNodeConfig(types.DataTypeString, "Human friendly node name", "")

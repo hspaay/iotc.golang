@@ -35,16 +35,17 @@ const (
 
 // InputDiscoveryMessage with node input description
 type InputDiscoveryMessage struct {
-	Address string `json:"address"` // Address of the input
-	// Config      ConfigAttrMap `json:"config,omitempty"`      // Configuration of input
-	DataType    DataType  `json:"dataType,omitempty"`    // input value data type
-	Description string    `json:"description,omitempty"` // optional description
-	EnumValues  []string  `json:"enumValues,omitempty"`  // enum valid input values for enum datatypes
-	Instance    string    `json:"instance,omitempty"`    // instance identifier for multi-I/O nodes
-	Max         float32   `json:"max,omitempty"`         // optional max value of input for numeric data types
-	Min         float32   `json:"min,omitempty"`         // optional min value of input for numeric data types
-	InputType   InputType `json:"inputType,omitempty"`   // type of input or output as per IOTypeXyz
-	Unit        Unit      `json:"unit,omitempty"`        // unit of value
+	Address    string        `json:"address"`              // Discovery address of the input
+	Attr       NodeAttrMap   `json:"attr"`                 // Attributes describing this input
+	Config     ConfigAttrMap `json:"config,omitempty"`     // Optional configuration of input
+	DataType   DataType      `json:"dataType,omitempty"`   // input value data type
+	EnumValues []string      `json:"enumValues,omitempty"` // enum valid input values for enum datatypes
+	InputType  InputType     `json:"inputType,omitempty"`  // type of input or output as per InputType
+	Instance   string        `json:"instance,omitempty"`   // instance identifier for multi-I/O nodes
+	Max        float32       `json:"max,omitempty"`        // optional max value of input for numeric data types
+	Min        float32       `json:"min,omitempty"`        // optional min value of input for numeric data types
+	Timestamp  string        `json:"timestamp"`            // Time the record is last updated
+	Unit       Unit          `json:"unit,omitempty"`       // unit of value
 }
 
 // SetInputMessage to control an input

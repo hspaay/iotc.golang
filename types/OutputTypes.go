@@ -142,16 +142,17 @@ type OutputBatchMessage struct {
 
 // OutputDiscoveryMessage with node output description
 type OutputDiscoveryMessage struct {
-	Address     string     `json:"address"`               // Address of the publication: zone/publisher/node/$output/type/instance
-	DataType    DataType   `json:"dataType,omitempty"`    // output value data type, default is string
-	Description string     `json:"description,omitempty"` // optional description for humans
-	EnumValues  []string   `json:"enumValues,omitempty"`  // possible enum output values for enum datatype
-	Instance    string     `json:"instance"`              // instance identifier for multi-I/O nodes
-	Max         float32    `json:"max,omitempty"`         // optional max value of output for numeric data types
-	Min         float32    `json:"min,omitempty"`         // optional min value of output for numeric data types
-	OutputType  OutputType `json:"outputType"`            // type of output as per OutputTypeXyz
-	Timestamp   string     `json:"timestamp"`             // time the record is created
-	Unit        Unit       `json:"unit,omitempty"`        // unit of output value
+	Address    string        `json:"address"`              // Address of the publication: zone/publisher/node/$output/type/instance
+	Attr       NodeAttrMap   `json:"attr"`                 // Attributes describing this output
+	Config     ConfigAttrMap `json:"config,omitempty"`     // Optional configuration of output
+	DataType   DataType      `json:"dataType,omitempty"`   // output value data type, default is string
+	EnumValues []string      `json:"enumValues,omitempty"` // possible enum output values for enum datatype
+	Instance   string        `json:"instance"`             // instance identifier for multi-I/O nodes
+	Max        float32       `json:"max,omitempty"`        // optional max value of output for numeric data types
+	Min        float32       `json:"min,omitempty"`        // optional min value of output for numeric data types
+	OutputType OutputType    `json:"outputType"`           // type of output as per OutputTypeXyz
+	Timestamp  string        `json:"timestamp"`            // time the record is last updated
+	Unit       Unit          `json:"unit,omitempty"`       // unit of output value
 }
 
 // OutputEventMessage message with multiple output values

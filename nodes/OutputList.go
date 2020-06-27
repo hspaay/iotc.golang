@@ -108,7 +108,7 @@ func MakeOutputDiscoveryAddress(nodeAddress string, outputType types.OutputType,
 
 	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+types.MessageTypeOutputDiscovery,
 		zone, publisherID, nodeID, outputType, instance)
-	return address
+	return strings.ToLower(address)
 }
 
 // NewOutput creates a new output for the given node.
