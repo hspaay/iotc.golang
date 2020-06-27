@@ -1,5 +1,5 @@
-// Package nodes with handling of node output values
-package nodes
+// Package outputs with handling of node output values
+package outputs
 
 import (
 	"encoding/json"

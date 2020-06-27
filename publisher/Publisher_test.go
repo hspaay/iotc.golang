@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iotdomain/iotdomain-go/inputs"
 	"github.com/iotdomain/iotdomain-go/messenger"
 	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/outputs"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,8 +39,8 @@ var node1valueAddr = node1Base + "/switch/0/$raw"
 var node1latestAddr = node1Base + "/switch/0/$latest"
 var node1historyAddr = node1Base + "/switch/0/$history"
 
-var node1Input1 = nodes.NewInput(node1Addr, "switch", "0")
-var node1Output1 = nodes.NewOutput(node1Addr, "switch", "0")
+var node1Input1 = inputs.NewInput(node1Addr, "switch", "0")
+var node1Output1 = outputs.NewOutput(node1Addr, "switch", "0")
 var pubAddr = fmt.Sprintf("%s/%s/$identity", domain1ID, publisher1ID)
 
 var pub2Addr = fmt.Sprintf("%s/%s/$identity", domain1ID, publisher2ID)
@@ -135,7 +137,7 @@ func TestAlias(t *testing.T) {
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
 	pub1.Nodes.UpdateNode(node1)
-	pub1.PublishUpdatedDiscoveries()
+	pub1.PublishUpdatedNodes()
 	// time.Sleep(1)
 
 	// Stress concurrency, run test with -race
@@ -219,7 +221,7 @@ func TestOutputValue(t *testing.T) {
 	pub1.Outputs.UpdateOutput(node1Output1)
 	pub1.OutputValues.UpdateOutputValue(node1Output1Addr, "true")
 
-	pub1.PublishUpdatedDiscoveries()
+	pub1.PublishUpdatedOutputs()
 	pub1.PublishUpdatedOutputValues()
 	// time.Sleep(time.Second * 1) // receive publications
 	pub1.Stop()
@@ -273,7 +275,9 @@ func TestReceiveInput(t *testing.T) {
 	pub1.Nodes.UpdateNode(node1) // p1
 	pub1.Inputs.UpdateInput(node1Input1)
 	pub1.Outputs.UpdateOutput(node1Output1)
-	pub1.PublishUpdatedDiscoveries()
+	pub1.PublishUpdatedNodes()
+	pub1.PublishUpdatedInputs()
+	pub1.PublishUpdatedOutputs()
 	// process background messages
 	// time.Sleep(time.Second * 1) // receive publications
 

@@ -1,5 +1,5 @@
-// Package nodes with handling of node outputs objects
-package nodes
+// Package outputs with handling of outputs objects
+package outputs
 
 import (
 	"fmt"
@@ -9,7 +9,8 @@ import (
 	"github.com/iotdomain/iotdomain-go/types"
 )
 
-// OutputList with output management
+// OutputList for managing discovered inputs
+// The outputs can be from a node discovered by a publisher, or discovered by a message bus subscriber
 type OutputList struct {
 	outputMap      map[string]*types.OutputDiscoveryMessage // output discovery address - object map
 	updateMutex    *sync.Mutex                              // mutex for async updating of outputs
@@ -44,9 +45,9 @@ func (outputs *OutputList) GetOutput(
 
 // GetNodeOutputs returns all outputs for the given node in this list
 // This method is concurrent safe
-func (outputs *OutputList) GetNodeOutputs(node *types.NodeDiscoveryMessage) []*types.OutputDiscoveryMessage {
+func (outputs *OutputList) GetNodeOutputs(nodeAddress string) []*types.OutputDiscoveryMessage {
 	nodeOutputs := []*types.OutputDiscoveryMessage{}
-	segments := strings.Split(node.Address, "/")
+	segments := strings.Split(nodeAddress, "/")
 	prefix := strings.Join(segments[:3], "/")
 
 	for _, output := range outputs.outputMap {

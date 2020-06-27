@@ -16,9 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/iotdomain/iotdomain-go/inputs"
 	"github.com/iotdomain/iotdomain-go/messenger"
 	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/outputs"
 	"github.com/iotdomain/iotdomain-go/persist"
+	"github.com/iotdomain/iotdomain-go/publishers"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -46,17 +49,17 @@ type NodeInputHandler func(input *types.InputDiscoveryMessage, message *types.Se
 
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
-	Nodes           *nodes.NodeList           // discovered nodes published by this publisher
-	Inputs          *nodes.InputList          // discovered inputs published by this publisher
-	Outputs         *nodes.OutputList         // discovered outputs published by this publisher
-	OutputForecasts *nodes.OutputForecastList // output forecasts values published by this publisher
-	OutputValues    *nodes.OutputValueList    // output values published by this publisher
+	Nodes           *nodes.NodeList             // discovered nodes published by this publisher
+	Inputs          *inputs.InputList           // discovered inputs published by this publisher
+	Outputs         *outputs.OutputList         // discovered outputs published by this publisher
+	OutputForecasts *outputs.OutputForecastList // output forecasts values published by this publisher
+	OutputValues    *outputs.OutputValueList    // output values published by this publisher
 
 	cacheFolder       string                     // folder to save discovered nodes and publishers
 	discoverCountdown int                        // countdown each heartbeat
 	discoveryInterval int                        // discovery polling interval
 	discoveryHandler  func(publisher *Publisher) // function that performs discovery
-	domainPublishers  *nodes.PublisherList       // publishers on the network by discovery address
+	domainPublishers  *publishers.PublisherList  // publishers on the network by discovery address
 
 	fullIdentity        *types.PublisherFullIdentity // this publishers identity
 	identityPrivateKey  *ecdsa.PrivateKey            // key for signing and encryption
@@ -253,16 +256,18 @@ func (publisher *Publisher) Start() {
 		configAddr := nodes.MakeNodeAddress(publisher.Domain(), publisher.PublisherID(), "+", types.MessageTypeConfigure)
 		publisher.messenger.Subscribe(configAddr, publisher.handleNodeConfigCommand)
 
-		inputAddr := nodes.MakeInputSetAddress(configAddr, "+", "+")
+		inputAddr := inputs.MakeInputSetAddress(configAddr, "+", "+")
 		publisher.messenger.Subscribe(inputAddr, publisher.handleNodeInput)
 
 		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := nodes.MakePublisherIdentityAddress(publisher.Domain(), "+")
+		pubAddr := publishers.MakePublisherIdentityAddress(publisher.Domain(), "+")
 		publisher.messenger.Subscribe(pubAddr, publisher.handlePublisherDiscovery)
 
 		// publish discovery of this publisher
 		publisher.PublishIdentity()
-		publisher.PublishUpdatedDiscoveries()
+		publisher.PublishUpdatedNodes()
+		publisher.PublishUpdatedInputs()
+		publisher.PublishUpdatedOutputs()
 
 		publisher.logger.Infof("Publisher.Start: Publisher %s started", publisher.PublisherID())
 	}
@@ -308,10 +313,10 @@ func (publisher *Publisher) heartbeatLoop() {
 	for {
 		time.Sleep(time.Second)
 
-		// FIXME: the publishUpdates duration adds to the heartbeat. This can also take a
-		//  while unless the messenger unloads using channels (which it should)
-		//  we want to be sure it has completed when the heartbeat ends
-		publisher.PublishUpdatedDiscoveries()
+		// FIXME: The duration of publishing these updates adds to the heartbeat which delays the heartbeat
+		publisher.PublishUpdatedNodes()
+		publisher.PublishUpdatedInputs()
+		publisher.PublishUpdatedOutputs()
 		publisher.PublishUpdatedOutputValues()
 
 		// discover new nodes
@@ -374,14 +379,14 @@ func NewPublisher(
 	}
 
 	var publisher = &Publisher{
-		Inputs:          nodes.NewInputList(),
+		Inputs:          inputs.NewInputList(),
 		Nodes:           nodes.NewNodeList(),
-		Outputs:         nodes.NewOutputList(),
-		OutputValues:    nodes.NewOutputValueList(),
-		OutputForecasts: nodes.NewOutputForecastList(),
+		Outputs:         outputs.NewOutputList(),
+		OutputValues:    outputs.NewOutputValueList(),
+		OutputForecasts: outputs.NewOutputForecastList(),
 		//
 		discoveryInterval: DefaultDiscoveryInterval,
-		domainPublishers:  nodes.NewPublisherList(),
+		domainPublishers:  publishers.NewPublisherList(),
 		exitChannel:       make(chan bool),
 		messenger:         messenger,
 		pollCountdown:     1, // run discovery before poll

@@ -1,4 +1,3 @@
-// Package publisher with handling of publisher discovery
 package publisher
 
 import (
@@ -6,48 +5,10 @@ import (
 	"encoding/json"
 
 	"github.com/iotdomain/iotdomain-go/messenger"
-	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/publishers"
 	"github.com/iotdomain/iotdomain-go/types"
-	"gopkg.in/square/go-jose.v2"
+	"github.com/square/go-jose"
 )
-
-// handleIdentityUpdate handles the set command for an update to this publisher identity.
-// The message must be encrypted and signed by the DSS or it will be discarded.
-func (publisher *Publisher) handleIdentityUpdate(address string, message string) {
-	var fullIdentity types.PublisherFullIdentity
-
-	// Expect the message to be encrypted
-	isEncrypted, dmessage, err := messenger.DecryptMessage(message, publisher.identityPrivateKey)
-
-	if !isEncrypted {
-		publisher.logger.Warnf("handleIdentityUpdate: message to '%s' must be encrypted but isn't. Message discarded.", address)
-		return
-	} else if err != nil {
-		publisher.logger.Warnf("handleIdentityUpdate: decryption failed of message to '%s'. Message discarded.", address)
-		return
-	}
-
-	// Verify the message is send by and signed by the DSS
-	isSigned, err := messenger.VerifySender(dmessage, &fullIdentity, publisher.domainPublishers.GetPublisherKey)
-	if !isSigned {
-		// commands must use signed messages
-		publisher.logger.Warnf("handleIdentityUpdate: Identity update '%s' is not signed. Message discarded.", address)
-		return
-	} else if err != nil {
-		// signing failed, discard the message
-		publisher.logger.Warnf("handleIdentityUpdate: Signature verification failed for  %s. Message discarded.", address)
-		return
-	}
-	dssAddress := nodes.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
-	if fullIdentity.Sender != dssAddress {
-		publisher.logger.Warnf("handleIdentityUpdate: Sender is %s instead of the DSS. Identity update discarded.", fullIdentity.Sender)
-
-	}
-
-	privKey := messenger.PrivateKeyFromPem(fullIdentity.PrivateKey)
-	publisher.identityPrivateKey = privKey
-	publisher.fullIdentity = &fullIdentity
-}
 
 // handleDSSDiscovery discoveres the identity of the domain security service
 // The DSS publish signing key is used to verify the identity of all publishers
@@ -101,7 +62,7 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	}
 
 	// Handle the DSS publisher separately
-	dssAddress := nodes.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
+	dssAddress := publishers.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
 	if address == dssAddress {
 		publisher.handleDSSDiscovery(pubIdentityMsg)
 		return

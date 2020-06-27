@@ -1,5 +1,5 @@
 // Package nodes with management of discovered publishers
-package nodes
+package publishers
 
 import (
 	"crypto/ecdsa"

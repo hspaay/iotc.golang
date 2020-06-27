@@ -1,4 +1,4 @@
-// Package publisher with handling of input commands
+// Package publisher with command to set a remote input
 package publisher
 
 import (

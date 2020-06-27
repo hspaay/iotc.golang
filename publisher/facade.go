@@ -6,7 +6,9 @@ package publisher
 import (
 	"crypto/ecdsa"
 
+	"github.com/iotdomain/iotdomain-go/inputs"
 	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/outputs"
 	"github.com/iotdomain/iotdomain-go/types"
 )
 
@@ -77,7 +79,7 @@ func (publisher *Publisher) GetNodeStatus(nodeID string, attrName types.NodeStat
 // This is a convenience function using the publisher's output list
 func (publisher *Publisher) GetOutputByType(nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
-	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
+	outputAddr := outputs.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	output := publisher.Outputs.GetOutputByAddress(outputAddr)
 	return output
 }
@@ -106,7 +108,7 @@ func (publisher *Publisher) NewNode(nodeID string, nodeType types.NodeType) stri
 // returns the input to allow for easy update
 func (publisher *Publisher) NewInput(nodeID string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
-	input := nodes.NewInput(nodeAddr, inputType, instance)
+	input := inputs.NewInput(nodeAddr, inputType, instance)
 	publisher.Inputs.UpdateInput(input)
 	return input
 }
@@ -116,7 +118,7 @@ func (publisher *Publisher) NewInput(nodeID string, inputType types.InputType, i
 // returns the output object to allow for easy updates
 func (publisher *Publisher) NewOutput(nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
-	output := nodes.NewOutput(nodeAddr, outputType, instance)
+	output := outputs.NewOutput(nodeAddr, outputType, instance)
 	publisher.Outputs.UpdateOutput(output)
 	return output
 }
@@ -164,6 +166,6 @@ func (publisher *Publisher) UpdateNodeConfig(nodeID string, attrName types.NodeA
 // See NodeList.UpdateOutputValue for more details
 func (publisher *Publisher) UpdateOutputValue(nodeID string, outputType types.OutputType, instance string, newValue string) bool {
 	nodeAddr := nodes.MakeNodeDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID)
-	outputAddr := nodes.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
+	outputAddr := outputs.MakeOutputDiscoveryAddress(nodeAddr, outputType, instance)
 	return publisher.OutputValues.UpdateOutputValue(outputAddr, newValue)
 }

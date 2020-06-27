@@ -1,4 +1,4 @@
-package nodes
+package publishers
 
 import (
 	"testing"

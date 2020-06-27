@@ -1,5 +1,5 @@
-// Package nodes with updating and publishing of output forecasts
-package nodes
+// Package outputs with updating and publishing of output forecasts
+package outputs
 
 import (
 	"sync"

@@ -1,4 +1,4 @@
-// Package publisher with functions for managing the publisher's identity
+// Package publisher with handling of publisher discovery
 package publisher
 
 import (
@@ -14,10 +14,48 @@ import (
 	"time"
 
 	"github.com/iotdomain/iotdomain-go/messenger"
-	"github.com/iotdomain/iotdomain-go/nodes"
 	"github.com/iotdomain/iotdomain-go/persist"
+	"github.com/iotdomain/iotdomain-go/publishers"
 	"github.com/iotdomain/iotdomain-go/types"
 )
+
+// handleIdentityUpdate handles the set command for an update to this publisher identity.
+// The message must be encrypted and signed by the DSS or it will be discarded.
+func (publisher *Publisher) handleIdentityUpdate(address string, message string) {
+	var fullIdentity types.PublisherFullIdentity
+
+	// Expect the message to be encrypted
+	isEncrypted, dmessage, err := messenger.DecryptMessage(message, publisher.identityPrivateKey)
+
+	if !isEncrypted {
+		publisher.logger.Warnf("handleIdentityUpdate: message to '%s' must be encrypted but isn't. Message discarded.", address)
+		return
+	} else if err != nil {
+		publisher.logger.Warnf("handleIdentityUpdate: decryption failed of message to '%s'. Message discarded.", address)
+		return
+	}
+
+	// Verify the message is send by and signed by the DSS
+	isSigned, err := messenger.VerifySender(dmessage, &fullIdentity, publisher.domainPublishers.GetPublisherKey)
+	if !isSigned {
+		// commands must use signed messages
+		publisher.logger.Warnf("handleIdentityUpdate: Identity update '%s' is not signed. Message discarded.", address)
+		return
+	} else if err != nil {
+		// signing failed, discard the message
+		publisher.logger.Warnf("handleIdentityUpdate: Signature verification failed for  %s. Message discarded.", address)
+		return
+	}
+	dssAddress := publishers.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
+	if fullIdentity.Sender != dssAddress {
+		publisher.logger.Warnf("handleIdentityUpdate: Sender is %s instead of the DSS. Identity update discarded.", fullIdentity.Sender)
+
+	}
+
+	privKey := messenger.PrivateKeyFromPem(fullIdentity.PrivateKey)
+	publisher.identityPrivateKey = privKey
+	publisher.fullIdentity = &fullIdentity
+}
 
 // CreateIdentity creates a new identity for a domain publisher
 // The validity is 1 year
@@ -38,7 +76,7 @@ func CreateIdentity(domain string, publisherID string) (
 
 	pubSigningStr := messenger.PublicKeyToPem(&privKey.PublicKey)
 
-	addr := nodes.MakePublisherIdentityAddress(domain, publisherID)
+	addr := publishers.MakePublisherIdentityAddress(domain, publisherID)
 
 	publicIdentity := types.PublisherPublicIdentity{
 		Domain:       domain,
@@ -93,7 +131,7 @@ func LoadIdentity(folder string, publisherID string) (fullIdentity *types.Publis
 		return nil, nil, err
 	}
 	// sanity check in case the file was edited
-	addr := nodes.MakePublisherIdentityAddress(fullIdentity.Public.Domain, publisherID)
+	addr := publishers.MakePublisherIdentityAddress(fullIdentity.Public.Domain, publisherID)
 	if fullIdentity.Public.Domain == "" ||
 		fullIdentity.Public.PublisherID != publisherID ||
 		fullIdentity.Address != addr ||
@@ -139,7 +177,7 @@ func SetupPublisherIdentity(identityFolder string, domain string, publisherID st
 	}
 	// If an identity is saved, load it
 	fullIdentity, privKey, err := LoadIdentity(identityFolder, publisherID)
-	identityAddress := nodes.MakePublisherIdentityAddress(domain, publisherID)
+	identityAddress := publishers.MakePublisherIdentityAddress(domain, publisherID)
 
 	// validity check on identity, recreate a new one if changed
 	if err != nil ||

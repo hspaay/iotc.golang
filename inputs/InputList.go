@@ -1,5 +1,5 @@
-// Package nodes with handling of various node inputs
-package nodes
+// Package inputs with managing of inputs
+package inputs
 
 import (
 	"fmt"
@@ -10,7 +10,8 @@ import (
 	"github.com/iotdomain/iotdomain-go/types"
 )
 
-// InputList with input management
+// InputList for managing discovered inputs
+// The inputs can be from a node discovered by a publisher, or discovered by a message bus subscriber
 type InputList struct {
 	inputMap      map[string]*types.InputDiscoveryMessage
 	updateMutex   *sync.Mutex                             // mutex for async updating of inputs

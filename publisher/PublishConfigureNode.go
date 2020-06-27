@@ -1,4 +1,4 @@
-// Package publisher with handling of input commands
+// Package client with command to configure a remote node
 package publisher
 
 import (

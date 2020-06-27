@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/iotdomain/iotdomain-go/inputs"
 	"github.com/iotdomain/iotdomain-go/messenger"
 	"github.com/iotdomain/iotdomain-go/nodes"
+	"github.com/iotdomain/iotdomain-go/outputs"
+	"github.com/iotdomain/iotdomain-go/publishers"
 	"github.com/iotdomain/iotdomain-go/types"
 	log "github.com/sirupsen/logrus"
 	"github.com/square/go-jose"
@@ -16,16 +19,16 @@ import (
 // Start() will subscribe to discover all publishers.
 // To discover nodes, subscribe to the publisher
 type Subscriber struct {
-	domain        string               // The domain in which we live
-	isRunning     bool                 // publisher was started and is running
-	logger        *log.Logger          //
-	inputList     *nodes.InputList     // inputs by discovery address
-	messenger     messenger.IMessenger // Message bus messenger to use
-	nodes         *nodes.NodeList      // nodes by discovery address
-	outputList    *nodes.OutputList    // outputs by discovery address
-	publishers    *nodes.PublisherList // publishers on the network
-	subscriptions nodes.NodeList       // publishers to which we subscribe to receive their nodes
-	updateMutex   *sync.Mutex          // mutex for async updating and publishing
+	domain        string                    // The domain in which we live
+	isRunning     bool                      // publisher was started and is running
+	logger        *log.Logger               //
+	inputList     *inputs.InputList         // inputs by discovery address
+	messenger     messenger.IMessenger      // Message bus messenger to use
+	nodes         *nodes.NodeList           // nodes by discovery address
+	outputList    *outputs.OutputList       // outputs by discovery address
+	publishers    *publishers.PublisherList // publishers on the network
+	subscriptions nodes.NodeList            // publishers to which we subscribe to receive their nodes
+	updateMutex   *sync.Mutex               // mutex for async updating and publishing
 }
 
 // Start listen for publisher nodes
@@ -40,7 +43,7 @@ func (subscriber *Subscriber) Start() {
 		subscriber.messenger.Connect("", "")
 
 		// subscribe to receive all publisher identities
-		pubAddr := nodes.MakePublisherIdentityAddress("+", "+")
+		pubAddr := publishers.MakePublisherIdentityAddress("+", "+")
 		subscriber.messenger.Subscribe(pubAddr, subscriber.handlePublisherDiscovery)
 
 		subscriber.logger.Warningf("Subscriber started")
@@ -108,12 +111,12 @@ func NewSubscriber(domain string, messenger messenger.IMessenger) *Subscriber {
 
 	var subscriber = &Subscriber{
 		domain:      domain,
-		inputList:   nodes.NewInputList(),
+		inputList:   inputs.NewInputList(),
 		logger:      log.New(),
 		messenger:   messenger,
 		nodes:       nodes.NewNodeList(),
-		outputList:  nodes.NewOutputList(),
-		publishers:  nodes.NewPublisherList(),
+		outputList:  outputs.NewOutputList(),
+		publishers:  publishers.NewPublisherList(),
 		updateMutex: &sync.Mutex{},
 	}
 	return subscriber
