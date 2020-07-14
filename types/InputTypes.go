@@ -4,6 +4,18 @@ package types
 // DefaultInputInstance is the input instance identifier when only a single instance exists
 const DefaultInputInstance = "0"
 
+// InputAttr input configuration attributes
+type InputAttr string
+
+// Input Attributes
+const (
+	InputAttrLogin        InputAttr = "login"        // Basic Auth login for rest endpoints, use secret=true
+	InputAttrPassword     InputAttr = "password"     // Basic Auth login for rest endpoints, use secret=true
+	InputAttrPollInterval InputAttr = "pollInterval" // input (poll) interval for REST endpoint
+	InputAttrSetEnabled   InputAttr = "setEnabled"   // when enabled, the input can be set with a $set command, boolean
+	InputAttrSource       InputAttr = "source"       // source address to read input from. subscription address, http://, or file://
+)
+
 // InputType defines the convention names for output types
 type InputType string
 
@@ -40,12 +52,15 @@ type InputDiscoveryMessage struct {
 	Config     ConfigAttrMap `json:"config,omitempty"`     // Optional configuration of input
 	DataType   DataType      `json:"dataType,omitempty"`   // input value data type
 	EnumValues []string      `json:"enumValues,omitempty"` // enum valid input values for enum datatypes
-	InputType  InputType     `json:"inputType,omitempty"`  // type of input or output as per InputType
-	Instance   string        `json:"instance,omitempty"`   // instance identifier for multi-I/O nodes
 	Max        float32       `json:"max,omitempty"`        // optional max value of input for numeric data types
 	Min        float32       `json:"min,omitempty"`        // optional min value of input for numeric data types
 	Timestamp  string        `json:"timestamp"`            // Time the record is last updated
 	Unit       Unit          `json:"unit,omitempty"`       // unit of value
+	// For convenience, filled when registering or receiving
+	NodeID      string    `json:"-"`
+	PublisherID string    `json:"-"`
+	InputType   InputType `json:"-"`
+	Instance    string    `json:"-"`
 }
 
 // SetInputMessage to control an input

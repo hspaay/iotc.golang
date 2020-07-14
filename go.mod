@@ -6,6 +6,8 @@ go 1.13
 
 require (
 	github.com/eclipse/paho.mqtt.golang v1.2.0
+	github.com/fsnotify/fsnotify v1.4.9
+	github.com/google/go-cmp v0.5.0 // indirect
 	github.com/sirupsen/logrus v1.6.0
 	github.com/square/go-jose v2.5.1+incompatible
 	github.com/stretchr/testify v1.6.0

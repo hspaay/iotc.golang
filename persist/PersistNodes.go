@@ -18,7 +18,7 @@ const InputsFileSuffix = "-inputs.json"
 // OutputsFileSuffix to append to name of the file containing saved output
 const OutputsFileSuffix = "-outputs.json"
 
-// LoadNodesFromCache loads previously cached publisher node messages from JSON file.
+// LoadNodes loads previously saved publisher node messages from JSON file.
 // Existing nodes are replaced if they exist in the JSON file. Custom nodes must be updated
 // after loading nodes from file as previously saved versions will be loaded here.
 //
@@ -26,9 +26,9 @@ const OutputsFileSuffix = "-outputs.json"
 //   Use "" for default, which is <userhome>/.cache/iotc
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the address of a list that holds nodes
-func LoadNodesFromCache(altCacheFolder string, publisherID string, nodelist interface{}) error {
-	cacheFolder := altCacheFolder
-	if altCacheFolder == "" {
+func LoadNodes(altFolder string, publisherID string, nodelist interface{}) error {
+	cacheFolder := altFolder
+	if altFolder == "" {
 		cacheFolder = DefaultCacheFolder
 	}
 	nodesFile := path.Join(cacheFolder, publisherID+NodesFileSuffix)
@@ -47,12 +47,11 @@ func LoadNodesFromCache(altCacheFolder string, publisherID string, nodelist inte
 	return nil
 }
 
-// SaveNodesToCache saves the nodelist to a JSON file in the cache folder
-// cacheFolder is the location for the cache
-// publisherID determines the filename: <publisherID-nodes.json>
+// SaveNodes saves the nodelist to a JSON file in the given folder
+// publisherID determines the filename: <publisherID>-nodes.json
 // nodelist is a list of nodes to save
-func SaveNodesToCache(cacheFolder string, publisherID string, nodeList interface{}) error {
-	return SaveToJSON(cacheFolder, publisherID+NodesFileSuffix, nodeList)
+func SaveNodes(folder string, publisherID string, nodeList interface{}) error {
+	return SaveToJSON(folder, publisherID+NodesFileSuffix, nodeList)
 }
 
 // SaveInputs saves the discovered inputs to cache

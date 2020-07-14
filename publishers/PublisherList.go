@@ -1,4 +1,4 @@
-// Package nodes with management of discovered publishers
+// Package publishers with management of discovered publishers
 package publishers
 
 import (
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
 )
 
@@ -35,14 +35,14 @@ func (pubList *PublisherList) GetAllPublishers() []*types.PublisherIdentityMessa
 
 // GetDSSIdentity returns the Domain Security Service publisher identity
 // Returns nil if no DSS was received
-func (pubList *PublisherList) GetDSSIdentity(domain string) *types.PublisherPublicIdentity {
+func (pubList *PublisherList) GetDSSIdentity(domain string) *types.PublisherIdentityMessage {
 	addr := MakePublisherIdentityAddress(domain, types.DSSPublisherID)
 	dssMessage := pubList.GetPublisherByAddress(addr)
 	if dssMessage == nil {
 		// DSS for the domain wasn't received
 		return nil
 	}
-	return &dssMessage.Public
+	return dssMessage
 }
 
 // GetPublisherByAddress returns a publisher Identity by its identity discovery address
@@ -56,7 +56,7 @@ func (pubList *PublisherList) GetPublisherByAddress(address string) *types.Publi
 }
 
 // GetPublisherKey returns the public key of a publisher for signature verification or encryption
-// publisherAddress starts with domain/publisherId
+// publisherAddress must start with domain/publisherId
 // returns public key or nil if publisher public key is not found
 func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.PublicKey {
 	segments := strings.Split(publisherAddress, "/")
@@ -69,12 +69,12 @@ func (pubList *PublisherList) GetPublisherKey(publisherAddress string) *ecdsa.Pu
 	// Use cached key instead of regenerating them each time
 	pubKey := pubList.publisherKeys[identityAddress]
 	if pubKey == nil {
-		pub := pubList.GetPublisherByAddress(identityAddress)
-		if pub == nil || pub.Public.PublicKey == "" {
+		ident := pubList.GetPublisherByAddress(identityAddress)
+		if ident == nil || ident.PublicKey == "" {
 			// unknown publisher
 			return nil
 		}
-		pubKey = messenger.PublicKeyFromPem(pub.Public.PublicKey)
+		pubKey = messaging.PublicKeyFromPem(ident.PublicKey)
 		pubList.publisherKeys[identityAddress] = pubKey
 	}
 	return pubKey
@@ -109,7 +109,7 @@ func (pubList *PublisherList) UpdatePublisher(pub *types.PublisherIdentityMessag
 // publisherID of the publisher for this node, unique for the domain
 func MakePublisherIdentityAddress(domain string, publisherID string) string {
 	address := fmt.Sprintf("%s/%s/%s", domain, publisherID, types.MessageTypeIdentity)
-	return strings.ToLower(address)
+	return address
 }
 
 // NewPublisherList creates a new list of discovered publishers

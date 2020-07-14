@@ -54,10 +54,10 @@ func TestSave(t *testing.T) {
 	nodeList2 := make([]*types.NodeDiscoveryMessage, 0)
 	nodeList = append(nodeList, nodes.NewNode("zone1", "publisher1", "node1", types.NodeTypeAdapter))
 
-	err := SaveNodesToCache(cacheFolder, PublisherID, nodeList)
+	err := SaveNodes(cacheFolder, PublisherID, nodeList)
 	assert.NoError(t, err, "Failed saving config")
 
-	err = LoadNodesFromCache(cacheFolder, PublisherID, &nodeList2)
+	err = LoadNodes(cacheFolder, PublisherID, &nodeList2)
 	assert.NoError(t, err, "Failed loading app config")
 	nodeList2Node1 := nodeList2[0]
 	if assert.NotNil(t, nodeList2Node1) {

@@ -3,9 +3,8 @@ package publisher
 import (
 	"reflect"
 
-	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/persist"
-	"github.com/sirupsen/logrus"
 )
 
 // NewAppPublisher function for all the boilerplate. This:
@@ -24,11 +23,10 @@ import (
 //
 // This returns publisher instance or error if messenger fails to load
 func NewAppPublisher(appID string, configFolder string, cacheFolder string, appConfig interface{}, persistNodes bool) (*Publisher, error) {
-	logger := logrus.New()
-	var messengerConfig = messenger.MessengerConfig{}
+	var messengerConfig = messaging.MessengerConfig{}
 
 	err := persist.LoadMessengerConfig(configFolder, &messengerConfig)
-	messenger := messenger.NewMessenger(&messengerConfig, logger)
+	messenger := messaging.NewMessenger(&messengerConfig)
 
 	// appconfig is optional
 	// The publisherID can be overridden from the appConfig yaml file
@@ -42,10 +40,11 @@ func NewAppPublisher(appID string, configFolder string, cacheFolder string, appC
 		pubID = appID
 	}
 	// identity lives in the config folder
-	pub := NewPublisher(configFolder, cacheFolder, messengerConfig.Domain, pubID, messengerConfig.Signing, messenger)
+	pub := NewPublisher(configFolder, cacheFolder, messengerConfig.Domain, pubID,
+		messengerConfig.Signing, messenger)
 
 	// cache holds previously discovered nodes and external publisher
 	// Should node name and alias configuration updates be stored in config or cache?
-	pub.LoadFromCache(cacheFolder, persistNodes)
+	pub.LoadConfig(configFolder, persistNodes)
 	return pub, err
 }

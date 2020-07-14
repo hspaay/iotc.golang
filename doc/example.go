@@ -98,7 +98,7 @@ func SetupNodes(pub *publisher.Publisher, city string) {
 	pub.NewNode(city, types.NodeTypeWeatherService)
 	output := pub.NewOutput(city, types.OutputTypeTemperature, types.DefaultOutputInstance)
 	output.Unit = types.UnitCelcius
-	pub.Outputs.UpdateOutput(output)
+	// pub.UpdateOutput(output)
 	pub.NewOutput(city, types.OutputTypeHumidity, types.DefaultOutputInstance)
 }
 
@@ -120,10 +120,10 @@ func UpdateWeather(pub *publisher.Publisher) {
 		hum := fmt.Sprintf("%d", weather.Main.Humidity)
 		pub.UpdateOutputValue(nodeID, types.OutputTypeTemperature, types.DefaultOutputInstance, temp)
 		pub.UpdateOutputValue(nodeID, types.OutputTypeHumidity, types.DefaultOutputInstance, hum)
-		pub.SetNodeErrorStatus(nodeID, types.NodeRunStateReady, "Forecast loaded successfully")
+		pub.UpdateNodeErrorStatus(nodeID, types.NodeRunStateReady, "Forecast loaded successfully")
 	} else {
 		// pub.SetOutputError(nodeID, OutputType, OutputTypeTemperature, "Forecast not available")
-		pub.SetNodeErrorStatus(nodeID, types.NodeRunStateError, "Forecast not available")
+		pub.UpdateNodeErrorStatus(nodeID, types.NodeRunStateError, "Forecast not available")
 	}
 }
 

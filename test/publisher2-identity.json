@@ -1,17 +1,14 @@
 {
   "address": "test/publisher2/$identity",
-  "public": {
-   "domain": "test",
-   "issuerName": "publisher2",
-   "location": "local",
-   "organization": "",
-   "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYdfQ/sYp5IRCBtIXCaKJnebvl2Gj\ns7L2KvOScvNrBJfnUcBRVFhvCuRAPZ3qbCOlZh7M/1FXFbbzS7Bp0bRw8w==\n-----END PUBLIC KEY-----\n",
-   "publisherId": "publisher2",
-   "timestamp": "2020-06-18T09:29:08.189-0700",
-   "validUntil": "2021-06-18T09:29:08.189-0700"
-  },
-  "signature": "4zjJu5BlsA6Ry2VpRmwzJQtGyq1u9S0uj3eJXtjWaF0AaY4UkCRT-BvbnQ6vOYhUcjVm7hK6haWb5KQYqrXykQ==",
-  "signer": "publisher2",
-  "timestamp": "2020-06-18T09:29:08.189-0700",
-  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEILX41JXsqUACAJ+eeqEEphXXDmnGKk4upXZGE+GqRNHaoAoGCCqGSM49\nAwEHoUQDQgAEYdfQ/sYp5IRCBtIXCaKJnebvl2Gjs7L2KvOScvNrBJfnUcBRVFhv\nCuRAPZ3qbCOlZh7M/1FXFbbzS7Bp0bRw8w==\n-----END PRIVATE KEY-----\n"
+  "domain": "test",
+  "issuerName": "publisher2",
+  "location": "local",
+  "organization": "",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+VYZWzI9aPDO8hED0c2u6Esb+q0k\nGSjioWwJtf7W3+NMNkLywt9EZZkZ6zb+Y06m17Pn35s6cvsWMeGxvX/+fw==\n-----END PUBLIC KEY-----\n",
+  "publisherId": "publisher2",
+  "validUntil": "2021-07-10T21:40:34.705-0700",
+  "signature": "6HnxNZK6Ur1nGTmBl6fVf67-HZD87t8wDYOvRlFVeQL6G8Z_xNRJ3pk18MUWskiVkNwm636A4r0-gAiRy5nxoQ==",
+  "timestamp": "2020-07-10T21:40:34.705-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIG2EsGgHdktC4MnmrLRPNYCTlCzxN2u2GQeb5EDFqyKGoAoGCCqGSM49\nAwEHoUQDQgAE+VYZWzI9aPDO8hED0c2u6Esb+q0kGSjioWwJtf7W3+NMNkLywt9E\nZZkZ6zb+Y06m17Pn35s6cvsWMeGxvX/+fw==\n-----END PRIVATE KEY-----\n",
+  "sender": ""
  }

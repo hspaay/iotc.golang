@@ -5,10 +5,11 @@ package types
 // When they are configurable they also appear in Node Config section.
 const (
 	NodeAttrAddress         NodeAttr = "address"         // device domain or ip address
-	NodeAttrAlias           NodeAttr = "alias"           // node alias for publishing inputs and outputs
-	NodeAttrColor           NodeAttr = "color"           // color in hex notation
-	NodeAttrDescription     NodeAttr = "description"     // device description
+	NodeAttrBatch           NodeAttr = "batch"           // Batch publishing size
+	NodeAttrColor           NodeAttr = "color"           // Color in hex notation
+	NodeAttrDescription     NodeAttr = "description"     // Device description
 	NodeAttrDisabled        NodeAttr = "disabled"        // device or sensor is disabled
+	NodeAttrEvent           NodeAttr = "event"           // Enable/disable event publishing
 	NodeAttrFilename        NodeAttr = "filename"        // filename to write images or other values to
 	NodeAttrGatewayAddress  NodeAttr = "gatewayAddress"  // the node gateway address
 	NodeAttrHostname        NodeAttr = "hostname"        // network device hostname
@@ -22,9 +23,15 @@ const (
 	NodeAttrMax             NodeAttr = "max"             // maximum value of sensor or config
 	NodeAttrMin             NodeAttr = "min"             // minimum value of sensor or config
 	NodeAttrModel           NodeAttr = "model"           // device model
-	NodeAttrName            NodeAttr = "name"            // name of device, sensor
+	NodeAttrName            NodeAttr = "name"            // Name of device, sensor
 	NodeAttrNetmask         NodeAttr = "netmask"         // IP network mask
 	NodeAttrPassword        NodeAttr = "password"        // password to connect. Value is not published.
+	NodeAttrPublishBatch    NodeAttr = "publishBatch"    // int with nr of events per batch, 0 to disable
+	NodeAttrPublishEvent    NodeAttr = "publishEvent"    // enable publishing as event
+	NodeAttrPublishForecast NodeAttr = "publishForecast" // bool, publish output with $forecast message
+	NodeAttrPublishHistory  NodeAttr = "publishHistory"  // bool, publish output with $history message
+	NodeAttrPublishLatest   NodeAttr = "publishLatest"   // bool, publish output with $latest message
+	NodeAttrPublishRaw      NodeAttr = "publishRaw"      // bool, publish output with $raw message
 	NodeAttrPollInterval    NodeAttr = "pollInterval"    // polling interval in seconds
 	NodeAttrPowerSource     NodeAttr = "powerSource"     // battery, usb, mains
 	NodeAttrProduct         NodeAttr = "product"         // device product or model name
@@ -125,6 +132,14 @@ type ConfigAttr struct {
 	Secret      bool     `json:"secret,omitempty"`      // The configuration attribute is secret. Don't show with attributes.
 }
 
+// NodeAliasMessage with values to update a node alias
+type NodeAliasMessage struct {
+	Address   string `json:"address"` // zone/publisher/node/$alias
+	Alias     string `json:"alias"`   // new alias to set
+	Sender    string `json:"sender"`  // sending node: zone/publisher/node
+	Timestamp string `json:"timestamp"`
+}
+
 // NodeConfigureMessage with values to update a node configuration
 type NodeConfigureMessage struct {
 	Address   string      `json:"address"` // zone/publisher/node/$configure
@@ -135,12 +150,14 @@ type NodeConfigureMessage struct {
 
 // NodeDiscoveryMessage definition published in node discovery
 type NodeDiscoveryMessage struct {
-	Address     string        `json:"address"`          // Node discovery address
-	Attr        NodeAttrMap   `json:"attr,omitempty"`   // Attributes describing this node
-	Config      ConfigAttrMap `json:"config,omitempty"` // Description of configurable attributes
-	NodeID      string        `json:"nodeId"`           // The node immutable ID
-	NodeType    NodeType      `json:"nodeType"`         // node type see NodeTypeXxx
-	PublisherID string        `json:"publisherId"`      // publisher managing this node
-	Status      NodeStatusMap `json:"status,omitempty"` // Node performance status information
-	Timestamp   string        `json:"timestamp"`        // time the record is last updated
+	Address   string        `json:"address"`          // Node discovery address
+	Attr      NodeAttrMap   `json:"attr,omitempty"`   // Attributes describing this node
+	Config    ConfigAttrMap `json:"config,omitempty"` // Description of configurable attributes
+	DeviceID  string        `json:"deviceid"`         // Device hardware or service ID
+	NodeID    string        `json:"nodeid"`           // nodeID used in address
+	NodeType  NodeType      `json:"nodeType"`         // node type see NodeTypeXxx
+	Status    NodeStatusMap `json:"status,omitempty"` // Node performance status information
+	Timestamp string        `json:"timestamp"`        // time the record is last updated
+	// For convenience, filled when registering or receiving
+	PublisherID string `json:"-"`
 }

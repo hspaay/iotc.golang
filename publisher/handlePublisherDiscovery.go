@@ -4,9 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/iotdomain/iotdomain-go/messenger"
+	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/publishers"
 	"github.com/iotdomain/iotdomain-go/types"
+	"github.com/sirupsen/logrus"
 	"github.com/square/go-jose"
 )
 
@@ -14,14 +15,14 @@ import (
 // The DSS publish signing key is used to verify the identity of all publishers
 // Without a DSS, all publishers are unverified.
 func (publisher *Publisher) handleDSSDiscovery(dssIdentityMsg *types.PublisherIdentityMessage) {
-	var dssIdentity *types.PublisherIdentityMessage
 	// Verify the identity of the DSS
 	// TODO: CA support. For now assume address protection is used so this is trusted.
 
 	// dssSigningPem := dssIdentity.Identity.PublicKeySigning
-	// dssSigningKey := messenger.PublicKeyFromPem(dssSigningPem)
+	// dssSigningKey := messaging.PublicKeyFromPem(dssSigningPem)
 	// publisher.dssSigningKey = dssSigningKey
-	publisher.domainPublishers.UpdatePublisher(dssIdentity)
+	publisher.domainPublishers.UpdatePublisher(dssIdentityMsg)
+	logrus.Infof("handleDSSDiscovery: %s", dssIdentityMsg.Address)
 }
 
 // handlePublisherDiscovery collects and saves remote publishers
@@ -42,9 +43,9 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	jseSignature, err := jose.ParseSigned(string(message))
 	if err != nil {
 		// message isn't signed
-		if publisher.signingMethod == SigningMethodJWS {
+		if publisher.signMessages {
 			// message must be signed though. Discard
-			publisher.logger.Warnf("handlePublisherDiscovery: Publisher update isn't signed but only signed updates are accepted. Publisher: %s", address)
+			logrus.Warnf("handlePublisherDiscovery: Publisher update isn't signed but only signed updates are accepted. Publisher: %s", address)
 			return
 		}
 		// accept the unsigned message as signing isn't required
@@ -56,7 +57,7 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 
 	err = json.Unmarshal([]byte(payload), &pubIdentityMsg)
 	if err != nil {
-		publisher.logger.Warnf("handlePublisherDiscovery: Failed parsing json payload [unsigned]: %s", err)
+		logrus.Warnf("handlePublisherDiscovery: Failed parsing json payload [unsigned]: %s", err)
 		// abort
 		return
 	}
@@ -75,24 +76,24 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 	if dssSigningKey == nil {
 		// 1: No DSS, assume address protection is in place
 		publisher.domainPublishers.UpdatePublisher(pubIdentityMsg)
-		publisher.logger.Infof("handlePublisherDiscovery: Discovered publisher %s. [No DSS present]", address)
+		logrus.Infof("handlePublisherDiscovery: Discovered publisher %s. [No DSS present]", address)
 
 	} else {
 		// 2: We have a DSS. Require the publisher identity is signed by the DSS
 		// Create base64 encoded identity
-		identityAsJSON, err := json.Marshal(pubIdentityMsg.Public)
+		identityAsJSON, err := json.Marshal(pubIdentityMsg)
 		if err != nil {
-			publisher.logger.Infof("handlePublisherDiscovery: Missing identity for %s", address)
+			logrus.Infof("handlePublisherDiscovery: Missing identity for %s", address)
 			return
 		}
 		base64URLIdentity := base64.URLEncoding.EncodeToString(identityAsJSON)
-		valid := messenger.VerifyEcdsaSignature(base64URLIdentity, pubIdentityMsg.IdentitySignature, dssSigningKey)
+		valid := messaging.VerifyEcdsaSignature(base64URLIdentity, pubIdentityMsg.IdentitySignature, dssSigningKey)
 		if !valid {
-			publisher.logger.Infof("handlePublisherDiscovery: Identity for %s doesn't have a valid DSS signature", address)
+			logrus.Infof("handlePublisherDiscovery: Identity for %s doesn't have a valid DSS signature", address)
 			return
 		}
 		// finally, The newly published identity is correctly signed by the DSS
 		publisher.domainPublishers.UpdatePublisher(pubIdentityMsg)
-		publisher.logger.Infof("Discovered publisher %s. [DSS verified]", address)
+		logrus.Infof("Discovered publisher %s. [DSS verified]", address)
 	}
 }

@@ -1,0 +1,14 @@
+{
+  "address": "test/$dss/$identity",
+  "domain": "test",
+  "issuerName": "$dss",
+  "location": "local",
+  "organization": "",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUcUO+DWh5/fGoMrCbvTew1K5vrLL\nBMczXU+URKbgQWVXxRWLl0bgBr1LPFoI2QNS9crSpbpFEZOg8T0L/DJD1g==\n-----END PUBLIC KEY-----\n",
+  "publisherId": "$dss",
+  "validUntil": "2021-07-13T18:47:16.431-0700",
+  "signature": "tQr7Q_4PwW-rNhHm2RRFVmTNQjXrPiH47GZ8e7kIRF08Z1Yfq4In_ICOGr-LFBtPrnH_kIUzokdBOSQtRxU9GA==",
+  "timestamp": "2020-07-13T18:47:16.431-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIBOHGOKfyWyjZOMeZa0jPvO2ECK6xOhFdnUWCNcA6F8DoAoGCCqGSM49\nAwEHoUQDQgAEUcUO+DWh5/fGoMrCbvTew1K5vrLLBMczXU+URKbgQWVXxRWLl0bg\nBr1LPFoI2QNS9crSpbpFEZOg8T0L/DJD1g==\n-----END PRIVATE KEY-----\n",
+  "sender": ""
+ }

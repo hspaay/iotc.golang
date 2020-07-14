@@ -4,6 +4,19 @@ package types
 // DefaultOutputInstance is the output instance identifier when only a single instance exists
 const DefaultOutputInstance = "0"
 
+// // OutputAttr output configuration attributes
+// type OutputAttr string
+
+// // Output Attributes
+// const (
+// 	OutputAttrPublishBatch   OutputAttr = "publishBatch"   // int, publish batch of N events
+// 	OutputAttrPublishEvent   OutputAttr = "publishEvent"   // bool, include output in $event publication
+// 	OutputAttrPublishFile    OutputAttr = "publishFile"    // string, save output to local file, "" to disable
+// 	OutputAttrPublishHistory OutputAttr = "publishHistory" // bool, publish output with $history message
+// 	OutputAttrPublishLatest  OutputAttr = "publishLatest"  // bool, publish output with $latest message
+// 	OutputAttrPublishRaw     OutputAttr = "publishRaw"     // bool, publish output with $raw message
+// )
+
 // OutputType defines the convention names for output types
 type OutputType string
 
@@ -143,16 +156,19 @@ type OutputBatchMessage struct {
 // OutputDiscoveryMessage with node output description
 type OutputDiscoveryMessage struct {
 	Address    string        `json:"address"`              // Address of the publication: zone/publisher/node/$output/type/instance
-	Attr       NodeAttrMap   `json:"attr"`                 // Attributes describing this output
+	Attr       NodeAttrMap   `json:"attr,omitempty"`       // Attributes describing this output
 	Config     ConfigAttrMap `json:"config,omitempty"`     // Optional configuration of output
 	DataType   DataType      `json:"dataType,omitempty"`   // output value data type, default is string
 	EnumValues []string      `json:"enumValues,omitempty"` // possible enum output values for enum datatype
-	Instance   string        `json:"instance"`             // instance identifier for multi-I/O nodes
 	Max        float32       `json:"max,omitempty"`        // optional max value of output for numeric data types
 	Min        float32       `json:"min,omitempty"`        // optional min value of output for numeric data types
-	OutputType OutputType    `json:"outputType"`           // type of output as per OutputTypeXyz
 	Timestamp  string        `json:"timestamp"`            // time the record is last updated
 	Unit       Unit          `json:"unit,omitempty"`       // unit of output value
+	// For convenience, filled when registering or receiving
+	NodeID      string     `json:"-"`
+	PublisherID string     `json:"-"`
+	OutputType  OutputType `json:"-"`
+	Instance    string     `json:"-"`
 }
 
 // OutputEventMessage message with multiple output values

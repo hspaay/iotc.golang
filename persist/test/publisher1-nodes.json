@@ -1,9 +1,35 @@
 [
   {
     "address": "zone1/publisher1/node1/$node",
-    "publisher": "publisher1",
-    "runstate": "",
-    "type": "adapter",
-    "zone": "zone1"
+    "config": {
+      "name": {
+        "datatype": "string",
+        "description": "Human friendly node name"
+      },
+      "publishEvent": {
+        "datatype": "string",
+        "default": "false",
+        "description": "Enable publishing outputs as event"
+      },
+      "publishHistory": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing output history"
+      },
+      "publishLatest": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing latest output"
+      },
+      "publishRaw": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing raw outputs"
+      }
+    },
+    "deviceid": "node1",
+    "nodeid": "node1",
+    "nodeType": "adapter",
+    "timestamp": "2020-07-12T22:26:24.218-0700"
   }
 ]
