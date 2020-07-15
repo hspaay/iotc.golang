@@ -264,6 +264,11 @@ func (publisher *Publisher) UpdateOutput(output *types.OutputDiscoveryMessage) {
 	publisher.registeredOutputs.UpdateOutput(output)
 }
 
+// UpdateOutputForecast replaces a forecast
+func (publisher *Publisher) UpdateOutputForecast(nodeID string, outputType types.OutputType, instance string, forecast outputs.OutputForecast) {
+	publisher.registeredForecastValues.UpdateForecast(nodeID, outputType, instance, forecast)
+}
+
 // UpdateOutputValue adds the registered node's output value to the front of the value history
 func (publisher *Publisher) UpdateOutputValue(nodeID string, outputType types.OutputType, instance string, newValue string) bool {
 	outputAddr := outputs.MakeOutputDiscoveryAddress(publisher.Domain(), publisher.PublisherID(), nodeID, outputType, instance)
