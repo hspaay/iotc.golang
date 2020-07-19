@@ -28,7 +28,7 @@ var node1Output1Instance = "0"
 
 func TestCreateOutputs(t *testing.T) {
 	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
-	output := collection.NewOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
+	output := collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
 
 	require.NotNil(t, output, "Failed creating output")
 
@@ -58,7 +58,7 @@ func TestCreateOutputs(t *testing.T) {
 
 func TestUpdateOutputs(t *testing.T) {
 	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
-	output1 := collection.NewOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
+	output1 := collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
 	if !assert.NotNil(t, output1, "Failed creating output") {
 		return
 	}

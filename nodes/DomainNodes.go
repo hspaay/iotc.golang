@@ -143,7 +143,7 @@ func (domainNodes *DomainNodes) handleDiscoverNode(address string, message strin
 	var discoMsg types.NodeDiscoveryMessage
 
 	// verify the message signature and get the payload
-	_, err := messaging.VerifySignature(message, &discoMsg, domainNodes.getPublisherKey)
+	_, err := messaging.VerifySenderSignature(message, &discoMsg, domainNodes.getPublisherKey)
 	if err != nil {
 		logrus.Warnf("handleDiscoverNode: Failed verifying signature on address %s: %s", address, err)
 		return

@@ -46,6 +46,22 @@ func (regNodes *RegisteredNodes) Clone(node *types.NodeDiscoveryMessage) *types.
 	return &newNode
 }
 
+// CreateNode creates a node instance for a device or service and adds it to the list. If the node exists it will remain unchanged.
+// This returns the node instance
+func (regNodes *RegisteredNodes) CreateNode(deviceID string, nodeType types.NodeType) *types.NodeDiscoveryMessage {
+	existingNode := regNodes.GetNodeByID(deviceID)
+	if existingNode != nil {
+		return existingNode
+	}
+
+	regNodes.updateMutex.Lock()
+	defer regNodes.updateMutex.Unlock()
+
+	newNode := NewNode(regNodes.domain, regNodes.publisherID, deviceID, nodeType)
+	regNodes.updateNode(newNode)
+	return newNode
+}
+
 // GetAllNodes returns a list of nodes
 func (regNodes *RegisteredNodes) GetAllNodes() []*types.NodeDiscoveryMessage {
 	regNodes.updateMutex.Lock()
@@ -280,22 +296,6 @@ func (regNodes *RegisteredNodes) UpdateErrorStatus(nodeID string, runState strin
 		regNodes.updateNode(newNode)
 	}
 	return changed
-}
-
-// NewNode creates a node instance for a device or service and adds it to the list. If the node exists it will remain unchanged.
-// This returns the node instance
-func (regNodes *RegisteredNodes) NewNode(deviceID string, nodeType types.NodeType) *types.NodeDiscoveryMessage {
-	existingNode := regNodes.GetNodeByID(deviceID)
-	if existingNode != nil {
-		return existingNode
-	}
-
-	regNodes.updateMutex.Lock()
-	defer regNodes.updateMutex.Unlock()
-
-	newNode := NewNode(regNodes.domain, regNodes.publisherID, deviceID, nodeType)
-	regNodes.updateNode(newNode)
-	return newNode
 }
 
 // NewNodeConfig creates a new node configuration instance and adds it to the node with the given ID.

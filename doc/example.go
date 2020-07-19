@@ -95,11 +95,11 @@ var appConfig = &AppConfig{
 
 // SetupNodes creates a node for each city with outputs for temperature and humidity
 func SetupNodes(pub *publisher.Publisher, city string) {
-	pub.NewNode(city, types.NodeTypeWeatherService)
-	output := pub.NewOutput(city, types.OutputTypeTemperature, types.DefaultOutputInstance)
+	pub.CreateNode(city, types.NodeTypeWeatherService)
+	output := pub.CreateOutput(city, types.OutputTypeTemperature, types.DefaultOutputInstance)
 	output.Unit = types.UnitCelcius
 	// pub.UpdateOutput(output)
-	pub.NewOutput(city, types.OutputTypeHumidity, types.DefaultOutputInstance)
+	pub.CreateOutput(city, types.OutputTypeHumidity, types.DefaultOutputInstance)
 }
 
 // UpdateWeather obtains the forecast and updates the output value.

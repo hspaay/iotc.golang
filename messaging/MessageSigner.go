@@ -29,7 +29,7 @@ type MessageSigner struct {
 // Sender field is missing then the 'address' field contains the publisher.
 //  or 'address' field
 func (signer *MessageSigner) VerifySignedMessage(rawMessage string, object interface{}) (isSigned bool, err error) {
-	isSigned, err = VerifySignature(rawMessage, object, signer.getPublicKey)
+	isSigned, err = VerifySenderSignature(rawMessage, object, signer.getPublicKey)
 	return isSigned, err
 }
 
@@ -49,6 +49,11 @@ func (signer *MessageSigner) PublishObject(address string, retained bool, object
 		err = signer.PublishSigned(address, retained, string(payload))
 	}
 	return err
+}
+
+// SetSignMessages enables or disables message signing. Intended for testing.
+func (signer *MessageSigner) SetSignMessages(sign bool) {
+	signer.signMessages = sign
 }
 
 // Subscribe to messages on the given address
@@ -216,7 +221,7 @@ func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload strin
 	return string(payloadB), err
 }
 
-// VerifySignature verifies if a message is JWS signed. If signed then the signature is verified
+// VerifySenderSignature verifies if a message is JWS signed. If signed then the signature is verified
 // using the 'Sender' or 'Address' attributes to determine the public key to verify with. To verify correctly,
 // the sender has to be a known publisher and verified with the DSS.
 //
@@ -227,7 +232,7 @@ func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload strin
 // The rawMessage is json unmarshalled into the given object.
 //
 // This returns a flag if the message was signed and if so, an error if the verification failed
-func VerifySignature(rawMessage string, object interface{}, getPublicKey func(address string) *ecdsa.PublicKey) (isSigned bool, err error) {
+func VerifySenderSignature(rawMessage string, object interface{}, getPublicKey func(address string) *ecdsa.PublicKey) (isSigned bool, err error) {
 
 	jwsSignature, err := jose.ParseSigned(rawMessage)
 	if err != nil {

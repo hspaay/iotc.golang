@@ -270,12 +270,12 @@ func TestReceiveInput(t *testing.T) {
 	// signMessages = false
 	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, signMessages, testMessenger)
 
-	// update the node alias and see if its output is published with alias' as node id
-	pub1.SetNodeInputHandler(func(address string, message *types.SetInputMessage) {
-		logrus.Infof("Received message: '%s'", message.Value)
-		pub1.UpdateOutputValue(node1ID, node1Output1Type, types.DefaultOutputInstance, message.Value)
-	})
 	pub1.Start()
+	// update the node alias and see if its output is published with alias' as node id
+	pub1.CreateInput(node1ID, "switch", "0", func(address string, sender string, value string) {
+		logrus.Infof("Received message '%s' from sender %s", value, sender)
+		pub1.UpdateOutputValue(node1ID, node1Output1Type, types.DefaultOutputInstance, value)
+	})
 	pub1.UpdateNode(node1) // p1
 	pub1.UpdateInput(node1Input1)
 	pub1.UpdateOutput(node1Output1)
@@ -317,13 +317,13 @@ func TestSetInput(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
 	var receivedInputValue = ""
 	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, signMessages, testMessenger)
-
-	pub1.SetNodeInputHandler(func(address string, message *types.SetInputMessage) {
-		receivedInputValue = message.Value
-	})
-	pub1.UpdateInput(node1Input1)
-
 	pub1.Start()
+
+	pub1.CreateInput(node1ID, "switch", "0", func(address string, sender string, value string) {
+		logrus.Infof("Received message '%s' from sender %s", value, sender)
+		receivedInputValue = value
+	})
+
 	// encrypt
 	signer := messaging.NewMessageSigner(true, pub1.GetPublisherKey, testMessenger, pub1.GetIdentityKeys())
 	pubKey := pub1.GetPublisherKey(node1InputSetAddr)
@@ -384,9 +384,9 @@ func TestErrors(t *testing.T) {
 	pub1.GetOutputs()
 	pub1.GetOutputValue("fakeid", "faketype", "")
 	pub1.MakeNodeDiscoveryAddress("fakeid")
-	pub1.NewInput("fakeid", types.InputTypeColor, types.DefaultInputInstance)
-	pub1.NewNode("fakeid", types.NodeTypeAlarm)
-	pub1.NewOutput("fakeid", types.OutputTypeAlarm, types.DefaultOutputInstance)
+	pub1.CreateInput("fakeid", types.InputTypeColor, types.DefaultInputInstance, nil)
+	pub1.CreateNode("fakeid", types.NodeTypeAlarm)
+	pub1.CreateOutput("fakeid", types.OutputTypeAlarm, types.DefaultOutputInstance)
 	pub1.UpdateNodeErrorStatus("fakeid", types.NodeRunStateError, "fake status")
 	pub1.UpdateNodeAttr("fakeid", types.NodeAttrMap{})
 	pub1.UpdateNodeConfig("fakeid", types.NodeAttrName, nil)

@@ -72,7 +72,7 @@ func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(address strin
 	}
 
 	// Verify the message using the public key of the sender
-	isSigned, err := messaging.VerifySignature(dmessage, &configureMessage, nodeConfigure.getPublisherKey)
+	isSigned, err := messaging.VerifySenderSignature(dmessage, &configureMessage, nodeConfigure.getPublisherKey)
 	if !isSigned {
 		// all configuration commands must use signed messages
 		logrus.Warnf("receiveConfigureCommand: message to input '%s' is not signed. Message discarded.", address)

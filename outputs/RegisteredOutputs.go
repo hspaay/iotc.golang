@@ -18,6 +18,14 @@ type RegisteredOutputs struct {
 	updateMutex    *sync.Mutex                              // mutex for async updating of outputs
 }
 
+// CreateOutput creates and registers a new output
+func (regOutputs *RegisteredOutputs) CreateOutput(
+	nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
+	output := NewOutput(regOutputs.domain, regOutputs.publisherID, nodeID, outputType, instance)
+	regOutputs.UpdateOutput(output)
+	return output
+}
+
 // GetAllOutputs returns the list of outputs
 func (regOutputs *RegisteredOutputs) GetAllOutputs() []*types.OutputDiscoveryMessage {
 	regOutputs.updateMutex.Lock()
@@ -98,14 +106,6 @@ func (regOutputs *RegisteredOutputs) GetUpdatedOutputs(clearUpdates bool) []*typ
 	}
 	regOutputs.updateMutex.Unlock()
 	return updateList
-}
-
-// NewOutput creates and registers a new output
-func (regOutputs *RegisteredOutputs) NewOutput(
-	nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
-	output := NewOutput(regOutputs.domain, regOutputs.publisherID, nodeID, outputType, instance)
-	regOutputs.UpdateOutput(output)
-	return output
 }
 
 // SetAlias updates the address of all inputs of the given nodeID using the alias instead

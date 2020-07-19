@@ -33,16 +33,15 @@ func (setAlias *ReceiveNodeAlias) SetAliasHandler(handler func(address string, m
 	setAlias.setAliasHandler = handler
 }
 
-// Start listening for set input commands
+// Start listening for node alias commands
 func (setAlias *ReceiveNodeAlias) Start() {
 	setAlias.updateMutex.Lock()
 	defer setAlias.updateMutex.Unlock()
-	// subscribe to all set commands for inputs of this publisher nodes
 	addr := MakeAliasAddress(setAlias.domain, setAlias.publisherID, "+")
 	setAlias.messageSigner.Subscribe(addr, setAlias.decodeAliasCommand)
 }
 
-// Stop listening for set input command
+// Stop listening for alias input command
 func (setAlias *ReceiveNodeAlias) Stop() {
 	setAlias.updateMutex.Lock()
 	defer setAlias.updateMutex.Unlock()
@@ -76,7 +75,7 @@ func (setAlias *ReceiveNodeAlias) decodeAliasCommand(address string, message str
 	}
 
 	// Verify the message using the public key of the sender and decode the payload
-	isSigned, err := messaging.VerifySignature(dmessage, &aliasMessage, setAlias.getPublisherKey)
+	isSigned, err := messaging.VerifySenderSignature(dmessage, &aliasMessage, setAlias.getPublisherKey)
 	if !isSigned {
 		// all inputs must use signed messages
 		logrus.Warnf("decodeAliasCommand: message to input '%s' is not signed. Message discarded.", address)

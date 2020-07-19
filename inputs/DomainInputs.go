@@ -83,7 +83,7 @@ func (inputs *DomainInputs) handleDiscoverInput(address string, message string) 
 	var discoMsg types.InputDiscoveryMessage
 
 	// verify the message signature and get the payload
-	_, err := messaging.VerifySignature(message, &discoMsg, inputs.getPublisherKey)
+	_, err := messaging.VerifySenderSignature(message, &discoMsg, inputs.getPublisherKey)
 	if err != nil {
 		logrus.Warnf("handleDiscoverInput: Failed verifying signature on address %s: %s", address, err)
 		return

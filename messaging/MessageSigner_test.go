@@ -133,7 +133,7 @@ func TestVerifyPublisher(t *testing.T) {
 	//
 	var received TestObjectWithSender
 
-	isSigned, err := messaging.VerifySignature(sig1, &received, func(address string) *ecdsa.PublicKey {
+	isSigned, err := messaging.VerifySenderSignature(sig1, &received, func(address string) *ecdsa.PublicKey {
 		// return the public key of this publisher
 		return &privKey.PublicKey
 	})
@@ -152,7 +152,7 @@ func TestVerifySender(t *testing.T) {
 	//
 	var received TestObjectWithSender
 
-	isSigned, err := messaging.VerifySignature(sig1, &received, func(address string) *ecdsa.PublicKey {
+	isSigned, err := messaging.VerifySenderSignature(sig1, &received, func(address string) *ecdsa.PublicKey {
 		// return the public key of this publisher
 		return &privKey.PublicKey
 	})

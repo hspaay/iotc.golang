@@ -54,9 +54,10 @@ type InputDiscoveryMessage struct {
 	EnumValues []string      `json:"enumValues,omitempty"` // enum valid input values for enum datatypes
 	Max        float32       `json:"max,omitempty"`        // optional max value of input for numeric data types
 	Min        float32       `json:"min,omitempty"`        // optional min value of input for numeric data types
+	Source     string        `json:"source,omitempty"`     // the input source URL, empty for set commands
 	Timestamp  string        `json:"timestamp"`            // Time the record is last updated
 	Unit       Unit          `json:"unit,omitempty"`       // unit of value
-	// For convenience, filled when registering or receiving
+	// For convenience, filled when registering or receiving:
 	NodeID      string    `json:"-"`
 	PublisherID string    `json:"-"`
 	InputType   InputType `json:"-"`

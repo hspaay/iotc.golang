@@ -8,6 +8,13 @@ import (
 	"github.com/iotdomain/iotdomain-go/types"
 )
 
+// InputSubscription with handler of subscriber to input updates
+type InputSubscription struct {
+	handler      func(inputAddress string, sender string, value string) // the notification handler of this input
+	inputAddress string                                                 // the input belonging to this subscription
+	source       string                                                 // the source of the input, eg, the input address, http address or file path
+}
+
 // RegisteredInputs manages registration of publisher inputs
 // Generics would be nice as this overlaps with outputs, nodes, publishers
 type RegisteredInputs struct {
@@ -16,6 +23,52 @@ type RegisteredInputs struct {
 	inputMap      map[string]*types.InputDiscoveryMessage // registered inputs by address
 	updatedInputs map[string]*types.InputDiscoveryMessage // inputs that have been rediscovered/updated since last publication
 	updateMutex   *sync.Mutex                             // mutex for async handling of inputs
+	subscriptions map[string]*InputSubscription           // subscription to input by inputAddress
+}
+
+// CreateInput creates and registers a new input with optional handler for input trigger
+func (regInputs *RegisteredInputs) CreateInput(
+	nodeID string, inputType types.InputType, instance string,
+	handler func(inputAddress string, sender string, value string)) *types.InputDiscoveryMessage {
+
+	return regInputs.CreateInputWithSource(nodeID, inputType, instance, "", handler)
+}
+
+// CreateInputWithSource creates and registers a new input that takes its input value from a given source
+func (regInputs *RegisteredInputs) CreateInputWithSource(
+	nodeID string, inputType types.InputType, instance string,
+	source string, handler func(inputAddress string, sender string, value string)) *types.InputDiscoveryMessage {
+
+	input := NewInput(regInputs.domain, regInputs.publisherID, nodeID, inputType, instance)
+	input.Source = source
+	regInputs.UpdateInput(input)
+
+	sub := &InputSubscription{
+		handler:      handler,
+		inputAddress: input.Address,
+		source:       input.Address,
+	}
+	regInputs.updateMutex.Lock()
+	defer regInputs.updateMutex.Unlock()
+	regInputs.subscriptions[input.Address] = sub
+	return input
+}
+
+// DeleteInput unregisters the input
+func (regInputs *RegisteredInputs) DeleteInput(
+	nodeID string, inputType types.InputType, instance string) {
+
+	regInputs.updateMutex.Lock()
+	defer regInputs.updateMutex.Unlock()
+
+	inputAddr := MakeInputDiscoveryAddress(regInputs.domain, regInputs.publisherID, nodeID, inputType, instance)
+	delete(regInputs.inputMap, inputAddr)
+	delete(regInputs.subscriptions, inputAddr)
+	if regInputs.updatedInputs == nil {
+		regInputs.updatedInputs = make(map[string]*types.InputDiscoveryMessage)
+	}
+	// nil updates mean that the inputs are deleted
+	regInputs.updatedInputs[inputAddr] = nil
 }
 
 // GetAllInputs returns the list of inputs
@@ -67,6 +120,17 @@ func (regInputs *RegisteredInputs) GetInputsByNode(nodeID string) []*types.Input
 	return inputList
 }
 
+// GetInputsWithSource returns a list of inputs that have the given source
+func (regInputs *RegisteredInputs) GetInputsWithSource(source string) []*types.InputDiscoveryMessage {
+	inputList := make([]*types.InputDiscoveryMessage, 0)
+	for _, input := range regInputs.inputMap {
+		if input.Source == source {
+			inputList = append(inputList, input)
+		}
+	}
+	return inputList
+}
+
 // GetUpdatedInputs returns the list of registered inputs that have been updated
 // clear the update on return
 func (regInputs *RegisteredInputs) GetUpdatedInputs(clearUpdates bool) []*types.InputDiscoveryMessage {
@@ -83,15 +147,6 @@ func (regInputs *RegisteredInputs) GetUpdatedInputs(clearUpdates bool) []*types.
 		}
 	}
 	return updateList
-}
-
-// NewInput creates and registers a new input
-func (regInputs *RegisteredInputs) NewInput(
-	nodeID string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
-
-	input := NewInput(regInputs.domain, regInputs.publisherID, nodeID, inputType, instance)
-	regInputs.UpdateInput(input)
-	return input
 }
 
 // SetAlias updates the address of all outputs with the given nodeID using the alias instead
@@ -111,6 +166,7 @@ func (regInputs *RegisteredInputs) SetAlias(nodeID string, alias string) {
 }
 
 // UpdateInput replaces the registered input using the node.Address
+// If the input doesn't yet exist, it will be added.
 func (regInputs *RegisteredInputs) UpdateInput(input *types.InputDiscoveryMessage) {
 
 	regInputs.updateMutex.Lock()
@@ -121,6 +177,16 @@ func (regInputs *RegisteredInputs) UpdateInput(input *types.InputDiscoveryMessag
 	}
 	input.Timestamp = time.Now().Format(types.TimeFormat)
 	regInputs.updatedInputs[input.Address] = input
+}
+
+// NotifyInputHandler passes the sender and value of an input command to the input's handler
+// The sender is the identity address of the publisher and can be used for authorization. It is
+// empty for locally triggered inputs such as file change and http polling.
+func (regInputs *RegisteredInputs) NotifyInputHandler(inputAddress string, sender string, value string) {
+	subscription := regInputs.subscriptions[inputAddress]
+	if subscription != nil && subscription.handler != nil {
+		subscription.handler(inputAddress, sender, value)
+	}
 }
 
 // NewInput instance for creating an input object for later adding.
@@ -147,10 +213,11 @@ func NewInput(
 func NewRegisteredInputs(domain string, publisherID string) *RegisteredInputs {
 
 	regInputs := &RegisteredInputs{
-		domain:      domain,
-		publisherID: publisherID,
-		inputMap:    make(map[string]*types.InputDiscoveryMessage),
-		updateMutex: &sync.Mutex{},
+		domain:        domain,
+		publisherID:   publisherID,
+		inputMap:      make(map[string]*types.InputDiscoveryMessage),
+		subscriptions: make(map[string]*InputSubscription), // subscription to input by address
+		updateMutex:   &sync.Mutex{},
 	}
 	return regInputs
 }

@@ -37,7 +37,7 @@ func (publisher *Publisher) HandleIdentityUpdate(address string, message string)
 	}
 
 	// Verify the message is send by and signed by the DSS
-	isSigned, err := messaging.VerifySignature(dmessage, &fullIdentity, publisher.domainPublishers.GetPublisherKey)
+	isSigned, err := messaging.VerifySenderSignature(dmessage, &fullIdentity, publisher.domainPublishers.GetPublisherKey)
 	if !isSigned {
 		// commands must use signed messages
 		logrus.Warnf("HandleIdentityUpdate: Identity update '%s' is not signed. Message discarded.", address)

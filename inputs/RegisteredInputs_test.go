@@ -32,7 +32,7 @@ func TestNewInput(t *testing.T) {
 	collection := inputs.NewRegisteredInputs(domain, publisher1ID)
 	require.NotNil(t, collection, "Failed creating registered input collection")
 
-	input := collection.NewInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance)
+	input := collection.CreateInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance, nil)
 	require.NotNil(t, input, "Failed creating input")
 
 	// must be able to get the newly created input
@@ -51,7 +51,7 @@ func TestNewInput(t *testing.T) {
 
 func TestUpdateInput(t *testing.T) {
 	collection := inputs.NewRegisteredInputs(domain, publisher1ID)
-	collection.NewInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance)
+	collection.CreateInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance, nil)
 	updated := collection.GetUpdatedInputs(true)
 	require.Equal(t, 1, len(updated), "Expected 1 updated input")
 
