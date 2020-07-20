@@ -69,6 +69,7 @@ func (ifout *InputFromOutputs) onReceiveOutput(address string, message string) {
 			logrus.Warnf("onReceiveOutput: earlier timestamp of output %s. Message discarded.", address)
 			return
 		}
+		ifout.senderTimestamp[address] = latestMessage.Timestamp
 		_ = isSigned
 		value = latestMessage.Value
 	}

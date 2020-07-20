@@ -98,7 +98,8 @@ func TestPublishSetInput(t *testing.T) {
 	assert.NotEqual(t, "content1", rxMsg, "message with failed signature verification should not be accepted")
 
 	// with encryption expect to have received input
-	signer.PublishObject(setInput1Addr, false, setMsg, &privKey.PublicKey)
+	inputs.PublishSetInput(setInput1Addr, setMsg.Value, setMsg.Sender, signer, &privKey.PublicKey)
+	// signer.PublishObject(setInput1Addr, false, setMsg, &privKey.PublicKey)
 	rxMsg = receivedInputs[input1Addr]
 	assert.Equal(t, "content1", rxMsg, "Set message content doesnt match")
 

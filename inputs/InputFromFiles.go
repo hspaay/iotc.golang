@@ -22,7 +22,7 @@ type InputFromFiles struct {
 	sourceToInputMap map[string][]string // source to inputAddress map (1:N)
 }
 
-// CreateInput creates an input that triggers on file or folder changes and invokes the given handler.
+// CreateInput creates an input that triggers on file is written to and invokes the given handler.
 // This returns the input address
 func (iffile *InputFromFiles) CreateInput(
 	nodeID string, inputType types.InputType, instance string,
@@ -139,15 +139,15 @@ func (iffile *InputFromFiles) watchFile(fileName string) string {
 	} else if strings.HasPrefix(fileName, ".") {
 		newPath, err = filepath.Abs(fileName)
 	}
+	err = iffile.watcher.Add(newPath)
 	if err != nil {
-		logrus.Errorf("SubscribeToFile: File ignored. Unable to watch file %s: %s", fileName, err)
+		logrus.Errorf("SubscribeToFile: File ignored. Unable to watch file %s: %s", newPath, err)
 		return ""
 	}
-	iffile.watcher.Add(newPath)
 	return newPath
 }
 
-// loop watching for changes to file
+// loop watching for writing to file
 func (iffile *InputFromFiles) watcherLoop() {
 	for iffile.isRunning {
 		select {
@@ -170,12 +170,13 @@ func (iffile *InputFromFiles) watcherLoop() {
 }
 
 // NewInputFromFiles creates a new file watcher input list
-func NewInputFromFiles() *InputFromFiles {
+func NewInputFromFiles(regInputs *RegisteredInputs) *InputFromFiles {
 	watcher, _ := fsnotify.NewWatcher()
 	fil := &InputFromFiles{
-		watcher:          watcher,
+		registeredInputs: regInputs,
 		sourceToInputMap: make(map[string][]string),
 		updateMutex:      &sync.Mutex{},
+		watcher:          watcher,
 	}
 	return fil
 }

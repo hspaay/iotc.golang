@@ -2,6 +2,7 @@
 package inputs
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -35,21 +36,24 @@ func (regInputs *RegisteredInputs) CreateInput(
 }
 
 // CreateInputWithSource creates and registers a new input that takes its input value from a given source
+// Replaces the existing input if it already exist.
 func (regInputs *RegisteredInputs) CreateInputWithSource(
-	nodeID string, inputType types.InputType, instance string,
-	source string, handler func(inputAddress string, sender string, value string)) *types.InputDiscoveryMessage {
+	nodeID string, inputType types.InputType, instance string, source string,
+	handler func(inputAddress string, sender string, value string)) *types.InputDiscoveryMessage {
+
+	regInputs.updateMutex.Lock()
+	defer regInputs.updateMutex.Unlock()
 
 	input := NewInput(regInputs.domain, regInputs.publisherID, nodeID, inputType, instance)
 	input.Source = source
-	regInputs.UpdateInput(input)
+
+	regInputs.updateInput(input)
 
 	sub := &InputSubscription{
 		handler:      handler,
 		inputAddress: input.Address,
 		source:       input.Address,
 	}
-	regInputs.updateMutex.Lock()
-	defer regInputs.updateMutex.Unlock()
 	regInputs.subscriptions[input.Address] = sub
 	return input
 }
@@ -149,7 +153,7 @@ func (regInputs *RegisteredInputs) GetUpdatedInputs(clearUpdates bool) []*types.
 	return updateList
 }
 
-// SetAlias updates the address of all outputs with the given nodeID using the alias instead
+// SetAlias updates the address of all inputs with the given nodeID using the alias instead
 func (regInputs *RegisteredInputs) SetAlias(nodeID string, alias string) {
 	inputs := regInputs.GetInputsByNode(nodeID)
 	for _, input := range inputs {
@@ -160,17 +164,29 @@ func (regInputs *RegisteredInputs) SetAlias(nodeID string, alias string) {
 		input.NodeID = alias
 		regInputs.updateMutex.Lock()
 		delete(regInputs.inputMap, oldAddress)
+		regInputs.updateInput(input)
 		regInputs.updateMutex.Unlock()
-		regInputs.UpdateInput(input)
 	}
 }
 
-// UpdateInput replaces the registered input using the node.Address
-// If the input doesn't yet exist, it will be added.
-func (regInputs *RegisteredInputs) UpdateInput(input *types.InputDiscoveryMessage) {
+// UpdateInput replaces an existing input with the provided input.
+// The input must already exist and be created using 'CreateInput', otherwise it returns an error
+func (regInputs *RegisteredInputs) UpdateInput(input *types.InputDiscoveryMessage) error {
 
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
+	existingInput := regInputs.inputMap[input.Address]
+	if existingInput == nil {
+		return errors.New("UpdateInput but input " + input.Address + " doesn't exist.")
+	}
+	regInputs.updateInput(input)
+	return nil
+}
+
+// updateInput replaces an existing input or adds the provided input.
+// If the input doesn't exist it will be added. The input is also added to the updatedInputs map
+func (regInputs *RegisteredInputs) updateInput(input *types.InputDiscoveryMessage) {
+
 	regInputs.inputMap[input.Address] = input
 	if regInputs.updatedInputs == nil {
 		regInputs.updatedInputs = make(map[string]*types.InputDiscoveryMessage)

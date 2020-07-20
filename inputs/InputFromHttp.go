@@ -70,6 +70,7 @@ func (ifhttp *InputFromHTTP) DeleteInput(nodeID string, inputType types.InputTyp
 		return
 	}
 	delete(ifhttp.subscriptions, existingInput.Address)
+	ifhttp.registeredInputs.DeleteInput(nodeID, inputType, instance)
 }
 
 // Send a request to the URL and read the response
@@ -78,7 +79,7 @@ func (ifhttp *InputFromHTTP) readInput(input *types.InputDiscoveryMessage) (stri
 	var err error
 	url := input.Source
 
-	logrus.Debugf("HTTPInputList.read: Reading from URL %s", url)
+	logrus.Debugf("InputFromHTTP.readInput: Reading from URL %s", url)
 	startTime := time.Now()
 	var req *http.Request
 	var resp *http.Response
@@ -99,19 +100,19 @@ func (ifhttp *InputFromHTTP) readInput(input *types.InputDiscoveryMessage) (stri
 	}
 	// handle failure to load the image
 	if err != nil {
-		logrus.Errorf("readCameraImage: Error opening URL %s: %s", url, err)
+		logrus.Errorf("InputFromHTTP.readInput: Error opening URL %s: %s", url, err)
 		return "", err
 	}
 	defer resp.Body.Close()
 	// was it a good response?
 	if resp.StatusCode > 299 {
-		msg := fmt.Sprintf("readCameraImage: Failed opening URL %s: %s", url, resp.Status)
+		msg := fmt.Sprintf("InputFromHTTP.readInput: Failed opening URL %s: %s", url, resp.Status)
 		err := errors.New(msg)
 		return "", err
 	}
 	payload, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.Errorf("readCameraImage: Error reading from %s: %s", url, err)
+		logrus.Errorf("InputFromHTTP.readInput: Error reading from %s: %s", url, err)
 		return "", err
 	}
 	endTime := time.Now()
@@ -163,8 +164,11 @@ func (ifhttp *InputFromHTTP) pollLoop() {
 func NewInputFromHTTP(registeredInputs *RegisteredInputs) *InputFromHTTP {
 
 	httpInput := &InputFromHTTP{
+		pollDelay:        make(map[string]int),
+		pollInterval:     3600,
 		registeredInputs: registeredInputs,
 		subscriptions:    make(map[string]string),
+		updateMutex:      &sync.Mutex{},
 	}
 	return httpInput
 }
