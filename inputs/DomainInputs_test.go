@@ -28,7 +28,7 @@ func TestNewDomainInput(t *testing.T) {
 	messenger := messaging.NewDummyMessenger(dummyConfig)
 	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
 
-	collection := inputs.NewDomainInputs(getPubKey, signer)
+	collection := inputs.NewDomainInputs(signer)
 	require.NotNil(t, collection, "Failed creating registered input collection")
 
 	input := inputs.NewInput(domain, publisherID, nodeID, inputType, types.DefaultInputInstance)
@@ -66,7 +66,7 @@ func TestDiscoverDomainInputs(t *testing.T) {
 	messenger := messaging.NewDummyMessenger(dummyConfig)
 	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
 
-	collection := inputs.NewDomainInputs(getPubKey, signer)
+	collection := inputs.NewDomainInputs(signer)
 	require.NotNil(t, collection, "Failed creating registered input collection")
 	collection.Start()
 

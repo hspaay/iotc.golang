@@ -3,6 +3,8 @@ package publisher
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/publishers"
@@ -35,7 +37,7 @@ func (publisher *Publisher) handleDSSDiscovery(dssIdentityMsg *types.PublisherId
 //
 // address contains the publisher's identity address: <domain>/<publisher>/$identity
 // message contains the publisher identity message
-func (publisher *Publisher) handlePublisherDiscovery(address string, message string) {
+func (publisher *Publisher) handlePublisherDiscovery(address string, message string) error {
 	var pubIdentityMsg *types.PublisherIdentityMessage
 	var payload string
 
@@ -45,8 +47,9 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 		// message isn't signed
 		if publisher.signMessages {
 			// message must be signed though. Discard
-			logrus.Warnf("handlePublisherDiscovery: Publisher update isn't signed but only signed updates are accepted. Publisher: %s", address)
-			return
+			errText := fmt.Sprintf("handlePublisherDiscovery: Publisher update isn't signed but only signed updates are accepted. Publisher: %s", address)
+			logrus.Warn(errText)
+			return errors.New(errText)
 		}
 		// accept the unsigned message as signing isn't required
 		payload = message
@@ -57,16 +60,16 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 
 	err = json.Unmarshal([]byte(payload), &pubIdentityMsg)
 	if err != nil {
-		logrus.Warnf("handlePublisherDiscovery: Failed parsing json payload [unsigned]: %s", err)
 		// abort
-		return
+		errText := fmt.Sprintf("handlePublisherDiscovery: Failed parsing json payload [unsigned]: %s", err)
+		logrus.Warn(errText)
+		return errors.New(errText)
 	}
 
 	// Handle the DSS publisher separately
 	dssAddress := publishers.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
 	if address == dssAddress {
 		publisher.handleDSSDiscovery(pubIdentityMsg)
-		return
 	}
 
 	// So we have a publisher identity update. Determine if it is trusted.
@@ -83,17 +86,20 @@ func (publisher *Publisher) handlePublisherDiscovery(address string, message str
 		// Create base64 encoded identity
 		identityAsJSON, err := json.Marshal(pubIdentityMsg)
 		if err != nil {
-			logrus.Infof("handlePublisherDiscovery: Missing identity for %s", address)
-			return
+			errText := fmt.Sprintf("handlePublisherDiscovery: Missing identity for %s", address)
+			logrus.Warn(errText)
+			return errors.New(errText)
 		}
 		base64URLIdentity := base64.URLEncoding.EncodeToString(identityAsJSON)
 		valid := messaging.VerifyEcdsaSignature(base64URLIdentity, pubIdentityMsg.IdentitySignature, dssSigningKey)
 		if !valid {
-			logrus.Infof("handlePublisherDiscovery: Identity for %s doesn't have a valid DSS signature", address)
-			return
+			errText := fmt.Sprintf("handlePublisherDiscovery: Identity for %s doesn't have a valid DSS signature", address)
+			logrus.Warn(errText)
+			return errors.New(errText)
 		}
 		// finally, The newly published identity is correctly signed by the DSS
 		publisher.domainPublishers.UpdatePublisher(pubIdentityMsg)
 		logrus.Infof("Discovered publisher %s. [DSS verified]", address)
 	}
+	return err
 }

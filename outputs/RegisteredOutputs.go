@@ -18,11 +18,14 @@ type RegisteredOutputs struct {
 	updateMutex    *sync.Mutex                              // mutex for async updating of outputs
 }
 
-// CreateOutput creates and registers a new output
+// CreateOutput creates and registers a new output. If the output already exists, it is replaced.
 func (regOutputs *RegisteredOutputs) CreateOutput(
 	nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
 	output := NewOutput(regOutputs.domain, regOutputs.publisherID, nodeID, outputType, instance)
-	regOutputs.UpdateOutput(output)
+
+	regOutputs.updateMutex.Lock()
+	defer regOutputs.updateMutex.Unlock()
+	regOutputs.updateOutput(output)
 	return output
 }
 
@@ -117,19 +120,17 @@ func (regOutputs *RegisteredOutputs) SetAlias(nodeID string, alias string) {
 			regOutputs.domain, regOutputs.publisherID, alias, output.OutputType, output.Instance)
 		output.Address = newAddress
 		output.NodeID = alias
+
 		regOutputs.updateMutex.Lock()
+		defer regOutputs.updateMutex.Unlock()
 		delete(regOutputs.outputMap, oldAddress)
-		regOutputs.updateMutex.Unlock()
-		regOutputs.UpdateOutput(output)
+		regOutputs.updateOutput(output)
 	}
 }
 
-// UpdateOutput replaces the output and updates its timestamp
-// The output will be added to the list of updated outputs
-func (regOutputs *RegisteredOutputs) UpdateOutput(output *types.OutputDiscoveryMessage) {
-	regOutputs.updateMutex.Lock()
-	defer regOutputs.updateMutex.Unlock()
-
+// UpdateOutput replaces the output and updates its timestamp.
+// For internal use only. Use within locked section.
+func (regOutputs *RegisteredOutputs) updateOutput(output *types.OutputDiscoveryMessage) {
 	regOutputs.outputMap[output.Address] = output
 	if regOutputs.updatedOutputs == nil {
 		regOutputs.updatedOutputs = make(map[string]*types.OutputDiscoveryMessage)

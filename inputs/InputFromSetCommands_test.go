@@ -28,7 +28,7 @@ func TestCreateSetInput(t *testing.T) {
 	registeredInputs := inputs.NewRegisteredInputs(domain, publisher1ID)
 
 	receiver := inputs.NewInputFromSetCommands(domain, publisher1ID,
-		signer, registeredInputs, privKey)
+		signer, registeredInputs)
 
 	receiver.CreateInput(node1ID, input1Type, types.DefaultInputInstance, nil)
 	receiver.DeleteInput(node1ID, input1Type, types.DefaultInputInstance)
@@ -58,7 +58,7 @@ func TestPublishSetInput(t *testing.T) {
 
 	registeredInputs := inputs.NewRegisteredInputs(domain, publisher1ID)
 	// the receiver registers the inputs and listens for set commands
-	receiver := inputs.NewInputFromSetCommands(domain, publisher1ID, signer, registeredInputs, privKey)
+	receiver := inputs.NewInputFromSetCommands(domain, publisher1ID, signer, registeredInputs)
 
 	// publish the encrypted set input message for node 1 temperature
 	receiver.CreateInput(node1ID, input1Type, types.DefaultInputInstance, inputHandler)

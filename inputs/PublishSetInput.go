@@ -2,11 +2,14 @@ package inputs
 
 import (
 	"crypto/ecdsa"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
+	"github.com/sirupsen/logrus"
 )
 
 // PublishSetInput sends a message to set the input value of a remote destination. The destination
@@ -16,7 +19,7 @@ import (
 //  The messageSigner is used to encrypt the message using the encryption key from the destination publisher
 func PublishSetInput(
 	destination string, value string, sender string,
-	messageSigner *messaging.MessageSigner, encryptionKey *ecdsa.PublicKey) {
+	messageSigner *messaging.MessageSigner, encryptionKey *ecdsa.PublicKey) error {
 
 	// logger.Infof("PublishSetInput: publishing encrypted input %s to %s", value, remoteNodeInputAddress)
 	// encryptionKey := setInputs.getPublisherKey(remoteNodeInputAddress)
@@ -24,7 +27,9 @@ func PublishSetInput(
 	segments := strings.Split(destination, "/")
 	// a full address is required
 	if len(segments) < 6 {
-		return
+		errText := fmt.Sprintf("PublishSetInput: Can't publish SetInput message as the destination address '%s' is incomplete", destination)
+		logrus.Error(errText)
+		return errors.New(errText)
 	}
 	// zone/pub/node/inputtype/instance/$set
 	segments[5] = types.MessageTypeSet
@@ -39,5 +44,5 @@ func PublishSetInput(
 		Value:     value,
 	}
 	// setInputs.messageSigner.PublishObject(inputAddr, false, &setMessage, encryptionKey)
-	messageSigner.PublishObject(inputAddr, false, &setMessage, encryptionKey)
+	return messageSigner.PublishObject(inputAddr, false, &setMessage, encryptionKey)
 }

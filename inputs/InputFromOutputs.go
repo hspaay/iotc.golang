@@ -5,9 +5,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
-	"github.com/sirupsen/logrus"
 )
 
 // InputFromOutputs subscribe to domain outputs to use as input
@@ -52,7 +52,7 @@ func (ifout *InputFromOutputs) DeleteInput(nodeID string, inputType types.InputT
 }
 
 // onReceiveOutput verifies the message sender (for 'latest' outputs)
-func (ifout *InputFromOutputs) onReceiveOutput(address string, message string) {
+func (ifout *InputFromOutputs) onReceiveOutput(address string, message string) error {
 	var value string
 	if strings.HasSuffix(address, types.MessageTypeRaw) {
 		value = message
@@ -60,14 +60,12 @@ func (ifout *InputFromOutputs) onReceiveOutput(address string, message string) {
 		latestMessage := types.OutputLatestMessage{}
 		isSigned, err := ifout.messageSigner.VerifySignedMessage(message, &latestMessage)
 		if err != nil {
-			logrus.Warningf("onReceiveOutput: Sender of output on address %s failed to verify", address)
-			return
+			return lib.MakeErrorf("onReceiveOutput: Sender of output on address %s failed to verify: %s", address, err)
 		}
 		// Verify this is the most recent message to protect against replay attacks
 		prevTimestamp := ifout.senderTimestamp[address]
 		if prevTimestamp > latestMessage.Timestamp {
-			logrus.Warnf("onReceiveOutput: earlier timestamp of output %s. Message discarded.", address)
-			return
+			return lib.MakeErrorf("onReceiveOutput: earlier timestamp of output %s. Message discarded.", address)
 		}
 		ifout.senderTimestamp[address] = latestMessage.Timestamp
 		_ = isSigned
@@ -79,6 +77,7 @@ func (ifout *InputFromOutputs) onReceiveOutput(address string, message string) {
 	for _, input := range inputs {
 		ifout.registeredInputs.NotifyInputHandler(input.Address, address, value)
 	}
+	return nil
 }
 
 // NewInputFromOutputs creates a input list with subscriptions to outputs to use as input

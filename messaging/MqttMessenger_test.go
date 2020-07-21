@@ -25,14 +25,28 @@ type PubMessage struct {
 var pub1Message = &PubMessage{Name: "bob"}
 var pub1JSON, _ = json.Marshal(pub1Message)
 
+func TestNewMessenger(t *testing.T) {
+	config := messaging.MessengerConfig{Messenger: "MQTTMessenger"}
+	m := messaging.NewMessenger(&config)
+	assert.NotNil(t, m, "Failed creating mqtt messenger")
+
+	config.Messenger = "dummy"
+	m = messaging.NewMessenger(&config)
+	assert.NotNil(t, m, "Failed creating dummy messenger")
+}
+
 // TestConnect to mqtt broker
 func TestConnect(t *testing.T) {
-	logrus.SetReportCaller(true) // publisher logging includes caller and file:line#
-
 	messenger := messaging.NewMqttMessenger(&messengerConfig)
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
+	// messenger.Disconnect()
+
+	// using LWT
+	err = messenger.Connect("test/pub1/$lwt", "last will and testament")
+	assert.NoError(t, err, "Connection failed")
 	messenger.Disconnect()
+
 }
 
 // TestPublish onto mqtt broker
@@ -40,12 +54,24 @@ func TestPublish(t *testing.T) {
 	logrus.SetReportCaller(true) // publisher logging includes caller and file:line#
 
 	messenger := messaging.NewMqttMessenger(&messengerConfig)
+
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 
 	err = messenger.Publish(pub1Addr, false, string(pub1JSON))
 	assert.NoError(t, err, "Publish failed")
+
+	// raw
+	err = messenger.PublishRaw(pub1Addr, false, string(pub1JSON))
+	assert.NoError(t, err, "Publish failed")
+
 	messenger.Disconnect()
+
+	// test publish without connection
+	err = messenger.Publish(pub1Addr, false, string(pub1JSON))
+	assert.Error(t, err, "Publish without connection succeeded??")
+	err = messenger.PublishRaw(pub1Addr, false, string(pub1JSON))
+	assert.Error(t, err, "PublishRaw without connection succeeded??")
 }
 
 // TestPublishSubscribe onto mqtt broker
@@ -56,14 +82,19 @@ func TestPublishSubscribe(t *testing.T) {
 	logrus.SetReportCaller(true) // publisher logging includes caller and file:line#
 
 	messenger := messaging.NewMqttMessenger(&messengerConfig)
+	messenger.Subscribe(pub1Addr, func(addr string, message string) error {
+		return nil
+	})
+
 	err := messenger.Connect("", "")
 	assert.NoError(t, err, "Connection failed")
 
-	messenger.Subscribe(pub1Addr, func(addr string, message string) {
+	messenger.Subscribe(pub1Addr, func(addr string, message string) error {
 		err := json.Unmarshal([]byte(message), &receivedMessage)
 		assert.NoError(t, err, "Received message can't be parsed")
 		rxLength = len(message)
 		logrus.Infof("TestPublishSubscribe: Received message. Length=%d: %s", len(message), message)
+		return nil
 	})
 
 	logrus.Infof("TestPublishSubscribe: sending message. Length=%d", len(pub1JSON))

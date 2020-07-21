@@ -36,7 +36,7 @@ type MqttMessenger struct {
 // TopicSubscription holds subscriptions to restore after disconnect
 type TopicSubscription struct {
 	address string
-	handler func(address string, message string)
+	handler func(address string, message string) error
 	token   pahomqtt.Token // for debugging
 	client  *MqttMessenger //
 }
@@ -259,7 +259,7 @@ func (messenger *MqttMessenger) resubscribe() {
 // qos: Quality of service for subscription: 0, 1, 2
 // handler: callback handler.
 func (messenger *MqttMessenger) Subscribe(
-	address string, onMessage func(address string, message string)) {
+	address string, onMessage func(address string, message string) error) {
 	subscription := TopicSubscription{
 		address: address,
 		handler: onMessage,
@@ -281,7 +281,7 @@ func (messenger *MqttMessenger) Subscribe(
 // Unsubscribe an address and handler
 // if handler is nil then only the address needs to match
 func (messenger *MqttMessenger) Unsubscribe(
-	address string, onMessage func(address string, message string)) {
+	address string, onMessage func(address string, message string) error) {
 	// messenger.publishMutex.Lock()
 	var onMessageID = onMessage
 	// onMessageStr := fmt.Sprintf("%v", &onMessage)
@@ -292,7 +292,9 @@ func (messenger *MqttMessenger) Unsubscribe(
 		// if sub.address == address && handlerStr == onMessageStr {
 		if sub.address == address && (onMessage == nil || &onMessageID == &handlerID) {
 			// shift remainder left one index
-			copy(messenger.subscriptions[i:], messenger.subscriptions[i+1:])
+			if i < len(messenger.subscriptions) {
+				copy(messenger.subscriptions[i:], messenger.subscriptions[i+1:])
+			}
 			messenger.subscriptions = messenger.subscriptions[:len(messenger.subscriptions)-1]
 			if onMessage != nil {
 				break

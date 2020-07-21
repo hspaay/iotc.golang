@@ -5,6 +5,8 @@ package publisher
 
 import (
 	"crypto/ecdsa"
+	"errors"
+	"fmt"
 
 	"github.com/iotdomain/iotdomain-go/inputs"
 	"github.com/iotdomain/iotdomain-go/nodes"
@@ -14,7 +16,7 @@ import (
 )
 
 // CreateInput creates a new node input that handle set commands and add it to the registered inputs
-// returns the input to allow for easy update
+//  If an input of the given nodeID, type and instance already exist it will be replaced. This returns the new input
 func (pub *Publisher) CreateInput(nodeID string, inputType types.InputType, instance string,
 	handler func(inputAddress string, sender string, value string)) *types.InputDiscoveryMessage {
 	input := pub.inputFromSetCommands.CreateInput(nodeID, inputType, instance, handler)
@@ -228,16 +230,16 @@ func (pub *Publisher) PublishRaw(output *types.OutputDiscoveryMessage, sign bool
 }
 
 // PublishSetInput publishes a $set input command to the given domain input address
-// Returns true if successful, false if the input's publisher cannot be found and the message
-// is not sent.
-func (pub *Publisher) PublishSetInput(domainInputAddr string, value string) bool {
+// Returns error if the message cannot be sent.
+func (pub *Publisher) PublishSetInput(domainInputAddr string, value string) error {
 	destPubKey := pub.GetPublisherKey(domainInputAddr)
 	if destPubKey == nil {
-		logrus.Warnf("PublishSetInput: no public key found to encrypt command for set input to %s. Message not sent.", domainInputAddr)
-		return false
+		errText := fmt.Sprintf("PublishSetInput: no public key found to encrypt command for set input to %s. Message not sent.", domainInputAddr)
+		logrus.Warnf(errText)
+		return errors.New(errText)
 	}
-	inputs.PublishSetInput(domainInputAddr, value, pub.Address(), pub.messageSigner, destPubKey)
-	return true
+	err := inputs.PublishSetInput(domainInputAddr, value, pub.Address(), pub.messageSigner, destPubKey)
+	return err
 }
 
 // UpdateNodeErrorStatus sets a registered node RunState to the given status with a lasterror message
@@ -275,21 +277,21 @@ func (pub *Publisher) UpdateNodeStatus(nodeID string, status map[types.NodeStatu
 
 // UpdateInput replaces the existing registered input with a new instance. Intended to update an
 // input attribute.
-func (pub *Publisher) UpdateInput(input *types.InputDiscoveryMessage) {
-	pub.registeredInputs.UpdateInput(input)
-}
+// func (pub *Publisher) UpdateInput(input *types.InputDiscoveryMessage) {
+// 	pub.registeredInputs.UpdateInput(input)
+// }
 
 // UpdateNode replaces the existing registered node with a new instance. Intended to update a
 // node attribute.
-func (pub *Publisher) UpdateNode(node *types.NodeDiscoveryMessage) {
-	pub.registeredNodes.UpdateNode(node)
-}
+// func (pub *Publisher) UpdateNode(node *types.NodeDiscoveryMessage) {
+// 	pub.registeredNodes.UpdateNode(node)
+// }
 
-// UpdateOutput replaces a registered output with a new instance. Intended to update an
-// output attribute.
-func (pub *Publisher) UpdateOutput(output *types.OutputDiscoveryMessage) {
-	pub.registeredOutputs.UpdateOutput(output)
-}
+// // UpdateOutput replaces a registered output with a new instance. Intended to update an
+// // output attribute. If the output does not exist, this is ignored.
+// func (pub *Publisher) UpdateOutput(output *types.OutputDiscoveryMessage) {
+// 	pub.registeredOutputs.UpdateOutput(output)
+// }
 
 // UpdateOutputForecast replaces a forecast
 func (pub *Publisher) UpdateOutputForecast(nodeID string, outputType types.OutputType, instance string, forecast outputs.OutputForecast) {

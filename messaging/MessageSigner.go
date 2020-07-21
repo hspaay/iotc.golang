@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/iotdomain/iotdomain-go/types"
@@ -21,7 +22,17 @@ type MessageSigner struct {
 	getPublicKey func(address string) *ecdsa.PublicKey
 	messenger    IMessenger
 	signMessages bool              // flag, sign outgoing messages. Default is true. Disable for testing
-	signingKey   *ecdsa.PrivateKey // private key for signing
+	privateKey   *ecdsa.PrivateKey // private key for signing and decryption
+}
+
+// DecodeMessage decrypts the message and verifies the sender signature .
+// The sender and signer of the message is contained the message 'sender' field. If the
+// Sender field is missing then the 'address' field is used as sender.
+// object must hold the expected message type to decode the json message containging the sender info
+func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}) (isSigned bool, isEncrypted bool, err error) {
+	dmessage, isEncrypted, err := DecryptMessage(rawMessage, signer.privateKey)
+	isSigned, err = VerifySenderSignature(dmessage, object, signer.getPublicKey)
+	return isEncrypted, isSigned, err
 }
 
 // VerifySignedMessage parses and verifies the message signature
@@ -39,9 +50,9 @@ func (signer *MessageSigner) VerifySignedMessage(rawMessage string, object inter
 func (signer *MessageSigner) PublishObject(address string, retained bool, object interface{}, encryptionKey *ecdsa.PublicKey) error {
 	// payload, err := json.Marshal(object)
 	payload, err := json.MarshalIndent(object, " ", " ")
-	if err != nil {
-		logrus.Errorf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
-		return err
+	if err != nil || object == nil {
+		errText := fmt.Sprintf("Publisher.publishMessage: Error marshalling message for address %s: %s", address, err)
+		return errors.New(errText)
 	}
 	if encryptionKey != nil {
 		err = signer.PublishEncrypted(address, retained, string(payload), encryptionKey)
@@ -57,12 +68,16 @@ func (signer *MessageSigner) SetSignMessages(sign bool) {
 }
 
 // Subscribe to messages on the given address
-func (signer *MessageSigner) Subscribe(address string, handler func(address string, message string)) {
+func (signer *MessageSigner) Subscribe(
+	address string,
+	handler func(address string, message string) error) {
 	signer.messenger.Subscribe(address, handler)
 }
 
 // Unsubscribe to messages on the given address
-func (signer *MessageSigner) Unsubscribe(address string, handler func(address string, message string)) {
+func (signer *MessageSigner) Unsubscribe(
+	address string,
+	handler func(address string, message string) error) {
 	signer.messenger.Unsubscribe(address, handler)
 }
 
@@ -74,7 +89,7 @@ func (signer *MessageSigner) PublishEncrypted(
 	message := payload
 	// first sign, then encrypt as per RFC
 	if signer.signMessages {
-		message, err = CreateJWSSignature(string(payload), signer.signingKey)
+		message, err = CreateJWSSignature(string(payload), signer.privateKey)
 	}
 	emessage, err := EncryptMessage(message, publicKey)
 	err = signer.messenger.Publish(address, retained, emessage)
@@ -91,7 +106,7 @@ func (signer *MessageSigner) PublishSigned(
 	message := payload
 
 	if signer.signMessages {
-		message, err = CreateJWSSignature(string(payload), signer.signingKey)
+		message, err = CreateJWSSignature(string(payload), signer.privateKey)
 		if err != nil {
 			logrus.Errorf("Publisher.publishMessage: Error signing message for address %s: %s", address, err)
 		}
@@ -112,7 +127,7 @@ func NewMessageSigner(
 		getPublicKey: getPublicKey,
 		messenger:    messenger,
 		signMessages: signMessages,
-		signingKey:   signingKey, // private key for signing
+		privateKey:   signingKey, // private key for signing
 	}
 	return signer
 }
@@ -150,15 +165,15 @@ func CreateJWSSignature(payload string, privateKey *ecdsa.PrivateKey) (string, e
 
 // DecryptMessage deserializes and decrypts the message using JWE
 // This returns the decrypted message, or the input message if the message was not encrypted
-func DecryptMessage(serialized string, privateKey *ecdsa.PrivateKey) (isEncrypted bool, message string, err error) {
+func DecryptMessage(serialized string, privateKey *ecdsa.PrivateKey) (message string, isEncrypted bool, err error) {
 	message = serialized
 	decrypter, err := jose.ParseEncrypted(serialized)
 	if err == nil {
 		dmessage, err := decrypter.Decrypt(privateKey)
 		message = string(dmessage)
-		return true, message, err
+		return message, true, err
 	}
-	return false, message, err
+	return message, false, err
 }
 
 // EncryptMessage encrypts and serializes the message using JWE
@@ -244,6 +259,7 @@ func VerifySenderSignature(rawMessage string, object interface{}, getPublicKey f
 	err = json.Unmarshal([]byte(payload), object)
 	if err != nil {
 		// message doesn't have a json payload
+		err := errors.New("VerifySenderSignature: Signature okay but message unmarshal failed")
 		return true, err
 	}
 	// determine who the sender is
@@ -253,12 +269,12 @@ func VerifySenderSignature(rawMessage string, object interface{}, getPublicKey f
 		reflSender = reflObject.FieldByName("Address")
 		if !reflSender.IsValid() {
 			err = errors.New("VerifySender: object doesn't have a Sender or Address field")
-			return false, err
+			return true, err
 		}
 	}
 	sender := reflSender.String()
 	if sender == "" {
-		err := errors.New("VerifySender: Missing sender information in message")
+		err := errors.New("VerifySender: Missing sender or address information in message")
 		return true, err
 	}
 	// verify the message signature using the sender's public key

@@ -2,23 +2,21 @@
 package nodes
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
-	"github.com/sirupsen/logrus"
 )
 
 // DomainNodes manages nodes discovered on the domain
 type DomainNodes struct {
-	getPublisherKey func(address string) *ecdsa.PublicKey  // get publisher key for signature verification
-	nodeMap         map[string]*types.NodeDiscoveryMessage // registered nodes by node address
-	messageSigner   *messaging.MessageSigner               // subscription to input discovery messages
-	updateMutex     *sync.Mutex                            // mutex for async updating of nodes
+	nodeMap       map[string]*types.NodeDiscoveryMessage // registered nodes by node address
+	messageSigner *messaging.MessageSigner               // subscription to input discovery messages
+	updateMutex   *sync.Mutex                            // mutex for async updating of nodes
 }
 
 // GetAllNodes returns a list of all discovered nodes of the domain
@@ -139,19 +137,19 @@ func (domainNodes *DomainNodes) getNode(address string) *types.NodeDiscoveryMess
 }
 
 // handleDiscoverNode adds discovered domain nodes to the collection
-func (domainNodes *DomainNodes) handleDiscoverNode(address string, message string) {
+func (domainNodes *DomainNodes) handleDiscoverNode(address string, message string) error {
 	var discoMsg types.NodeDiscoveryMessage
 
 	// verify the message signature and get the payload
-	_, err := messaging.VerifySenderSignature(message, &discoMsg, domainNodes.getPublisherKey)
+	_, err := domainNodes.messageSigner.VerifySignedMessage(message, &discoMsg)
 	if err != nil {
-		logrus.Warnf("handleDiscoverNode: Failed verifying signature on address %s: %s", address, err)
-		return
+		return lib.MakeErrorf("handleDiscoverNode: Failed verifying signature on address %s: %s", address, err)
 	}
 	segments := strings.Split(address, "/")
 	discoMsg.PublisherID = segments[1]
 	discoMsg.NodeID = segments[2]
 	domainNodes.UpdateNode(&discoMsg)
+	return nil
 }
 
 // MakeNodeDiscoveryAddress generates the address of a node: domain/publisherID/nodeID/$node.
@@ -163,17 +161,11 @@ func (domainNodes *DomainNodes) MakeNodeDiscoveryAddress(domain string, publishe
 
 // NewDomainNodes creates a new instance for domain node management.
 //  messageSigner is used to receive signed node discovery messages
-func NewDomainNodes(
-	getPublisherKey func(string) *ecdsa.PublicKey,
-	messageSigner *messaging.MessageSigner) *DomainNodes {
+func NewDomainNodes(messageSigner *messaging.MessageSigner) *DomainNodes {
 	domainNodes := DomainNodes{
-		getPublisherKey: getPublisherKey,
-		messageSigner:   messageSigner,
-		nodeMap:         make(map[string]*types.NodeDiscoveryMessage),
-		updateMutex:     &sync.Mutex{},
-	}
-	if getPublisherKey == nil {
-		panic("Missing publisher key callback")
+		messageSigner: messageSigner,
+		nodeMap:       make(map[string]*types.NodeDiscoveryMessage),
+		updateMutex:   &sync.Mutex{},
 	}
 	return &domainNodes
 }

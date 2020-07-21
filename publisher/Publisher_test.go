@@ -9,7 +9,6 @@ import (
 	"github.com/iotdomain/iotdomain-go/inputs"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/nodes"
-	"github.com/iotdomain/iotdomain-go/outputs"
 	"github.com/iotdomain/iotdomain-go/publisher"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
@@ -27,14 +26,16 @@ const identityFolder = "../test"
 const cacheFolder = "../test/cache"
 
 var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
-var node1Alias = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1AliasID)
 var node1Addr = node1Base + "/$node"
-var node1 = nodes.NewNode(domain, publisher1ID, node1ID, types.NodeTypeUnknown)
-var node1ConfigureAddr = node1Base + "/$configure"
-var node1InputAddr = node1Base + "/switch/0/$input"
-var node1InputSetAddr = node1Base + "/switch/0/$set"
+var node1Alias = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1AliasID)
 
+// var node1 = nodes.NewNode(domain, publisher1ID, node1ID, types.NodeTypeUnknown)
+var node1ConfigureAddr = node1Base + "/$configure"
+var node1InputType = types.InputTypeSwitch
+var node1InputSetAddr = fmt.Sprintf("%s/%s/0/%s", node1Base, node1InputType, types.MessageTypeSet)
+var node1InputAddr = node1Base + "/switch/0/$input"
 var node1Output1Addr = node1Base + "/switch/0/$output"
+
 var node1Output1Type = types.OutputTypeSwitch // "switch"
 var node1Output1Instance = "0"
 
@@ -43,10 +44,9 @@ var node1valueAddr = node1Base + "/switch/0/$raw"
 var node1latestAddr = node1Base + "/switch/0/$latest"
 var node1historyAddr = node1Base + "/switch/0/$history"
 
-var node1Input1 = inputs.NewInput(domain, publisher1ID, node1ID, "switch", "0")
-var node1Output1 = outputs.NewOutput(domain, publisher1ID, node1ID, "switch", "0")
+// var node1Input1 = inputs.NewInput(domain, publisher1ID, node1ID, "switch", "0")
+// var node1Output1 = outputs.NewOutput(domain, publisher1ID, node1ID, "switch", "0")
 var pubAddr = fmt.Sprintf("%s/%s/$identity", domain, publisher1ID)
-
 var pub2Addr = fmt.Sprintf("%s/%s/$identity", domain, publisher2ID)
 
 var msgConfig *messaging.MessengerConfig = &messaging.MessengerConfig{Domain: domain}
@@ -67,7 +67,7 @@ func TestNewPublisher(t *testing.T) {
 func TestRegister(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
 	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, signMessages, testMessenger)
-	pub1.UpdateNode(node1)
+	pub1.CreateNode(node1ID, types.NodeTypeUnknown)
 	tmpNode := pub1.GetNodeByID(node1ID)
 	if !(assert.NotNil(t, tmpNode, "Failed getting registered node") &&
 		assert.Equal(t, node1Addr, tmpNode.Address, "Retrieved node not equal to expected node")) {
@@ -75,7 +75,7 @@ func TestRegister(t *testing.T) {
 	}
 	assert.Equalf(t, node1Addr, tmpNode.Address, "Node address doesn't match")
 
-	pub1.UpdateInput(node1Input1)
+	node1Input1 := pub1.CreateInput(node1ID, "switch", "0", nil)
 	tmpIn := pub1.GetInput(node1ID, "switch", "0")
 	if !(assert.NotNil(t, tmpIn, "Failed getting registered input") &&
 		assert.Equal(t, node1Input1.Address, tmpIn.Address, "Retrieved input 1 not equal to registered input 1") &&
@@ -86,7 +86,7 @@ func TestRegister(t *testing.T) {
 	assert.Equalf(t, types.InputTypeSwitch, tmpIn.InputType, "Input Type doesn't match")
 	assert.Equalf(t, "0", tmpIn.Instance, "Input Instance doesn't match")
 
-	pub1.UpdateOutput(node1Output1)
+	node1Output1 := pub1.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultInputInstance)
 	tmpOut := pub1.GetOutput(node1ID, "switch", "0")
 	require.NotNil(t, tmpOut, "Failed getting registered output")
 	assert.Equal(t, node1Output1.Address, tmpOut.Address, "Retrieved output 1 not equal to registered output 1")
@@ -99,10 +99,10 @@ func TestNodePublication(t *testing.T) {
 	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, signMessages, testMessenger)
 
 	// Start synchroneous publications to verify publications in order
-	pub1.Start()                    // publisher is first publication [0]
-	pub1.UpdateNode(node1)          // 2nd [1]
-	pub1.UpdateInput(node1Input1)   // 3rd [2]
-	pub1.UpdateOutput(node1Output1) // 4th [3]
+	pub1.Start() // publisher is first publication [0]
+	pub1.CreateNode(node1ID, types.NodeTypeUnknown)
+	pub1.CreateInput(node1ID, "switch", "0", nil)
+	pub1.CreateOutput(node1ID, node1Output1Type, types.DefaultOutputInstance) // 4th [3]
 	pub1.Stop()
 
 	nrPublications := testMessenger.NrPublications()
@@ -138,10 +138,9 @@ func TestAlias(t *testing.T) {
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
-	pub1.UpdateNode(node1)
-	// pub1.Nodes.UpdateNodeConfigValues(node1Addr, map[string]string{"alias": node1AliasID})
-	node1Output1 := outputs.NewOutput(domain, publisher1ID, node1ID, "switch", "0")
-	pub1.UpdateOutput(node1Output1) // expect an output discovery publication with the alias
+	pub1.CreateNode(node1ID, types.NodeTypeUnknown)
+	// expect an output discovery publication with the alias
+	pub1.CreateOutput(node1ID, node1Output1Type, types.DefaultOutputInstance) // 4th [3]
 
 	pub1.PublishUpdates()
 	// time.Sleep(1)
@@ -176,7 +175,7 @@ func TestConfigure(t *testing.T) {
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start() // call start to subscribe to node updates
-	pub1.UpdateNode(node1)
+	node1 := pub1.CreateNode(node1ID, types.NodeTypeUnknown)
 	config := nodes.NewNodeConfig(types.DataTypeString, "Friendly Name", "")
 	pub1.UpdateNodeConfig(node1ID, "name", config)
 
@@ -199,7 +198,7 @@ func TestConfigure(t *testing.T) {
 	// publisher.UpdateNodeConfig(node1Addr, config) // p2
 	// publisher.Outputs.UpdateOutput(node1Output1)        // p3
 	pub1.Stop()
-	node1 := pub1.GetNodeByID(node1ID)
+	node1 = pub1.GetNodeByID(node1ID)
 	c := node1.Attr["name"]
 	if !assert.NotNil(t, c, "Can't find configuration for name") {
 		return
@@ -210,17 +209,15 @@ func TestConfigure(t *testing.T) {
 // TestOutputValue tests publication of output values
 func TestOutputValue(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, signMessages, testMessenger)
-
-	// assert.Nilf(t, node1.Config["alias"], "Alias set for node 1, unexpected")
-	node1 = nodes.NewNode(domain, publisher1ID, node1ID, types.NodeTypeUnknown)
+	pub1 := publisher.NewPublisher(
+		identityFolder, cacheFolder, domain, publisher1ID, signMessages, testMessenger)
 
 	// update the node alias and see if its output is published with alias' as node id
 	pub1.Start()
 	pubKey := &pub1.GetIdentityKeys().PublicKey
-	pub1.UpdateNode(node1)
-	pub1.UpdateOutput(node1Output1)
-	pub1.UpdateOutputValue(node1ID, node1Output1.OutputType, types.DefaultOutputInstance, "true")
+	pub1.CreateNode(node1ID, types.NodeTypeUnknown)
+	node1Output1 := pub1.CreateOutput(node1ID, node1Output1Type, types.DefaultOutputInstance) // 4th [3]
+	pub1.UpdateOutputValue(node1ID, node1Output1.OutputType, node1Output1.Instance, "true")
 	pub1.PublishUpdates()
 
 	// time.Sleep(time.Second * 1) // receive publications
@@ -272,33 +269,22 @@ func TestReceiveInput(t *testing.T) {
 
 	pub1.Start()
 	// update the node alias and see if its output is published with alias' as node id
-	pub1.CreateInput(node1ID, "switch", "0", func(address string, sender string, value string) {
+	pub1.CreateInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance, func(address string, sender string, value string) {
 		logrus.Infof("Received message '%s' from sender %s", value, sender)
 		pub1.UpdateOutputValue(node1ID, node1Output1Type, types.DefaultOutputInstance, value)
 	})
-	pub1.UpdateNode(node1) // p1
-	pub1.UpdateInput(node1Input1)
-	pub1.UpdateOutput(node1Output1)
+	pub1.CreateNode(node1ID, types.NodeTypeUnknown)
+	pub1.CreateInput(node1ID, node1InputType, types.DefaultInputInstance, nil)
+	pub1.CreateOutput(node1ID, node1Output1Type, types.DefaultOutputInstance)
+
 	pub1.PublishUpdates()
 
 	// process background messages
 	// time.Sleep(time.Second * 1) // receive publications
 
 	// Pass a set input command to the onreceive handler
-	var payload = fmt.Sprintf(`{"address":"%s", "sender": "%s", "timestamp": "%s", "value": "true" }`,
-		node1InputSetAddr, pubAddr, time.Now().Format(types.TimeFormat))
-
-	// sign the command
-	message, err := messaging.CreateJWSSignature(payload, pub1.GetIdentityKeys())
-	assert.NoErrorf(t, err, "signing input message failed")
-
-	// encrypt the command using the GetPublisherKey(..of myself..)
-	pubKey := pub1.GetPublisherKey(pub1.Address())
-	emessage, err := messaging.EncryptMessage(message, pubKey)
-
-	assert.NoErrorf(t, err, "encrypting input message failed")
-
-	testMessenger.OnReceive(node1InputSetAddr, emessage)
+	err := pub1.PublishSetInput(node1InputSetAddr, "true")
+	assert.NoErrorf(t, err, "Publish failed: ", err)
 
 	in1 := pub1.GetInputByAddress(node1InputAddr)
 	assert.NotNilf(t, in1, "Input 1 not found on address %s", node1InputAddr)

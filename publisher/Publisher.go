@@ -345,19 +345,19 @@ func NewPublisher(
 	domainPublishers.UpdatePublisher(&identity.PublisherIdentityMessage)
 
 	// application services
-	domainInputs := inputs.NewDomainInputs(domainPublishers.GetPublisherKey, messageSigner)
-	domainOutputs := outputs.NewDomainOutputs(domainPublishers.GetPublisherKey, messageSigner)
-	domainNodes := nodes.NewDomainNodes(domainPublishers.GetPublisherKey, messageSigner)
+	domainInputs := inputs.NewDomainInputs(messageSigner)
+	domainOutputs := outputs.NewDomainOutputs(messageSigner)
+	domainNodes := nodes.NewDomainNodes(messageSigner)
 	registeredNodes := nodes.NewRegisteredNodes(domain, publisherID)
 	registeredInputs := inputs.NewRegisteredInputs(domain, publisherID)
 	registeredOutputs := outputs.NewRegisteredOutputs(domain, publisherID)
 	registeredOutputValues := outputs.NewRegisteredOutputValues(domain, publisherID)
 	registeredForecastValues := outputs.NewRegisteredForecastValues(domain, publisherID)
 
-	receiveNodeConfigure := nodes.NewReceiveNodeConfigure(domain, publisherID, nil, messageSigner,
-		registeredNodes, privateKey, domainPublishers.GetPublisherKey)
-	receiveNodeSetAlias := nodes.NewReceiveNodeAlias(domain, publisherID, nil, messageSigner,
-		privateKey, domainPublishers.GetPublisherKey)
+	receiveNodeConfigure := nodes.NewReceiveNodeConfigure(
+		domain, publisherID, nil, messageSigner, registeredNodes, privateKey)
+	receiveNodeSetAlias := nodes.NewReceiveNodeAlias(
+		domain, publisherID, nil, messageSigner, privateKey)
 
 	var publisher = &Publisher{
 		domainNodes:      domainNodes,
@@ -366,9 +366,9 @@ func NewPublisher(
 		domainPublishers: domainPublishers,
 
 		inputFromSetCommands: inputs.NewInputFromSetCommands(
-			domain, publisherID, messageSigner, registeredInputs, privateKey),
+			domain, publisherID, messageSigner, registeredInputs),
 		inputFromHTTP:    inputs.NewInputFromHTTP(registeredInputs),
-		inputFromFiles:   inputs.NewInputFromFiles(),
+		inputFromFiles:   inputs.NewInputFromFiles(registeredInputs),
 		inputFromOutputs: inputs.NewInputFromOutputs(messageSigner, registeredInputs),
 
 		exitChannel:        make(chan bool),

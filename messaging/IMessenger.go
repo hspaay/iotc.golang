@@ -44,9 +44,9 @@ type IMessenger interface {
 	//  address to subscribe to with support for wildcards '+' and '#'. Non MQTT busses must convert to equivalent
 	//  onMessage callback is invoked when a message on this address is received
 	// Multiple subscriptions for the same address is supported.
-	Subscribe(address string, onMessage func(address string, message string))
+	Subscribe(address string, onMessage func(address string, message string) error)
 
 	// Unsubscribe from a previously subscribed address.
 	// If onMessage is nil then all subscriptions with the address will be removed
-	Unsubscribe(address string, onMessage func(address string, message string))
+	Unsubscribe(address string, onMessage func(address string, message string) error)
 }

@@ -2,11 +2,12 @@
 package inputs
 
 import (
-	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
@@ -20,7 +21,6 @@ type InputFromSetCommands struct {
 	publisherID      string // the registered publisher for the inputs
 	isRunning        bool
 	messageSigner    *messaging.MessageSigner // subscription and publication messenger
-	privateKey       *ecdsa.PrivateKey        // private key for decrypting set command messages
 	senderTimestamp  map[string]string        // most recent timestamp of received commands by sender
 	registeredInputs *RegisteredInputs        // registered inputs of this publisher
 	// subscriptions of registered inputs
@@ -54,62 +54,43 @@ func (ifset *InputFromSetCommands) DeleteInput(nodeID string, inputType types.In
 
 // decodeSetCommand decrypts and verifies the signature of an incoming set command.
 // If successful this passes the set command to the setInputHandler callback
-func (ifset *InputFromSetCommands) decodeSetCommand(address string, message string) {
+func (ifset *InputFromSetCommands) decodeSetCommand(address string, message string) error {
 	var setMessage types.SetInputMessage
 
 	// Check that address is one of our inputs
 	segments := strings.Split(address, "/")
 	// a full address is required
 	if len(segments) < 6 {
-		return
+		errText := fmt.Sprintf("decodeSetCommand: Destination address '%s' is incomplete.", address)
+		return errors.New(errText)
 	}
 	// domain/pub/node/inputtype/instance/$input
 	segments[5] = types.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
-	// input := sin.publisherInputs.GetInputByAddress(inputAddr)
 
-	// if input == nil || message == "" {
-	// 	sin.logger.Infof("handleNodeInput unknown input for address %s or missing message", address)
-	// 	return
-	// }
+	isSigned, isEncrypted, err := ifset.messageSigner.DecodeMessage(message, &setMessage)
 
-	// Decrypt the message if encryption is enabled
-	var dmessage string
-	var isEncrypted bool
-	var err error
-	if ifset.privateKey != nil {
-		isEncrypted, dmessage, err = messaging.DecryptMessage(message, ifset.privateKey)
-		if !isEncrypted {
-			logrus.Infof("decodeSetCommand: message to input '%s' is not encrypted. Message discarded.", address)
-			return
-		} else if err != nil {
-			logrus.Warnf("decodeSetCommand: decryption failed of message to input '%s'. Message discarded.", address)
-			return
-		}
-	}
-	// Verify the message using the public key of the sender and decode the payload
-	// This fails if decryption is disabled and the message is encrypted
-	isSigned, err := ifset.messageSigner.VerifySignedMessage(dmessage, &setMessage)
-	if !isSigned {
-		// all inputs must use signed messages
-		logrus.Warnf("decodeSetCommand: message to input '%s' is not signed. Message discarded.", address)
-		return
+	if !isEncrypted {
+		return lib.MakeErrorf("decodeSetCommand: Alias update of '%s' is not encrypted. Message discarded.", address)
+	} else if !isSigned {
+		return lib.MakeErrorf("decodeSetCommand: Alias update of '%s' is not signed. Message discarded.", address)
 	} else if err != nil {
-		// signing failed, discard the message
-		logrus.Warnf("decodeSetCommand: signature verification failed for message to input %s: %s. Message discarded.", address, err)
-		return
+		return lib.MakeErrorf("decodeSetCommand: Message to %s. Error %s'. Message discarded.", address, err)
 	}
+
 	// Verify this is the most recent message to protect against replay attacks
 	prevTimestamp := ifset.senderTimestamp[setMessage.Sender]
 	if prevTimestamp > setMessage.Timestamp {
-		logrus.Warnf("decodeSetCommand: earlier timestamp of message to input %s from sender %s. Message discarded.", address, setMessage.Sender)
-		return
+		errText := fmt.Sprintf("decodeSetCommand: earlier timestamp of message to input %s from sender %s. Message discarded.", address, setMessage.Sender)
+		logrus.Warning(errText)
+		return errors.New(errText)
 	}
 	ifset.senderTimestamp[setMessage.Sender] = setMessage.Timestamp
 	logrus.Infof("decodeSetCommand successful for input %s. isEncrypted=%t, isSigned=%t", address, isEncrypted, isSigned)
 
 	// the handler is responsible for authorization
 	ifset.registeredInputs.NotifyInputHandler(inputAddr, setMessage.Sender, setMessage.Value)
+	return nil
 }
 
 // subscribeToSetCommand to receive set input commands for the given node, type and instance
@@ -149,8 +130,7 @@ func NewInputFromSetCommands(
 	domain string,
 	publisherID string,
 	messageSigner *messaging.MessageSigner,
-	registeredInputs *RegisteredInputs,
-	privateKey *ecdsa.PrivateKey) *InputFromSetCommands {
+	registeredInputs *RegisteredInputs) *InputFromSetCommands {
 
 	recvsetin := &InputFromSetCommands{
 		domain:           domain,
@@ -158,7 +138,6 @@ func NewInputFromSetCommands(
 		publisherID:      publisherID,
 		registeredInputs: registeredInputs,
 		senderTimestamp:  make(map[string]string),
-		privateKey:       privateKey,
 		subscriptions:    make(map[string]string),
 		updateMutex:      &sync.Mutex{},
 	}

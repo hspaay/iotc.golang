@@ -2,7 +2,7 @@
 package outputs
 
 import (
-	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,10 +14,9 @@ import (
 
 // DomainOutputs for managing discovered outputs
 type DomainOutputs struct {
-	getPublisherKey func(address string) *ecdsa.PublicKey // get publisher key for signature verification
-	outputMap       map[string]*types.OutputDiscoveryMessage
-	messageSigner   *messaging.MessageSigner // subscription to output discovery messages
-	updateMutex     *sync.Mutex              // mutex for async updating of outputs
+	outputMap     map[string]*types.OutputDiscoveryMessage
+	messageSigner *messaging.MessageSigner // subscription to output discovery messages
+	updateMutex   *sync.Mutex              // mutex for async updating of outputs
 }
 
 // GetAllOutputs returns a new list with the outputs from this collection
@@ -79,14 +78,15 @@ func (outputs *DomainOutputs) UpdateOutput(output *types.OutputDiscoveryMessage)
 
 // handleDiscoverOutput updates the domain output list with discovered outputs
 // This verifies that the output discovery message is properly signed by its publisher
-func (outputs *DomainOutputs) handleDiscoverOutput(address string, message string) {
+func (outputs *DomainOutputs) handleDiscoverOutput(address string, message string) error {
 	var discoMsg types.OutputDiscoveryMessage
 
 	// verify the message signature and get the payload
-	_, err := messaging.VerifySenderSignature(message, &discoMsg, outputs.getPublisherKey)
+	_, err := outputs.messageSigner.VerifySignedMessage(message, &discoMsg)
 	if err != nil {
-		logrus.Warnf("handleDiscoverOutput: Failed verifying signature on address %s: %s", address, err)
-		return
+		errText := fmt.Sprintf("handleDiscoverOutput: Failed verifying signature on address %s: %s", address, err)
+		logrus.Warn(errText)
+		return errors.New(errText)
 	}
 	segments := strings.Split(address, "/")
 	discoMsg.PublisherID = segments[1]
@@ -94,6 +94,7 @@ func (outputs *DomainOutputs) handleDiscoverOutput(address string, message strin
 	discoMsg.OutputType = types.OutputType(segments[3])
 	discoMsg.Instance = segments[4]
 	outputs.UpdateOutput(&discoMsg)
+	return nil
 }
 
 // MakeOutputDiscoveryAddress creates the address for the output discovery
@@ -104,15 +105,12 @@ func MakeOutputDiscoveryAddress(domain string, publisherID string, nodeID string
 }
 
 // NewDomainOutputs creates a new instance for handling of discovered domain outputs
-func NewDomainOutputs(
-	getPublisherKey func(string) *ecdsa.PublicKey,
-	messageSigner *messaging.MessageSigner) *DomainOutputs {
+func NewDomainOutputs(messageSigner *messaging.MessageSigner) *DomainOutputs {
 
 	outputs := DomainOutputs{
-		outputMap:       make(map[string]*types.OutputDiscoveryMessage),
-		getPublisherKey: getPublisherKey,
-		messageSigner:   messageSigner,
-		updateMutex:     &sync.Mutex{},
+		outputMap:     make(map[string]*types.OutputDiscoveryMessage),
+		messageSigner: messageSigner,
+		updateMutex:   &sync.Mutex{},
 	}
 	return &outputs
 }

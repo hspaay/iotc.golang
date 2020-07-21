@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"sync"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
@@ -18,14 +19,13 @@ type NodeConfigureHandler func(address string, params types.NodeAttrMap) types.N
 // This decrypts incoming messages determines the sender and verifies the signature with
 // the sender public key.
 type ReceiveNodeConfigure struct {
-	domain               string                                // the domain of this publisher
-	publisherID          string                                // the registered publisher for the inputs
-	nodeConfigureHandler NodeConfigureHandler                  // handler to pass the command to
-	getPublisherKey      func(address string) *ecdsa.PublicKey // obtain the verification key of signatures
-	messageSigner        *messaging.MessageSigner              // subscription and publication messenger
-	privateKey           *ecdsa.PrivateKey                     // private key for decrypting set command messages
-	registeredNodes      *RegisteredNodes                      // registered nodes of this publisher
-	updateMutex          *sync.Mutex                           // mutex for async handling of inputs
+	domain               string                   // the domain of this publisher
+	publisherID          string                   // the registered publisher for the inputs
+	nodeConfigureHandler NodeConfigureHandler     // handler to pass the command to
+	messageSigner        *messaging.MessageSigner // subscription and publication messenger
+	privateKey           *ecdsa.PrivateKey        // private key for decrypting set command messages
+	registeredNodes      *RegisteredNodes         // registered nodes of this publisher
+	updateMutex          *sync.Mutex              // mutex for async handling of inputs
 }
 
 // SetConfigureNodeHandler set the handler for updating node inputs
@@ -57,37 +57,23 @@ func (nodeConfigure *ReceiveNodeConfigure) Stop() {
 // - pass the configuration update to the adapter's callback set in Start()
 // - save node configuration if persistence is set
 // TODO: support for authorization per node
-func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(address string, message string) {
+func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(address string, message string) error {
 	var configureMessage types.NodeConfigureMessage
 
-	// Expect the message to be encrypted
-	isEncrypted, dmessage, err := messaging.DecryptMessage(message, nodeConfigure.privateKey)
-	if !isEncrypted {
-		logrus.Infof("receiveConfigureCommand: message to '%s' is not encrypted.", address)
-		// TODO: determine if encryption is required
-		// this could be fine for now, just warning
-	} else if err != nil {
-		logrus.Warnf("receiveConfigureCommand: decryption failed of message to '%s'. Message discarded.", address)
-		return
-	}
+	isSigned, isEncrypted, err := nodeConfigure.messageSigner.DecodeMessage(message, &configureMessage)
 
-	// Verify the message using the public key of the sender
-	isSigned, err := messaging.VerifySenderSignature(dmessage, &configureMessage, nodeConfigure.getPublisherKey)
-	if !isSigned {
-		// all configuration commands must use signed messages
-		logrus.Warnf("receiveConfigureCommand: message to input '%s' is not signed. Message discarded.", address)
-		return
+	if !isEncrypted {
+		return lib.MakeErrorf("receiveConfigureCommand: Configuration update of '%s' is not encrypted. Message discarded.", address)
+	} else if !isSigned {
+		return lib.MakeErrorf("receiveConfigureCommand: Configuration update of '%s' is not signed. Message discarded.", address)
 	} else if err != nil {
-		// signing failed, discard the message
-		logrus.Warnf("receiveConfigureCommand: signature verification failed for message to input %s. Message discarded.", address)
-		return
+		return lib.MakeErrorf("receiveConfigureCommand: Message to %s. Error %s'. Message discarded.", address, err)
 	}
 
 	// TODO: authorization check
 	node := nodeConfigure.registeredNodes.GetNodeByAddress(address)
 	if node == nil || message == "" {
-		logrus.Warnf("receiveConfigureCommand unknown node for address %s or missing message", address)
-		return
+		return lib.MakeErrorf("receiveConfigureCommand unknown node for address %s or missing message", address)
 	}
 	logrus.Infof("receiveConfigureCommand configure command on address %s. isEncrypted=%t, isSigned=%t", address, isEncrypted, isSigned)
 
@@ -100,6 +86,7 @@ func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(address strin
 	if params != nil {
 		nodeConfigure.registeredNodes.UpdateNodeConfigValues(node.NodeID, params)
 	}
+	return nil
 }
 
 // NewReceiveNodeConfigure returns a new instance of handling of node configuration commands.
@@ -109,11 +96,9 @@ func NewReceiveNodeConfigure(
 	configHandler NodeConfigureHandler,
 	messageSigner *messaging.MessageSigner,
 	registeredNodes *RegisteredNodes,
-	privateKey *ecdsa.PrivateKey,
-	getPublisherKey func(addr string) *ecdsa.PublicKey) *ReceiveNodeConfigure {
+	privateKey *ecdsa.PrivateKey) *ReceiveNodeConfigure {
 	sin := &ReceiveNodeConfigure{
 		domain:               domain,
-		getPublisherKey:      getPublisherKey,
 		messageSigner:        messageSigner,
 		nodeConfigureHandler: configHandler,
 		publisherID:          publisherID,

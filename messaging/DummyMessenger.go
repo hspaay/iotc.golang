@@ -21,7 +21,7 @@ type DummyMessenger struct {
 // Subscription to messages
 type Subscription struct {
 	address string
-	handler func(address string, message string)
+	handler func(address string, message string) error
 }
 
 // Connect the messenger
@@ -86,7 +86,7 @@ func (messenger *DummyMessenger) Publish(address string, retained bool, message 
 
 // Subscribe to a message by address
 func (messenger *DummyMessenger) Subscribe(
-	address string, onMessage func(address string, message string)) {
+	address string, onMessage func(address string, message string) error) {
 
 	logrus.Infof("DummyMessenger.Subscribe: address %s", address)
 	subscription := Subscription{address: address, handler: onMessage}
@@ -97,7 +97,7 @@ func (messenger *DummyMessenger) Subscribe(
 
 // Unsubscribe an address and handler
 func (messenger *DummyMessenger) Unsubscribe(
-	address string, onMessage func(address string, message string)) {
+	address string, onMessage func(address string, message string) error) {
 	messenger.publishMutex.Lock()
 	// https://stackoverflow.com/questions/9643205/how-do-i-compare-two-functions-for-pointer-equality-in-the-latest-go-weekly
 	var onMessageID = onMessage
@@ -131,18 +131,19 @@ func (messenger *DummyMessenger) matchAddress(address string, subscription strin
 	// Match the segments accepting wildcards. Rather crude but only intended for testing.
 	match = true
 	for index, addrSegment := range addressSegments {
+		if index >= len(subscriptionSegments) {
+			return false
+		}
 		subscriptionSegment := subscriptionSegments[index]
 
 		if subscriptionSegment == "#" {
-			match = true
-			break
+			return true
 		} else if subscriptionSegment == "+" {
 			// match, continue
 		} else if addrSegment == subscriptionSegment {
 			// match continue
 		} else {
-			match = false
-			break // no match
+			return false
 		}
 	}
 	return match

@@ -13,49 +13,37 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/persist"
 	"github.com/iotdomain/iotdomain-go/publishers"
 	"github.com/iotdomain/iotdomain-go/types"
-	"github.com/sirupsen/logrus"
 )
 
 // HandleIdentityUpdate handles the set command for an update to this publisher identity.
 // The message must be encrypted and signed by the DSS or it will be discarded.
-func (publisher *Publisher) HandleIdentityUpdate(address string, message string) {
+func (publisher *Publisher) HandleIdentityUpdate(address string, message string) error {
 	var fullIdentity types.PublisherFullIdentity
 
-	// Expect the message to be encrypted
-	isEncrypted, dmessage, err := messaging.DecryptMessage(message, publisher.identityPrivateKey)
+	isSigned, isEncrypted, err := publisher.messageSigner.DecodeMessage(message, &fullIdentity)
 
 	if !isEncrypted {
-		logrus.Warnf("HandleIdentityUpdate: message to '%s' must be encrypted but isn't. Message discarded.", address)
-		return
+		return lib.MakeErrorf("HandleIdentityUpdate: Identity update '%s' is not encrypted. Message discarded.", address)
+	} else if !isSigned {
+		return lib.MakeErrorf("HandleIdentityUpdate: Identity update '%s' is not signed. Message discarded.", address)
 	} else if err != nil {
-		logrus.Warnf("HandleIdentityUpdate: decryption failed of message to '%s'. Message discarded.", address)
-		return
+		return lib.MakeErrorf("HandleIdentityUpdate: Message to %s. Error %s'. Message discarded.", address, err)
 	}
 
-	// Verify the message is send by and signed by the DSS
-	isSigned, err := messaging.VerifySenderSignature(dmessage, &fullIdentity, publisher.domainPublishers.GetPublisherKey)
-	if !isSigned {
-		// commands must use signed messages
-		logrus.Warnf("HandleIdentityUpdate: Identity update '%s' is not signed. Message discarded.", address)
-		return
-	} else if err != nil {
-		// signing failed, discard the message
-		logrus.Warnf("HandleIdentityUpdate: Signature verification failed for  %s. Message discarded.", address)
-		return
-	}
 	dssAddress := publishers.MakePublisherIdentityAddress(publisher.Domain(), types.DSSPublisherID)
 	if fullIdentity.Sender != dssAddress {
-		logrus.Warnf("HandleIdentityUpdate: Sender is %s instead of the DSS. Identity update discarded.", fullIdentity.Sender)
-		return
+		return lib.MakeErrorf("HandleIdentityUpdate: Sender is %s instead of the DSS. Identity update discarded.", fullIdentity.Sender)
 	}
 
 	privKey := messaging.PrivateKeyFromPem(fullIdentity.PrivateKey)
 	publisher.identityPrivateKey = privKey
 	publisher.fullIdentity = &fullIdentity
+	return nil
 }
 
 // CreateIdentity creates a new identity for a domain publisher

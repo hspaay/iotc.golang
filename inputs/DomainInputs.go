@@ -2,22 +2,21 @@
 package inputs
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"strings"
 	"sync"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
-	"github.com/sirupsen/logrus"
 )
 
 // DomainInputs for managing discovered inputs.
 type DomainInputs struct {
-	getPublisherKey func(address string) *ecdsa.PublicKey // get publisher key for signature verification
-	inputMap        map[string]*types.InputDiscoveryMessage
-	messageSigner   *messaging.MessageSigner // subscription to input discovery messages
-	updateMutex     *sync.Mutex              // mutex for async updating of inputs
+	// getPublisherKey func(address string) *ecdsa.PublicKey // get publisher key for signature verification
+	inputMap      map[string]*types.InputDiscoveryMessage
+	messageSigner *messaging.MessageSigner // subscription to input discovery messages
+	updateMutex   *sync.Mutex              // mutex for async updating of inputs
 }
 
 // AddInput adds or replaces the input.
@@ -84,21 +83,20 @@ func (domainInputs *DomainInputs) Start() {
 }
 
 // Stop polling for inputs
-func (inputs *DomainInputs) Stop() {
+func (domainInputs *DomainInputs) Stop() {
 	addr := MakeInputDiscoveryAddress("+", "+", "+", "+", "+")
-	inputs.messageSigner.Unsubscribe(addr, inputs.handleDiscoverInput)
+	domainInputs.messageSigner.Unsubscribe(addr, domainInputs.handleDiscoverInput)
 }
 
 // handleDiscoverInput updates the domain input list with discovered inputs
 // This verifies that the input discovery message is properly signed by its publisher
-func (domainInputs *DomainInputs) handleDiscoverInput(address string, message string) {
+func (domainInputs *DomainInputs) handleDiscoverInput(address string, message string) error {
 	var discoMsg types.InputDiscoveryMessage
 
 	// verify the message signature and get the payload
-	_, err := messaging.VerifySenderSignature(message, &discoMsg, domainInputs.getPublisherKey)
+	_, err := domainInputs.messageSigner.VerifySignedMessage(message, &discoMsg)
 	if err != nil {
-		logrus.Warnf("handleDiscoverInput: Failed verifying signature on address %s: %s", address, err)
-		return
+		return lib.MakeErrorf("handleDiscoverInput: Failed verifying signature on address %s: %s", address, err)
 	}
 	segments := strings.Split(address, "/")
 	discoMsg.PublisherID = segments[1]
@@ -106,6 +104,7 @@ func (domainInputs *DomainInputs) handleDiscoverInput(address string, message st
 	discoMsg.InputType = types.InputType(segments[3])
 	discoMsg.Instance = segments[4]
 	domainInputs.AddInput(&discoMsg)
+	return nil
 }
 
 // MakeInputDiscoveryAddress creates the address for the input discovery
@@ -116,15 +115,12 @@ func MakeInputDiscoveryAddress(domain string, publisherID string, nodeID string,
 }
 
 // NewDomainInputs creates a new instance for handling of discovered domain inputs
-func NewDomainInputs(
-	getPublisherKey func(string) *ecdsa.PublicKey,
-	messageSigner *messaging.MessageSigner) *DomainInputs {
+func NewDomainInputs(messageSigner *messaging.MessageSigner) *DomainInputs {
 
 	inputs := DomainInputs{
-		inputMap:        make(map[string]*types.InputDiscoveryMessage),
-		getPublisherKey: getPublisherKey,
-		messageSigner:   messageSigner,
-		updateMutex:     &sync.Mutex{},
+		inputMap:      make(map[string]*types.InputDiscoveryMessage),
+		messageSigner: messageSigner,
+		updateMutex:   &sync.Mutex{},
 	}
 	return &inputs
 }
