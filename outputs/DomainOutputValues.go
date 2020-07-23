@@ -2,7 +2,6 @@
 package outputs
 
 import (
-	"crypto/ecdsa"
 	"sync"
 
 	"github.com/iotdomain/iotdomain-go/messaging"
@@ -11,13 +10,13 @@ import (
 
 // DomainOutputValues for managing values of discovered outputs
 type DomainOutputValues struct {
-	getPublisherKey func(address string) *ecdsa.PublicKey // get publisher key for signature verification
-	raw             map[string]string
-	latest          map[string]*types.OutputLatestMessage
-	history         map[string]*types.OutputHistoryMessage
-	event           map[string]*types.OutputEventMessage
-	messageSigner   *messaging.MessageSigner // subscription to output discovery messages
-	updateMutex     *sync.Mutex              // mutex for async updating of outputs
+	// c             lib.DomainCollection //
+	raw           map[string]string
+	latest        map[string]*types.OutputLatestMessage
+	history       map[string]*types.OutputHistoryMessage
+	event         map[string]*types.OutputEventMessage
+	messageSigner *messaging.MessageSigner // subscription to output discovery messages
+	updateMutex   *sync.Mutex              // mutex for async updating of outputs
 }
 
 // GetRaw returns the latest raw value of an output
@@ -62,4 +61,17 @@ func (dov *DomainOutputValues) UpdateRaw(address string, value string) {
 	dov.updateMutex.Lock()
 	defer dov.updateMutex.Unlock()
 	dov.raw[address] = value
+}
+
+// NewDomainOutputValues creates a new instance for handling of discovered output values
+func NewDomainOutputValues(messageSigner *messaging.MessageSigner) *DomainOutputValues {
+	return &DomainOutputValues{
+		// c:             lib.NewDomainCollection(messageSigner, reflect.TypeOf(&types.OutputLatestMessage{})),
+		messageSigner: messageSigner,
+		updateMutex:   &sync.Mutex{},
+		raw:           make(map[string]string, 0),
+		latest:        make(map[string]*types.OutputLatestMessage, 0),
+		history:       make(map[string]*types.OutputHistoryMessage, 0),
+		event:         make(map[string]*types.OutputEventMessage, 0),
+	}
 }

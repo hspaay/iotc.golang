@@ -23,10 +23,12 @@ type RegisteredForecastValues struct {
 // GetForecast returns the output's forecast by output address
 // outputAddress is the discovery address of the output
 // Returns nil if the type or instance is unknown or no forecast is available
-func (regForecasts *RegisteredForecastValues) GetForecast(outputAddress string) OutputForecast {
+func (regForecasts *RegisteredForecastValues) GetForecast(
+	nodeID string, outputType types.OutputType, instance string) OutputForecast {
 	regForecasts.updateMutex.Lock()
 	defer regForecasts.updateMutex.Unlock()
 
+	outputAddress := MakeOutputDiscoveryAddress(regForecasts.domain, regForecasts.publisherID, nodeID, outputType, instance)
 	var forecast = regForecasts.forecastMap[outputAddress]
 	return forecast
 }

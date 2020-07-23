@@ -1,32 +1,26 @@
 package outputs_test
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"testing"
 
+	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/outputs"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const domain = "test"
-
-const node1ID = "node1"
-const node1AliasID = "alias1"
-const publisher1ID = "publisher1"
-const publisher2ID = "publisher2"
-
-var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
-
-// var node1Alias = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1AliasID)
-var node1Addr = node1Base + "/$node"
-
-var node1Output1Addr = node1Base + "/switch/0/$output"
-var node1Output1Type = types.OutputTypeSwitch
-var node1Output1Instance = "0"
-
 func TestCreateOutputs(t *testing.T) {
+	const domain = "test"
+	const publisher1ID = "publisher1"
+	const node1ID = "node1"
+	var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
+	var node1Addr = node1Base + "/$node"
+	var node1Output1Addr = node1Base + "/switch/0/$output"
+	var node1Output1Type = types.OutputTypeSwitch
+
 	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
 	output := collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
 
@@ -57,6 +51,10 @@ func TestCreateOutputs(t *testing.T) {
 }
 
 func TestUpdateOutputs(t *testing.T) {
+	const domain = "test"
+	const publisher1ID = "publisher1"
+	const node1ID = "node1"
+
 	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
 	output1 := collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
 	if !assert.NotNil(t, output1, "Failed creating output") {
@@ -73,4 +71,42 @@ func TestUpdateOutputs(t *testing.T) {
 	// if !(assert.Equal(t, 1, len(updated), "Expected 1 updated output")) {
 	// 	return
 	// }
+}
+
+func TestAlias(t *testing.T) {
+	const domain = "test"
+	const publisher1ID = "publisher1"
+	const node1ID = "node1"
+	const Alias1 = "bob"
+	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
+	collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
+	collection.SetAlias(node1ID, Alias1)
+
+	output1b := collection.GetOutput(Alias1, types.OutputTypeSwitch, types.DefaultOutputInstance)
+	require.NotNilf(t, output1b, "Output not retrievable using alias nodeID")
+	assert.Equal(t, Alias1, output1b.NodeID, "Output doesn't have the alias NodeID")
+}
+
+func TestPublishOutputs(t *testing.T) {
+	const domain = "test"
+	const publisher1ID = "publisher1"
+	const node1ID = "node1"
+
+	var privKey = messaging.CreateAsymKeys()
+
+	// get publisher key for signature verification
+	var getPublisherKey = func(addr string) *ecdsa.PublicKey {
+		return &privKey.PublicKey
+	}
+
+	msgr := messaging.NewDummyMessenger(nil)
+	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
+
+	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
+	output := collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
+	require.NotNil(t, output, "Failed creating output")
+
+	allOutputs := collection.GetAllOutputs()
+
+	outputs.PublishRegisteredOutputs(allOutputs, signer)
 }

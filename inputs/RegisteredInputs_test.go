@@ -103,6 +103,8 @@ func TestAlias(t *testing.T) {
 
 func TestPublish(t *testing.T) {
 
+	var privKey = messaging.CreateAsymKeys()
+
 	msgr := messaging.NewDummyMessenger(nil)
 	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
 

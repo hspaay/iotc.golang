@@ -14,6 +14,7 @@ require (
 	golang.org/x/net v0.0.0-20200528225125-3c3fba18258b // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v2 v2.3.0
+	github.com/modern-go/reflect2 v1.0.1
 )
 
 // replace github.com/iotdomain/iotdomain-go/standard => ../standard

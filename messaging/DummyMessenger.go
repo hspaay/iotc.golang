@@ -46,7 +46,7 @@ func (messenger *DummyMessenger) FindLastPublication(addr string) (message strin
 func (messenger *DummyMessenger) GetDomain() string {
 	domain := messenger.config.Domain
 	if domain == "" {
-		return types.LocalDomainID
+		domain = types.LocalDomainID
 	}
 	return domain
 }
@@ -65,7 +65,7 @@ func (messenger *DummyMessenger) OnReceive(address string, message string) {
 	for _, subscription := range subs {
 		match := messenger.matchAddress(address, subscription.address)
 
-		if match {
+		if match && subscription.handler != nil {
 			subscription.handler(address, message)
 		}
 	}
@@ -131,9 +131,9 @@ func (messenger *DummyMessenger) matchAddress(address string, subscription strin
 	// Match the segments accepting wildcards. Rather crude but only intended for testing.
 	match = true
 	for index, addrSegment := range addressSegments {
-		if index >= len(subscriptionSegments) {
-			return false
-		}
+		// if index >= len(subscriptionSegments) {
+		// 	return false
+		// }
 		subscriptionSegment := subscriptionSegments[index]
 
 		if subscriptionSegment == "#" {

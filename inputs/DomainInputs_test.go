@@ -38,7 +38,10 @@ func TestNewDomainInput(t *testing.T) {
 	addr := inputs.MakeInputDiscoveryAddress(domain, publisherID, nodeID, inputType, types.DefaultInputInstance)
 	input2 := collection.GetInputByAddress(addr)
 	require.NotNil(t, input2, "Failed getting created input")
-	// should be included in inputs of the node
+	input3 := collection.GetInputByAddress("fake/input/address/test/test")
+	require.Nil(t, input3, "Unexpected seeing an input3 here")
+
+	// input should be included in list of node inputs
 	nodeInputs := collection.GetNodeInputs(node1Addr)
 	allInputs := collection.GetAllInputs()
 	require.NotNil(t, nodeInputs, "Failed getting node inputs")
