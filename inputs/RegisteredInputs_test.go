@@ -1,6 +1,7 @@
 package inputs_test
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"testing"
 
@@ -104,6 +105,10 @@ func TestAlias(t *testing.T) {
 func TestPublish(t *testing.T) {
 
 	var privKey = messaging.CreateAsymKeys()
+
+	getPublisherKey := func(addr string) *ecdsa.PublicKey {
+		return &privKey.PublicKey
+	}
 
 	msgr := messaging.NewDummyMessenger(nil)
 	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)

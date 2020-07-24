@@ -218,7 +218,7 @@ func (pub *Publisher) PublishConfigureNode(domainNodeAddr string, attr types.Nod
 		logrus.Warnf("PublishConfigureNode: no public key found to encrypt command for node %s. Message not sent.", domainNodeAddr)
 		return false
 	}
-	nodes.PublishConfigureNode(domainNodeAddr, attr, pub.Address(), pub.messageSigner, destPubKey)
+	nodes.PublishNodeConfigure(domainNodeAddr, attr, pub.Address(), pub.messageSigner, destPubKey)
 	return true
 }
 

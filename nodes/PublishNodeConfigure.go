@@ -11,13 +11,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PublishConfigureNode updates the configuration of a remote node by this publisher
+// PublishNodeConfigure updates the configuration of a remote node by this publisher
 // If a key is given then the signed message will be encrypted with the given encryption key
-func PublishConfigureNode(
+func PublishNodeConfigure(
 	destinationAddress string, attr types.NodeAttrMap, sender string,
 	messageSigner *messaging.MessageSigner, encryptionKey *ecdsa.PublicKey) {
 
-	logrus.Infof("PublishSetConfigure: publishing encrypted configuration to %s", destinationAddress)
+	logrus.Infof("PublishNodeConfigure: publishing encrypted configuration to %s", destinationAddress)
 	// Check that address is one of our inputs
 	segments := strings.Split(destinationAddress, "/")
 	// a full address is required

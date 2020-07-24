@@ -35,7 +35,7 @@ func (domainInputs *DomainInputs) GetAllInputs() []*types.InputDiscoveryMessage 
 // Returns nil if the node has no known input
 func (domainInputs *DomainInputs) GetNodeInputs(nodeAddress string) []*types.InputDiscoveryMessage {
 	var inputList = make([]*types.InputDiscoveryMessage, 0)
-	domainInputs.c.GetNodeItems(nodeAddress, &inputList)
+	domainInputs.c.GetByAddressPrefix(nodeAddress, &inputList)
 	return inputList
 }
 

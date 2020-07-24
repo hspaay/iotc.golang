@@ -192,7 +192,7 @@ func TestConfigure(t *testing.T) {
 	privKey := pub1.GetIdentityKeys()
 	attrMap := types.NodeAttrMap{"name": "NewName"}
 	signer := messaging.NewMessageSigner(true, pub1.GetPublisherKey, testMessenger, privKey)
-	nodes.PublishConfigureNode(destination, attrMap, pub1.Address(), signer, &privKey.PublicKey)
+	nodes.PublishNodeConfigure(destination, attrMap, pub1.Address(), signer, &privKey.PublicKey)
 
 	// config := map[string]string{"alias": "myalias"}
 	// publisher.UpdateNodeConfig(node1Addr, config) // p2

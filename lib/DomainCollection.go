@@ -53,15 +53,18 @@ func (dc *DomainCollection) GetByAddress(address string) interface{} {
 	return item
 }
 
-// GetNodeItems fills the given slice (pointer) with all items that start with the given node address
-// resultSlicePtr must be a pointer to a slice with pointers to items, eg: []*Item
-func (dc *DomainCollection) GetNodeItems(nodeAddress string, resultSlicePtr interface{}) {
+// GetByAddressPrefix fills the given slice (pointer) with all items that start with the given address
+// The message type is removed from addressPrefix, so a node discover address can be used to
+//  find corresponding inputs and outputs.
+// The result is stored in resultSlicePtr which must be a pointer to a slice
+//   that contains pointers to items, eg: []*Item
+func (dc *DomainCollection) GetByAddressPrefix(addressPrefix string, resultSlicePtr interface{}) {
 
 	// todo: check that resultSlicePtr is of the right type
 
 	dc.UpdateMutex.Lock()
 	defer dc.UpdateMutex.Unlock()
-	base := MakeBaseAddress(nodeAddress)
+	base := MakeBaseAddress(addressPrefix)
 	itemListVal := reflect.ValueOf(resultSlicePtr).Elem()
 
 	for addr, item := range dc.DiscoMap {

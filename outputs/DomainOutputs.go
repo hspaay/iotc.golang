@@ -31,7 +31,7 @@ func (domainOutputs *DomainOutputs) GetAllOutputs() []*types.OutputDiscoveryMess
 // Returns nil if the node has no known input
 func (domainOutputs *DomainOutputs) GetNodeOutputs(nodeAddress string) []*types.OutputDiscoveryMessage {
 	var outputList = make([]*types.OutputDiscoveryMessage, 0)
-	domainOutputs.c.GetNodeItems(nodeAddress, &outputList)
+	domainOutputs.c.GetByAddressPrefix(nodeAddress, &outputList)
 	return outputList
 }
 
@@ -51,32 +51,32 @@ func (domainOutputs *DomainOutputs) GetOutput(
 // GetOutputByAddress returns an output by its address
 // outputAddr must contain the full domain output address, eg <zone>/<publisher>/<node>/"$output"/<type>/<instance>
 // Returns nil if address has no known output
-func (domainOutputs *DomainOutputs) GetOutputByAddress(outputAddr string) *types.OutputDiscoveryMessage {
-	var outputObject = domainOutputs.c.GetByAddress(outputAddr)
+func (domainOutputs *DomainOutputs) GetOutputByAddress(address string) *types.OutputDiscoveryMessage {
+	var outputObject = domainOutputs.c.GetByAddress(address)
 	if outputObject == nil {
 		return nil
 	}
 	return outputObject.(*types.OutputDiscoveryMessage)
 }
 
-// RemoveOutput removes an input using its address.
-// If the input doesn't exist, this is ignored.
-func (domainOutputs *DomainOutputs) RemoveOutput(outputAddr string) {
-	domainOutputs.c.Remove(outputAddr)
+// RemoveOutput removes an output using its address.
+// If the output doesn't exist, this is ignored.
+func (domainOutputs *DomainOutputs) RemoveOutput(address string) {
+	domainOutputs.c.Remove(address)
 }
 
 // Start subscribing to output discovery
 func (domainOutputs *DomainOutputs) Start() {
 	// subscription address for all outputs domain/publisher/node/type/instance/$output
 	// TODO: Only subscribe to selected publishers
-	addr := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainOutputs.c.MessageSigner.Subscribe(addr, domainOutputs.handleDiscoverOutput)
+	address := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
+	domainOutputs.c.MessageSigner.Subscribe(address, domainOutputs.handleDiscoverOutput)
 }
 
 // Stop polling for outputs
 func (domainOutputs *DomainOutputs) Stop() {
-	addr := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainOutputs.c.MessageSigner.Unsubscribe(addr, domainOutputs.handleDiscoverOutput)
+	address := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
+	domainOutputs.c.MessageSigner.Unsubscribe(address, domainOutputs.handleDiscoverOutput)
 }
 
 // handleDiscoverOutput updates the domain output list with discovered outputs

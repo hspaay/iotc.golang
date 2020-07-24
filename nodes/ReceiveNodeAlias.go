@@ -56,8 +56,8 @@ func (setAlias *ReceiveNodeAlias) decodeAliasCommand(address string, message str
 
 	// Check that address is one of our inputs
 	segments := strings.Split(address, "/")
-	// a full address is required
-	if len(segments) < 6 {
+	// a full address is required: domain/pub/node/$alias
+	if len(segments) < 4 {
 		return lib.MakeErrorf("decodeAliasCommand: address '%s' is incomplete", address)
 	}
 	// determine which node this message is for

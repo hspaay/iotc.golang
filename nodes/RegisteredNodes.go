@@ -262,9 +262,12 @@ func (regNodes *RegisteredNodes) SetAlias(nodeID string, aliasID string) bool {
 		}
 		aliasNode.NodeID = aliasID
 	}
-	aliasNode.Address = MakeNodeDiscoveryAddress(regNodes.domain, regNodes.publisherID, aliasID)
+	// TODO: the alias remains in existence with the last updated timestamp. should
+	// this be removed?
+	aliasNode.Address = MakeNodeDiscoveryAddress(regNodes.domain, regNodes.publisherID, aliasNode.NodeID)
 	regNodes.updateNode(aliasNode)
-	regNodes.updateNode(node)
+	// delete(regNodes.nodeMap, nodeID)
+	regNodes.updateNode(node) // last update of the alias
 	return true
 }
 
@@ -400,16 +403,16 @@ func (regNodes *RegisteredNodes) UpdateNodeConfigValues(nodeID string, params ty
 	return changed
 }
 
-// UpdateNode replaces a node or adds a new node based on node.Address.
-//
-// Intended to support Node immutability by making changes to a copy of a node and replacing
-// the existing node with the updated node
-// The updated node will be published
-func (regNodes *RegisteredNodes) UpdateNode(node *types.NodeDiscoveryMessage) {
-	regNodes.updateMutex.Lock()
-	defer regNodes.updateMutex.Unlock()
-	regNodes.updateNode(node)
-}
+// // UpdateNode replaces a node or adds a new node based on node.Address.
+// //
+// // Intended to support Node immutability by making changes to a copy of a node and replacing
+// // the existing node with the updated node
+// // The updated node will be published
+// func (regNodes *RegisteredNodes) UpdateNode(node *types.NodeDiscoveryMessage) {
+// 	regNodes.updateMutex.Lock()
+// 	defer regNodes.updateMutex.Unlock()
+// 	regNodes.updateNode(node)
+// }
 
 // UpdateNodeConfig updates a node's configuration and publishes the updated node.
 //
