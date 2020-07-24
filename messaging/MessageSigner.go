@@ -29,7 +29,7 @@ type MessageSigner struct {
 // The sender and signer of the message is contained the message 'sender' field. If the
 // Sender field is missing then the 'address' field is used as sender.
 // object must hold the expected message type to decode the json message containging the sender info
-func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}) (isSigned bool, isEncrypted bool, err error) {
+func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}) (isEncrypted bool, isSigned bool, err error) {
 	dmessage, isEncrypted, err := DecryptMessage(rawMessage, signer.privateKey)
 	isSigned, err = VerifySenderSignature(dmessage, object, signer.getPublicKey)
 	return isEncrypted, isSigned, err

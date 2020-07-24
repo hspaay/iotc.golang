@@ -12,7 +12,7 @@ import (
 )
 
 // PublishNodeConfigure updates the configuration of a remote node by this publisher
-// If a key is given then the signed message will be encrypted with the given encryption key
+// If an encryption key is given then the signed message will be encrypted, otherwise just signed.
 func PublishNodeConfigure(
 	destinationAddress string, attr types.NodeAttrMap, sender string,
 	messageSigner *messaging.MessageSigner, encryptionKey *ecdsa.PublicKey) {

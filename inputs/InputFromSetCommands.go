@@ -68,7 +68,7 @@ func (ifset *InputFromSetCommands) decodeSetCommand(address string, message stri
 	segments[5] = types.MessageTypeInputDiscovery
 	inputAddr := strings.Join(segments, "/")
 
-	isSigned, isEncrypted, err := ifset.messageSigner.DecodeMessage(message, &setMessage)
+	isEncrypted, isSigned, err := ifset.messageSigner.DecodeMessage(message, &setMessage)
 
 	if !isEncrypted {
 		return lib.MakeErrorf("decodeSetCommand: Alias update of '%s' is not encrypted. Message discarded.", address)

@@ -64,7 +64,7 @@ func (setAlias *ReceiveNodeAlias) decodeAliasCommand(address string, message str
 	segments[3] = types.MessageTypeNodeDiscovery
 	nodeAddr := strings.Join(segments, "/")
 
-	isSigned, isEncrypted, err := setAlias.messageSigner.DecodeMessage(message, &aliasMessage)
+	isEncrypted, isSigned, err := setAlias.messageSigner.DecodeMessage(message, &aliasMessage)
 
 	if !isEncrypted {
 		return lib.MakeErrorf("decodeAliasCommand: Alias update of '%s' is not encrypted. Message discarded.", address)

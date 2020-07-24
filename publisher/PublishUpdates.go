@@ -77,7 +77,8 @@ func (publisher *Publisher) PublishUpdatedForecasts(
 
 		pubForecast, _ := publisher.registeredNodes.GetNodeConfigBool(node.Address, types.NodeAttrPublishForecast, true)
 		if pubForecast {
-			forecast := publisher.registeredForecastValues.GetForecast(outputAddress)
+			forecast := publisher.registeredForecastValues.GetForecast(
+				node.NodeID, output.OutputType, output.Instance)
 			PublishForecast(output, forecast, messageSigner)
 		}
 	}

@@ -62,6 +62,43 @@ func (regNodes *RegisteredNodes) CreateNode(deviceID string, nodeType types.Node
 	return newNode
 }
 
+// CreateNodeConfig creates a new node configuration instance and adds it to the node with the given ID.
+// If the configuration already exists, its dataType, description and defaultValue are updated
+//  attrName is the configuration attribute name. See also types.NodeAttr for standard IDs
+//  dataType of the value. See also types.DataType for standard types.
+//  description of the value for humans
+//  defaultValue to use as default configuration value
+// returns a new Configuration Attribute instance.
+func (regNodes *RegisteredNodes) CreateNodeConfig(
+	nodeID string, attrName types.NodeAttr, dataType types.DataType,
+	description string, defaultValue string) *types.ConfigAttr {
+
+	node := regNodes.GetNodeByID(nodeID)
+	if node == nil {
+		return nil
+	}
+	regNodes.updateMutex.Lock()
+	defer regNodes.updateMutex.Unlock()
+
+	config, configExists := node.Config[attrName]
+	// update existing config or create a new one
+	if !configExists {
+		config = types.ConfigAttr{
+			DataType:    dataType,
+			Description: description,
+			Default:     defaultValue,
+		}
+	} else {
+		config.DataType = dataType
+		config.Default = defaultValue
+		config.Description = description
+	}
+	newNode := regNodes.Clone(node)
+	newNode.Config[attrName] = config
+	regNodes.updateNode(newNode)
+	return &config
+}
+
 // GetAllNodes returns a list of nodes
 func (regNodes *RegisteredNodes) GetAllNodes() []*types.NodeDiscoveryMessage {
 	regNodes.updateMutex.Lock()
@@ -301,40 +338,6 @@ func (regNodes *RegisteredNodes) UpdateErrorStatus(nodeID string, runState strin
 	return changed
 }
 
-// NewNodeConfig creates a new node configuration instance and adds it to the node with the given ID.
-// If the configuration already exists, its dataType, description and defaultValue are updated
-//  attrName is the configuration attribute name. See also types.NodeAttr for standard IDs
-//  dataType of the value. See also types.DataType for standard types.
-//  description of the value for humans
-//  defaultValue to use as default configuration value
-// returns a new Configuration Attribute instance.
-func (regNodes *RegisteredNodes) NewNodeConfig(nodeID string, attrName types.NodeAttr, dataType types.DataType, description string, defaultValue string) *types.ConfigAttr {
-	node := regNodes.GetNodeByID(nodeID)
-	if node == nil {
-		return nil
-	}
-	regNodes.updateMutex.Lock()
-	defer regNodes.updateMutex.Unlock()
-
-	config, configExists := node.Config[attrName]
-	// update existing config or create a new one
-	if !configExists {
-		config = types.ConfigAttr{
-			DataType:    dataType,
-			Description: description,
-			Default:     defaultValue,
-		}
-	} else {
-		config.DataType = dataType
-		config.Default = defaultValue
-		config.Description = description
-	}
-	newNode := regNodes.Clone(node)
-	newNode.Config[attrName] = config
-	regNodes.updateNode(newNode)
-	return &config
-}
-
 // UpdateNodeAttr updates node's attributes and publishes the updated node.
 // Node is marked as modified for publication only if one of the attrParams has changes
 //
@@ -420,7 +423,7 @@ func (regNodes *RegisteredNodes) UpdateNodeConfigValues(nodeID string, params ty
 // Nodes are immutable. A new node is created and published and the old node instance is discarded.
 func (regNodes *RegisteredNodes) UpdateNodeConfig(nodeID string, attrName types.NodeAttr, configAttr *types.ConfigAttr) {
 	node := regNodes.GetNodeByID(nodeID)
-	if node == nil || configAttr == nil {
+	if node == nil || configAttr == nil || attrName == "" {
 		return
 	}
 	regNodes.updateMutex.Lock()

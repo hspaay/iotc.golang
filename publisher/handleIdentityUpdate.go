@@ -25,7 +25,7 @@ import (
 func (publisher *Publisher) HandleIdentityUpdate(address string, message string) error {
 	var fullIdentity types.PublisherFullIdentity
 
-	isSigned, isEncrypted, err := publisher.messageSigner.DecodeMessage(message, &fullIdentity)
+	isEncrypted, isSigned, err := publisher.messageSigner.DecodeMessage(message, &fullIdentity)
 
 	if !isEncrypted {
 		return lib.MakeErrorf("HandleIdentityUpdate: Identity update '%s' is not encrypted. Message discarded.", address)

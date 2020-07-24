@@ -23,7 +23,8 @@ type InputFromFiles struct {
 }
 
 // CreateInput creates an input that triggers on file is written to and invokes the given handler.
-// This returns the input address
+// The file must exist when creating the input (the file watcher requires it).
+//  This returns the input address
 func (iffile *InputFromFiles) CreateInput(
 	nodeID string, inputType types.InputType, instance string,
 	path string, handler func(inputAddress string, sender string, path string)) string {
@@ -71,10 +72,13 @@ func (iffile *InputFromFiles) DeleteInput(nodeID string, inputType types.InputTy
 	}
 	fullPath := existingInput.Source
 	if fullPath == "" {
+		// not file path, just delete the input
 		logrus.Errorf("DeleteInput: input %s does not have a source path", existingInput.Address)
+		iffile.registeredInputs.DeleteInput(nodeID, inputType, instance)
 		return
 	}
-	// now we have a valid path, remove it
+
+	// now we have a valid path, remove it from the watcher
 	err := iffile.watcher.Remove(fullPath)
 	if err != nil {
 		logrus.Errorf("DeleteInput: error removing full path %s from file watcher: %s", fullPath, err)

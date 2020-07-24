@@ -19,6 +19,8 @@ func TestNewDomainNodes(t *testing.T) {
 	const domain = "test"
 	const publisherID = "pub2"
 	const nodeID = "node1"
+	const TestConfigID = "test"
+	const TestConfigDefault = "testDefault"
 	const node1Addr = domain + "/" + publisherID + "/" + nodeID
 	privKey := messaging.CreateAsymKeys()
 	getPubKey := func(address string) *ecdsa.PublicKey {
@@ -32,6 +34,7 @@ func TestNewDomainNodes(t *testing.T) {
 
 	node := nodes.NewNode(domain, publisherID, nodeID, types.NodeTypeAdapter)
 	node.Attr[types.NodeAttrName] = "bob"
+	node.Config[TestConfigID] = *nodes.NewNodeConfig(types.DataTypeString, "testing", "")
 	collection.AddNode(node)
 
 	// must be able to get the newly created node
@@ -49,10 +52,15 @@ func TestNewDomainNodes(t *testing.T) {
 	assert.NotEmpty(t, name, "Missing name attribute")
 	name = collection.GetNodeAttr("test/noaddress", types.NodeAttrName)
 	assert.Empty(t, name, "Missing name attribute")
+
 	// node config
 	confValue, err := collection.GetNodeConfigValue(addr, types.NodeAttrName, "default")
 	assert.NoError(t, err)
 	assert.Equal(t, "bob", confValue, "No default for config attribute")
+	confValue, err = collection.GetNodeConfigValue(addr, TestConfigID, TestConfigDefault)
+	assert.NoError(t, err)
+	assert.Equal(t, TestConfigDefault, confValue)
+
 	confValue, err = collection.GetNodeConfigValue(addr, types.NodeAttrDescription, "default")
 	assert.Error(t, err, "Expected error for config not existing")
 	name, err = collection.GetNodeConfigValue("test/noaddress", types.NodeAttrName, "default")

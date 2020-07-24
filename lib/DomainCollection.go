@@ -1,4 +1,4 @@
-// Pacakge lib with generic collection of discovered domain objects such as inputs, outputs and nodes
+// Package lib with generic collection of discovered domain objects such as inputs, outputs and nodes
 package lib
 
 import (

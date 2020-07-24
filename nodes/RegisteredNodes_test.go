@@ -69,6 +69,14 @@ func TestNewNode(t *testing.T) {
 	all = collection.GetAllNodes()
 	assert.Equal(t, 2, len(all))
 
+	// errors
+	n := nodes.NewNode("", "pub", "dev", types.NodeTypeAVControl)
+	assert.Nil(t, n, "Not expecting a node without domain")
+	n = nodes.NewNode("domain", "", "dev", types.NodeTypeAVControl)
+	assert.Nil(t, n, "Not expecting a node without publisher")
+	n = nodes.NewNode("domain", "pub", "", types.NodeTypeAVControl)
+	assert.Nil(t, n, "Not expecting a node without nodeid")
+
 }
 
 // Test updating of node atributes and status
@@ -76,9 +84,14 @@ func TestAttrStatus(t *testing.T) {
 	const node1ID = "node1"
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 	collection.CreateNode(node1ID, types.NodeTypeUnknown)
+	changed := collection.UpdateNodeStatus(node1ID, map[types.NodeStatus]string{types.NodeStatusLastError: "All is well"})
+	assert.True(t, changed)
 
 	newAttr := map[types.NodeAttr]string{types.NodeAttrManufacturer: "Bob"}
 	collection.UpdateNodeAttr(node1ID, newAttr)
+	//
+	changed = collection.UpdateNodeAttr("invalid Node", newAttr)
+	assert.False(t, changed)
 
 	newStatus := map[types.NodeStatus]string{"LastUpdated": "now"}
 	collection.UpdateNodeStatus(node1ID, newStatus)
@@ -100,8 +113,13 @@ func TestConfigure(t *testing.T) {
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 	node := collection.CreateNode(node1ID, types.NodeTypeUnknown)
 
-	config := collection.NewNodeConfig(node1ID, types.NodeAttrName, types.DataTypeString, "Friendly Name", "bob")
+	config := collection.CreateNodeConfig(node1ID, types.NodeAttrName, types.DataTypeString, "Friendly Name", "bob")
 	collection.UpdateNodeConfig(node1ID, types.NodeAttrName, config)
+	// invalid node or config should not blow up
+	collection.UpdateNodeConfig("notanode", types.NodeAttrName, config)
+	collection.UpdateNodeConfig(node1ID, types.NodeAttrName, nil)
+	collection.UpdateNodeConfig(node1ID, "", config)
+
 	// string
 	c, err := collection.GetNodeConfigString(node1ID, types.NodeAttrName, "def")
 	assert.NoError(t, err)
@@ -112,24 +130,49 @@ func TestConfigure(t *testing.T) {
 	// bool
 	_, err = collection.GetNodeConfigBool(node1ID, types.NodeAttrName, false)
 	assert.Error(t, err) // not a bool
+	config = collection.CreateNodeConfig(node1ID, types.NodeAttrName, types.DataTypeBool, "test", "")
+	configValue, err := collection.GetNodeConfigBool(node1ID, types.NodeAttrName, true)
+	assert.NoError(t, err, "Empty value is not an error")
+	assert.True(t, configValue, "Expected use of provided default value")
+
 	_, err = collection.GetNodeConfigBool("notanode", types.NodeAttrName, false)
 	assert.Error(t, err) // no node
-	config = collection.NewNodeConfig(node1ID, types.NodeAttrDisabled, types.DataTypeString, "Node is disabled", "false")
+	config = collection.CreateNodeConfig(node1ID, types.NodeAttrDisabled, types.DataTypeString, "Node is disabled", "false")
 	collection.UpdateNodeConfig(node1ID, types.NodeAttrDisabled, config)
 	_, err = collection.GetNodeConfigBool(node1ID, types.NodeAttrDisabled, false)
 	assert.NoError(t, err) // no node
-	// float
+
+	// test float
 	_, err = collection.GetNodeConfigFloat(node1ID, types.NodeAttrMin, 1.1)
-	assert.Error(t, err) // not a number
-	config = collection.NewNodeConfig(node1ID, types.NodeAttrMin, types.DataTypeNumber, "min", "1.23")
+	assert.Error(t, err) // config doesn't exist
+	config = collection.CreateNodeConfig(node1ID, types.NodeAttrMin, types.DataTypeNumber, "min", "1.23")
 	collection.UpdateNodeConfig(node1ID, types.NodeAttrDisabled, config)
 	_, err = collection.GetNodeConfigFloat(node1ID, types.NodeAttrMin, 1.1)
 	assert.NoError(t, err)
-	// int
+	// float - test clearing current value
+	config = collection.CreateNodeConfig(node1ID, types.NodeAttrMin, types.DataTypeNumber, "min", "")
+	collection.UpdateNodeConfigValues(node1ID, types.NodeAttrMap{types.NodeAttrMin: ""})
+	floatVal, err := collection.GetNodeConfigFloat(node1ID, types.NodeAttrMin, 1.1)
+	assert.NoError(t, err)
+	assert.Equal(t, float32(1.1), floatVal, "UpdateNodeConfig should use provided default")
+	// not a number
+	collection.UpdateNodeConfigValues(node1ID, types.NodeAttrMap{types.NodeAttrMin: "abc"})
+	floatVal, err = collection.GetNodeConfigFloat(node1ID, types.NodeAttrMin, 0)
+	assert.Error(t, err)
+	assert.Equal(t, float32(0), floatVal, "use provided default")
+
+	// test int
+	collection.UpdateNodeConfigValues(node1ID, types.NodeAttrMap{types.NodeAttrMin: "1.34"})
 	_, err = collection.GetNodeConfigInt(node1ID, types.NodeAttrMin, 0)
 	assert.Error(t, err) // float is not an int
 	_, err = collection.GetNodeConfigInt("notanode", types.NodeAttrMin, 1)
 	assert.Error(t, err) // not a number
+
+	config = collection.CreateNodeConfig(node1ID, types.NodeAttrName, types.DataTypeInt, "", "")
+	configValueInt, err := collection.GetNodeConfigInt(node1ID, types.NodeAttrName, 1)
+	assert.NoError(t, err, "Empty int value is not an error")
+	assert.Equal(t, 1, configValueInt, "Expected use of provided default value")
+
 	collection.UpdateNodeConfigValues(node1ID, types.NodeAttrMap{types.NodeAttrMin: "2"})
 	val2, err := collection.GetNodeConfigInt(node1ID, types.NodeAttrMin, 2)
 	assert.Equal(t, 2, val2) // Use default
@@ -180,6 +223,18 @@ func TestReceiveConfig(t *testing.T) {
 	nodes.PublishNodeConfigure(node1.Address, types.NodeAttrMap{
 		types.NodeAttrName: "bob",
 	}, "senderaddress", signer, &privKey.PublicKey)
+
+	// error conditions
+	//- invalid address
+	nodes.PublishNodeConfigure("InvalidAddr", types.NodeAttrMap{}, "sender", signer, &privKey.PublicKey)
+	//- unknown node
+	nodes.PublishNodeConfigure(domain+"/"+publisher1ID+"/nonode/$configure", types.NodeAttrMap{}, "sender", signer, &privKey.PublicKey)
+	// - not encrypted
+	nodes.PublishNodeConfigure(node1.Address, types.NodeAttrMap{}, "sender", signer, nil)
+	// - not signed
+	signer.SetSignMessages(false)
+	nodes.PublishNodeConfigure(node1.Address, types.NodeAttrMap{}, "sender", signer, &privKey.PublicKey)
+
 	receiver.Stop()
 	name := collection.GetNodeAttr(node1ID, types.NodeAttrName)
 	assert.Equal(t, "bob", name)
@@ -224,6 +279,8 @@ func TestAlias(t *testing.T) {
 	assert.NoErrorf(t, err, "Publish set alias failed: %s", err)
 	node2 = collection.GetNodeByID(node1AliasID)
 	assert.NotNil(t, node2, "Node not found using alias")
+	err = nodes.PublishNodeAlias("Invalid Address", node1AliasID, "sender", signer, &privKey.PublicKey)
+	assert.Errorf(t, err, "Publish with invalid address didnt fail")
 
 	receiver.Stop()
 
@@ -233,6 +290,7 @@ func TestError(t *testing.T) {
 	collection.CreateNode(node1ID, types.NodeTypeUnknown)
 	collection.UpdateErrorStatus("notanode", types.NodeRunStateError, "This is an error")
 	collection.UpdateErrorStatus(node1ID, types.NodeRunStateError, "This is an error")
+	collection.UpdateNodeStatus("unknownNode", map[types.NodeStatus]string{types.NodeStatusLastError: "This is an error"})
 }
 
 func TestPublishReceive(t *testing.T) {

@@ -56,7 +56,7 @@ func TestCreateCollection(t *testing.T) {
 	item2b = c.Get(item2InputBase, "not", "found")
 	require.Nil(t, item2b, "Not nil result for invalid address ")
 	itemList := make([]*ItemType, 0)
-	c.GetNodeItems(item2NodeBase, &itemList)
+	c.GetByAddressPrefix(item2NodeBase, &itemList)
 	assert.Equal(t, 1, len(itemList), "Unexpected nr items of node")
 
 	// cleanup

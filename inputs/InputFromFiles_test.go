@@ -56,6 +56,21 @@ func TestCreateInputFromFile(t *testing.T) {
 	ioutil.WriteFile(testFile, []byte("Hello World again"), 0644)
 	time.Sleep(time.Second)
 	assert.Empty(t, fileTouched, "Handler not called when touching file")
+	input := regInputs.GetInput(nodeID, inputType, instance)
+	assert.Nil(t, input, "Deleted input is still there")
+
+	// error cases
+	// - delete input with empty source
+	input = regInputs.GetInput(nodeID, inputType, instance2)
+	input.Source = ""
+	iff.DeleteInput(nodeID, inputType, instance2)
+	input = regInputs.GetInput(nodeID, inputType, instance2)
+	assert.Nil(t, input, "Deleted input2 is still there")
+	// - delete non existing input (it was just deleted)
+	iff.DeleteInput(nodeID, inputType, instance2)
+
+	// delete last input
+	iff.DeleteInput(nodeID, inputType, instance3)
 
 	iff.Stop()
 

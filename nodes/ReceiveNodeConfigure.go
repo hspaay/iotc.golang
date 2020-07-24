@@ -60,7 +60,7 @@ func (nodeConfigure *ReceiveNodeConfigure) Stop() {
 func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(address string, message string) error {
 	var configureMessage types.NodeConfigureMessage
 
-	isSigned, isEncrypted, err := nodeConfigure.messageSigner.DecodeMessage(message, &configureMessage)
+	isEncrypted, isSigned, err := nodeConfigure.messageSigner.DecodeMessage(message, &configureMessage)
 
 	if !isEncrypted {
 		return lib.MakeErrorf("receiveConfigureCommand: Configuration update of '%s' is not encrypted. Message discarded.", address)
