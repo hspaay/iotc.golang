@@ -4,11 +4,11 @@
   "issuerName": "publisher1",
   "location": "local",
   "organization": "",
-  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETdkX7K3Q9rPkzJdwkoVo0ZrZFWKU\nLS689koGL5gSROxXMIMH8DVqVbg0vq0d1LfJM7qRWyYcvaZ52H8OPZmwVQ==\n-----END PUBLIC KEY-----\n",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENzktJAvrmx09XDt+ImDs8dHjnho4\nhkvJrpzTpD/f2314AJNA4Mnzn8KW7HOkjJgN2cpbM+AUB+W22zIqoJQcVg==\n-----END PUBLIC KEY-----\n",
   "publisherId": "publisher1",
-  "validUntil": "2021-07-23T23:19:21.266-0700",
-  "signature": "uS1KfI1h6pqUGnJe9C4QVcVdH-5aDsowcV_ClPHuz5W3JuF9Gtp-4gBlWv0XqkpuEsKPMOf78APqr0zb-ZOa2g==",
-  "timestamp": "2020-07-23T23:19:21.266-0700",
-  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEID1CvP8DoCI9X21t0WAW12lldXGRJCiOQ9pLgtDfBJ4noAoGCCqGSM49\nAwEHoUQDQgAETdkX7K3Q9rPkzJdwkoVo0ZrZFWKULS689koGL5gSROxXMIMH8DVq\nVbg0vq0d1LfJM7qRWyYcvaZ52H8OPZmwVQ==\n-----END PRIVATE KEY-----\n",
+  "validUntil": "2021-07-29T22:04:36.347-0700",
+  "signature": "MEQCICan3FWWqLUDFO4nMRPwFCIadtJaLVPjpYWnYWSWquUCAiA5o9hSOUWnxX-v2f5ls7GyfKSMLh4474kiPXmQqtxhNA==",
+  "timestamp": "2020-07-29T22:04:36.347-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIJaggJzFmdYW11L4GrNK/QzH+FfBWvntKAVrFsVws66joAoGCCqGSM49\nAwEHoUQDQgAENzktJAvrmx09XDt+ImDs8dHjnho4hkvJrpzTpD/f2314AJNA4Mnz\nn8KW7HOkjJgN2cpbM+AUB+W22zIqoJQcVg==\n-----END PRIVATE KEY-----\n",
   "sender": ""
  }

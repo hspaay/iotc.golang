@@ -45,9 +45,9 @@ func TestEcdsaSigning(t *testing.T) {
 	privKey := messaging.CreateAsymKeys()
 	payload1, _ := json.Marshal(testObject)
 
-	sig1 := messaging.CreateEcdsaSignature(string(payload1), privKey)
-	match := messaging.VerifyEcdsaSignature(string(payload1), sig1, &privKey.PublicKey)
-	assert.Truef(t, match, "Verification of ECDSA signature failed")
+	sig1 := messaging.CreateEcdsaSignature(payload1, privKey)
+	err := messaging.VerifyEcdsaSignature(payload1, sig1, &privKey.PublicKey)
+	assert.NoErrorf(t, err, "Verification of ECDSA signature failed")
 	ident := &types.PublisherIdentityMessage{}
 	ident.Address = "1"
 	ident.Domain = "test"
@@ -55,16 +55,26 @@ func TestEcdsaSigning(t *testing.T) {
 	payload, _ := json.Marshal(ident)
 
 	// sig := messaging.SignEncodeIdentity(ident, privKey)
-	sig := messaging.CreateEcdsaSignature(string(payload), privKey)
-	verified := messaging.VerifyEcdsaSignature(string(payload), sig, &privKey.PublicKey)
-	assert.True(t, verified, "Verification ECDSA signature failed")
+	sig := messaging.CreateEcdsaSignature(payload, privKey)
+	err = messaging.VerifyEcdsaSignature(payload, sig, &privKey.PublicKey)
+	assert.NoErrorf(t, err, "Verification ECDSA signature failed")
 
-	// test without pk
-	sig = messaging.CreateEcdsaSignature(string(payload), nil)
+	// error cases - test without pk
+	sig = messaging.CreateEcdsaSignature(payload, nil)
 	assert.Empty(t, sig, "Expected no signature without keys")
-	// test with invalid payload and sig
-	verified = messaging.VerifyEcdsaSignature("hello world", sig, &privKey.PublicKey)
-	verified = messaging.VerifyEcdsaSignature(string(payload), "invalid sig", &privKey.PublicKey)
+	// test with invalid payload
+	err = messaging.VerifyEcdsaSignature([]byte("hello world"), sig, &privKey.PublicKey)
+	assert.Error(t, err)
+	// test with invalid signature
+	err = messaging.VerifyEcdsaSignature(payload, "invalid sig", &privKey.PublicKey)
+	assert.Error(t, err)
+	// test with invalid public key
+	sig = messaging.CreateEcdsaSignature(payload, privKey)
+	err = messaging.VerifyEcdsaSignature(payload, sig, nil)
+	assert.Error(t, err)
+	newKey := messaging.CreateAsymKeys()
+	err = messaging.VerifyEcdsaSignature(payload, sig, &newKey.PublicKey)
+	assert.Error(t, err)
 
 }
 
@@ -78,7 +88,7 @@ func TestJWSSigning(t *testing.T) {
 	assert.NoErrorf(t, err, "signing node1 failed")
 	assert.NotEmpty(t, sig1, "Signature is empty")
 
-	sig2 := messaging.CreateEcdsaSignature(string(payload1), privKey)
+	sig2 := messaging.CreateEcdsaSignature(payload1, privKey)
 	assert.NotEqual(t, sig1, sig2, "JWS Signature doesn't match with Ecdsa")
 }
 
@@ -92,7 +102,7 @@ func TestSigningPerformance(t *testing.T) {
 	start := time.Now()
 	for count := 0; count < 10000; count++ {
 		payload1base64 := base64.URLEncoding.EncodeToString(payload1)
-		sig := messaging.CreateEcdsaSignature(payload1base64, privKey)
+		sig := messaging.CreateEcdsaSignature([]byte(payload1base64), privKey)
 		_ = sig
 	}
 	duration := time.Since(start).Seconds()
@@ -120,12 +130,12 @@ func TestSigningPerformance(t *testing.T) {
 
 	// verify sig of base64URL encoded payload
 	payload1base64 := base64.URLEncoding.EncodeToString(payload1)
-	sig := messaging.CreateEcdsaSignature(payload1base64, privKey)
+	sig := messaging.CreateEcdsaSignature([]byte(payload1base64), privKey)
 	start = time.Now()
 	for count := 0; count < 10000; count++ {
 		// verify signature
 		// pubKey2 = messenger.PublicKeyFromPem(pubPem)
-		match := messaging.VerifyEcdsaSignature(payload1base64, sig, &privKey.PublicKey)
+		match := messaging.VerifyEcdsaSignature([]byte(payload1base64), sig, &privKey.PublicKey)
 		_ = match
 	}
 	duration = time.Since(start).Seconds()
@@ -154,7 +164,7 @@ func TestVerifySender(t *testing.T) {
 	sig1, err := messaging.CreateJWSSignature(string(payload1), privKey)
 
 	var received TestObjectWithSender
-	isSigned, err := messaging.VerifySenderSignature(sig1, &received, func(address string) *ecdsa.PublicKey {
+	isSigned, err := messaging.VerifySenderJWSSignature(sig1, &received, func(address string) *ecdsa.PublicKey {
 		// return the public key of this publisher
 		return &privKey.PublicKey
 	})
@@ -165,7 +175,7 @@ func TestVerifySender(t *testing.T) {
 	payload2, err := json.Marshal(testObject2)
 	sig2, err := messaging.CreateJWSSignature(string(payload2), privKey)
 	var received2 TestObjectNoSender
-	isSigned, err = messaging.VerifySenderSignature(sig2, &received2, func(address string) *ecdsa.PublicKey {
+	isSigned, err = messaging.VerifySenderJWSSignature(sig2, &received2, func(address string) *ecdsa.PublicKey {
 		// return the public key of this publisher
 		return &privKey.PublicKey
 	})
@@ -175,13 +185,13 @@ func TestVerifySender(t *testing.T) {
 	// using no public key lookup
 	payload2, err = json.Marshal(testObject2)
 	sig2, err = messaging.CreateJWSSignature(string(payload2), privKey)
-	isSigned, err = messaging.VerifySenderSignature(sig2, &received2, nil)
+	isSigned, err = messaging.VerifySenderJWSSignature(sig2, &received2, nil)
 	assert.Errorf(t, err, "Verification with invalid message succeeded")
 	assert.True(t, isSigned, "Message wasn't signed")
 
 	// no public key for sender
 	sig2, err = messaging.CreateJWSSignature(string(payload2), privKey)
-	isSigned, err = messaging.VerifySenderSignature(sig2, &received2, func(address string) *ecdsa.PublicKey {
+	isSigned, err = messaging.VerifySenderJWSSignature(sig2, &received2, func(address string) *ecdsa.PublicKey {
 		return nil
 	})
 	assert.Errorf(t, err, "Verification without public key succeeded")
@@ -191,27 +201,34 @@ func TestVerifySender(t *testing.T) {
 	testObject2.Address = ""
 	payload2, err = json.Marshal(testObject2)
 	sig2, err = messaging.CreateJWSSignature(string(payload2), privKey)
-	isSigned, err = messaging.VerifySenderSignature(sig2, &received2, nil)
-	assert.Errorf(t, err, "Verification with invalid message succeeded")
+	isSigned, err = messaging.VerifySenderJWSSignature(sig2, &received2, nil)
+	assert.Errorf(t, err, "Verification with message without Address should not succeed")
 	assert.True(t, isSigned, "Message wasn't signed")
 
 	// no sender or address
 	var obj3 struct{ field1 string }
 	payload3, err := json.Marshal(obj3)
 	sig3, err := messaging.CreateJWSSignature(string(payload3), privKey)
-	isSigned, err = messaging.VerifySenderSignature(sig3, &obj3, nil)
-	assert.Errorf(t, err, "Verification with invalid message succeeded")
+	isSigned, err = messaging.VerifySenderJWSSignature(sig3, &obj3, nil)
+	assert.Errorf(t, err, "Verification with message without sender should not succeed")
 	assert.True(t, isSigned, "Message wasn't signed")
 
 	// invalid message
-	isSigned, err = messaging.VerifySenderSignature("invalid", &received, nil)
-	assert.Errorf(t, err, "Verification with invalid message succeeded")
+	isSigned, err = messaging.VerifySenderJWSSignature("invalid", &received, nil)
+	assert.Errorf(t, err, "Verification with invalid message should not succeed")
 	// invalid payload
 	payload4 := "this is not json"
 	sig4, err := messaging.CreateJWSSignature(string(payload4), privKey)
-	isSigned, err = messaging.VerifySenderSignature(sig4, &received, nil)
-	assert.Errorf(t, err, "Verification with non json payload succeeded")
+	isSigned, err = messaging.VerifySenderJWSSignature(sig4, &received, nil)
+	assert.Errorf(t, err, "Verification with non json payload should not succeed")
 
+	// different public key
+	newKeys := messaging.CreateAsymKeys()
+	isSigned, err = messaging.VerifySenderJWSSignature(sig2, &received, func(address string) *ecdsa.PublicKey {
+		// return the public key of this publisher
+		return &newKeys.PublicKey
+	})
+	assert.Errorf(t, err, "Verification with wrong publickey should not succeed")
 }
 
 func TestSigner(t *testing.T) {
@@ -278,9 +295,10 @@ func TestSignIdentity(t *testing.T) {
 	newIdent.IssuerName = "dss"
 	newIdent.Organization = "iotdomain.org"
 	newIdent.IdentitySignature = ""
-	identSignature := messaging.SignEncodeIdentity(&newIdent.PublisherIdentityMessage, dssKeys)
+	identSignature := messaging.CreateIdentitySignature(&newIdent.PublisherIdentityMessage, dssKeys)
 	assert.NotNil(t, identSignature, "Signing identity fails")
 
 	// verify the signature
-
+	err := messaging.VerifyIdentitySignature(&newIdent.PublisherIdentityMessage, &dssKeys.PublicKey)
+	assert.NotNil(t, err)
 }

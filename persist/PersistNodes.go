@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"path"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,13 +36,11 @@ func LoadNodes(altFolder string, publisherID string, nodelist interface{}) error
 
 	jsonNodes, err := ioutil.ReadFile(nodesFile)
 	if err != nil {
-		log.Infof("LoadNodes: Unable to open cache file %s: %s", nodesFile, err)
-		return err
+		return lib.MakeErrorf("LoadNodes: Unable to open cache file %s: %s", nodesFile, err)
 	}
 	err = json.Unmarshal(jsonNodes, nodelist)
 	if err != nil {
-		log.Errorf("LoadNodes: Error parsing JSON node file %s: %v", nodesFile, err)
-		return err
+		return lib.MakeErrorf("LoadNodes: Error parsing JSON node file %s: %v", nodesFile, err)
 	}
 	log.Infof("LoadNodes: Node list loaded successfully from %s", nodesFile)
 	return nil
@@ -59,18 +58,18 @@ func SaveNodes(folder string, publisherID string, nodeList interface{}) error {
 //   Use "" for default, which is <userhome>/.cache/iotdomain
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the object to hold list of nodes
-func SaveInputs(cacheFolder string, publisherID string, inputList interface{}) error {
-	return SaveToJSON(cacheFolder, publisherID+InputsFileSuffix, inputList)
-}
+// func SaveInputs(cacheFolder string, publisherID string, inputList interface{}) error {
+// 	return SaveToJSON(cacheFolder, publisherID+InputsFileSuffix, inputList)
+// }
 
 // SaveOutputs saves the discovered outputs to cache
 // cacheFolder contains the location for the files
 //   Use "" for default, which is <userhome>/.config/iotdomain
 // publisherID determines the filename: <publisherID-nodes.json>
 // nodelist is the object to hold list of nodes
-func SaveOutputs(cacheFolder string, publisherID string, outputList interface{}) error {
-	return SaveToJSON(cacheFolder, publisherID+OutputsFileSuffix, outputList)
-}
+// func SaveOutputs(cacheFolder string, publisherID string, outputList interface{}) error {
+// 	return SaveToJSON(cacheFolder, publisherID+OutputsFileSuffix, outputList)
+// }
 
 // SaveToJSON saves the given collection to a JSON file
 // cacheFolder contains the location for the files

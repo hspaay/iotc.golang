@@ -31,7 +31,7 @@ type MessageSigner struct {
 // object must hold the expected message type to decode the json message containging the sender info
 func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}) (isEncrypted bool, isSigned bool, err error) {
 	dmessage, isEncrypted, err := DecryptMessage(rawMessage, signer.privateKey)
-	isSigned, err = VerifySenderSignature(dmessage, object, signer.getPublicKey)
+	isSigned, err = VerifySenderJWSSignature(dmessage, object, signer.getPublicKey)
 	return isEncrypted, isSigned, err
 }
 
@@ -40,7 +40,7 @@ func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}
 // Sender field is missing then the 'address' field contains the publisher.
 //  or 'address' field
 func (signer *MessageSigner) VerifySignedMessage(rawMessage string, object interface{}) (isSigned bool, err error) {
-	isSigned, err = VerifySenderSignature(rawMessage, object, signer.getPublicKey)
+	isSigned, err = VerifySenderJWSSignature(rawMessage, object, signer.getPublicKey)
 	return isSigned, err
 }
 
@@ -138,17 +138,25 @@ func NewMessageSigner(
 
 // CreateEcdsaSignature creates a ECDSA256 signature from the payload using the provided private key
 // This returns a base64url encoded signature
-func CreateEcdsaSignature(payload string, privateKey *ecdsa.PrivateKey) string {
+func CreateEcdsaSignature(payload []byte, privateKey *ecdsa.PrivateKey) string {
 	if privateKey == nil {
 		return ""
 	}
-	hashed := sha256.Sum256([]byte(payload))
+	hashed := sha256.Sum256(payload)
 	r, s, err := ecdsa.Sign(rand.Reader, privateKey, hashed[:])
 	if err != nil {
 		return ""
 	}
 	sig, err := asn1.Marshal(ECDSASignature{r, s})
 	return base64.URLEncoding.EncodeToString(sig)
+}
+
+// CreateIdentitySignature returns a base64URL encoded ECDSA256 signature of the public identity.
+// Used in creating or updating a publisher's identity.
+func CreateIdentitySignature(publicIdent *types.PublisherIdentityMessage, privKey *ecdsa.PrivateKey) string {
+	payload, _ := json.Marshal(publicIdent)
+	sigStr := CreateEcdsaSignature(payload, privKey)
+	return sigStr
 }
 
 // CreateJWSSignature signs the payload using JSE ES256 and return the JSE compact serialized message
@@ -195,38 +203,56 @@ func EncryptMessage(message string, publicKey *ecdsa.PublicKey) (serialized stri
 	return serialized, err
 }
 
-// SignEncodeIdentity returns a base64URL encoded ECDSA256 signature of the publisher identity.
-// Used in creating or updating a publisher's identity.
-func SignEncodeIdentity(ident *types.PublisherIdentityMessage, privKey *ecdsa.PrivateKey) string {
-	signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
-	joseSigner, _ := jose.NewSigner(signingKey, nil)
-	payload, _ := json.Marshal(ident)
-	jwsObject, _ := joseSigner.Sign(payload)
-	sig := jwsObject.Signatures[0].Signature
-	sigStr := base64.URLEncoding.EncodeToString(sig)
-	return sigStr
+// VerifyIdentitySignature verifies a base64URL encoded ECDSA256 signature in the identity
+// against the identity itself with signature set to empty.
+func VerifyIdentitySignature(ident *types.PublisherIdentityMessage, pubKey *ecdsa.PublicKey) error {
+	identCopy := *ident
+	identCopy.IdentitySignature = ""
+	payload, _ := json.Marshal(identCopy)
+
+	err := VerifyEcdsaSignature(payload, ident.IdentitySignature, pubKey)
+
+	// signingKey := jose.SigningKey{Algorithm: jose.ES256, Key: privKey}
+	// joseSigner, _ := jose.NewSigner(signingKey, nil)
+
+	// jwsObject, _ := joseSigner.Verify(payload)
+	// sig := jwsObject.Signatures[0].Signature
+	// sigStr := base64.URLEncoding.EncodeToString(sig)
+	// return sigStr
+	return err
 }
 
 // VerifyEcdsaSignature the payload using the base64url encoded signature and public key
-// payload is a text or base64 encoded raw data
+// payload is any raw data
 // signatureB64urlEncoded is the ecdsa 256 URL encoded signature
-func VerifyEcdsaSignature(payload string, signatureB64urlEncoded string, publicKey *ecdsa.PublicKey) bool {
+// Intended for signing an object like the publisher identity. Use VerifyJWSMessage for
+// verifying JWS signed messages.
+func VerifyEcdsaSignature(payload []byte, signatureB64urlEncoded string, publicKey *ecdsa.PublicKey) error {
 	var rs ECDSASignature
+	if publicKey == nil {
+		return errors.New("VerifyEcdsaSignature: publicKey is nil")
+	}
 	signature, err := base64.URLEncoding.DecodeString(signatureB64urlEncoded)
 	if err != nil {
-		return false
-	}
-	if _, err = asn1.Unmarshal(signature, &rs); err != nil {
-		return false
+		return errors.New("VerifyEcdsaSignature: Invalid signature")
 	}
 
-	hashed := sha256.Sum256([]byte(payload))
-	return ecdsa.Verify(publicKey, hashed[:], rs.R, rs.S)
+	if _, err = asn1.Unmarshal(signature, &rs); err != nil {
+		return errors.New("VerifyEcdsaSignature: Payload is not ASN")
+	}
+
+	hashed := sha256.Sum256(payload)
+	verified := ecdsa.Verify(publicKey, hashed[:], rs.R, rs.S)
+	if !verified {
+		return errors.New("VerifyEcdsaSignature: Signature does not match payload")
+	}
+	return nil
 }
 
 // VerifyJWSMessage verifies a signed message and returns its payload
-// message is the message to verify
-// publicKey from the signer. This must be known to verify the message.
+// The message is a JWS encoded string. The public key of the sender is
+// needed to verify the message.
+//  Intended for testing, as the application uses VerifySenderJWSSignature instead.
 func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload string, err error) {
 	jwsSignature, err := jose.ParseSigned(message)
 	if err != nil {
@@ -236,7 +262,7 @@ func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload strin
 	return string(payloadB), err
 }
 
-// VerifySenderSignature verifies if a message is JWS signed. If signed then the signature is verified
+// VerifySenderJWSSignature verifies if a message is JWS signed. If signed then the signature is verified
 // using the 'Sender' or 'Address' attributes to determine the public key to verify with. To verify correctly,
 // the sender has to be a known publisher and verified with the DSS.
 //
@@ -247,7 +273,7 @@ func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload strin
 // The rawMessage is json unmarshalled into the given object.
 //
 // This returns a flag if the message was signed and if so, an error if the verification failed
-func VerifySenderSignature(rawMessage string, object interface{}, getPublicKey func(address string) *ecdsa.PublicKey) (isSigned bool, err error) {
+func VerifySenderJWSSignature(rawMessage string, object interface{}, getPublicKey func(address string) *ecdsa.PublicKey) (isSigned bool, err error) {
 
 	jwsSignature, err := jose.ParseSigned(rawMessage)
 	if err != nil {
@@ -268,26 +294,31 @@ func VerifySenderSignature(rawMessage string, object interface{}, getPublicKey f
 	if !reflSender.IsValid() {
 		reflSender = reflObject.FieldByName("Address")
 		if !reflSender.IsValid() {
-			err = errors.New("VerifySender: object doesn't have a Sender or Address field")
+			err = errors.New("VerifySenderJWSSignature: object doesn't have a Sender or Address field")
 			return true, err
 		}
 	}
 	sender := reflSender.String()
 	if sender == "" {
-		err := errors.New("VerifySender: Missing sender or address information in message")
+		err := errors.New("VerifySenderJWSSignature: Missing sender or address information in message")
 		return true, err
 	}
 	// verify the message signature using the sender's public key
 	if getPublicKey == nil {
-		err := errors.New("VerifySender: Missing method to get public key for sender " + sender)
+		err := errors.New("VerifySenderJWSSignature: Missing method to get public key for sender " + sender)
 		return true, err
 	}
 	publicKey := getPublicKey(sender)
 	if publicKey == nil {
-		err := errors.New("VerifySender: No public key available for sender " + sender)
+		err := errors.New("VerifySenderJWSSignature: No public key available for sender " + sender)
 		return true, err
 	}
 
 	_, err = jwsSignature.Verify(publicKey)
+	if err != nil {
+		msg := fmt.Sprintf("VerifySenderJWSSignature: message signature from %s fails to verify with its public key", sender)
+		err := errors.New(msg)
+		return true, err
+	}
 	return true, err
 }

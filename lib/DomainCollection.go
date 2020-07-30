@@ -99,16 +99,19 @@ func (dc *DomainCollection) GetAll(resultSlicePtr interface{}) {
 	}
 }
 
-// HandleDiscovery updates the item list list with a discovered item
+// HandleDiscovery updates the collection with a discovered item
 // This verifies that the discovery message is properly signed by its publisher,
 // unmarshals the message into newItem and adds it to the collection. newItem must
 // be a pointer to an object of the proper type.
+//  For convenience this also set the PublisherID, NodeID in the target object. If the
+// discovery is of an input/output then the OutputType/Instance is also set. These
+// are derived from the address as they are not separate parameters in the standard.
 func (dc *DomainCollection) HandleDiscovery(address string, message string, newItem interface{}) error {
 
 	// verify the message signature and get the payload
 	_, err := dc.MessageSigner.VerifySignedMessage(message, newItem)
 	if err != nil {
-		return MakeErrorf("handleDiscoverOutput: Failed verifying signature on address %s: %s", address, err)
+		return MakeErrorf("HandleDiscovery: Failed verifying signature on address %s: %s", address, err)
 	}
 	segments := strings.Split(address, "/")
 	if len(segments) > 2 {

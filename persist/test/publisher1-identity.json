@@ -1,16 +1,14 @@
 {
-  "address": "a",
-  "identity": {
-   "domain": "mydomain",
-   "issuerName": "test",
-   "organization": "iotc",
-   "publicKeyCrypto": "pubcrypto",
-   "publicKeySigning": "pubsigning",
-   "publisherId": "publisher1",
-   "timestamp": "",
-   "validUntil": ""
-  },
-  "signature": "identSig",
-  "signer": "test",
-  "timestamp": ""
+  "address": "test/publisher1/$identity",
+  "domain": "test",
+  "issuerName": "publisher1",
+  "location": "local",
+  "organization": "",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXXmyMerQVL4N0Tf8cjWCmcmyFl9+\nnUhhJQee9AalIpeZ8DoWm+zq7nUhj5Mf1khBsOVciVfqwdsmNdTT0fjnNw==\n-----END PUBLIC KEY-----\n",
+  "publisherId": "publisher1",
+  "validUntil": "2021-07-29T22:21:16.380-0700",
+  "signature": "MEUCIQDnB61_j1R257onVAlzrPeJKimVcxzelZlQaojBZwTLqgIgFG061BGSBNHmW0oN7jUvBmcJv9YQkbe3BRNxwXa3YfU=",
+  "timestamp": "2020-07-29T22:21:16.380-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIPpEXaNoBMVChR8tVIb4IyvoGBbUjqOxJeqapCRbJYWAoAoGCCqGSM49\nAwEHoUQDQgAEXXmyMerQVL4N0Tf8cjWCmcmyFl9+nUhhJQee9AalIpeZ8DoWm+zq\n7nUhj5Mf1khBsOVciVfqwdsmNdTT0fjnNw==\n-----END PRIVATE KEY-----\n",
+  "sender": ""
  }
