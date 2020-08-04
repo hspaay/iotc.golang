@@ -7,7 +7,6 @@
 package publisher
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"os"
 	"os/signal"
@@ -16,12 +15,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/iotdomain/iotdomain-go/identities"
 	"github.com/iotdomain/iotdomain-go/inputs"
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/nodes"
 	"github.com/iotdomain/iotdomain-go/outputs"
 	"github.com/iotdomain/iotdomain-go/persist"
-	"github.com/iotdomain/iotdomain-go/publishers"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -36,29 +36,34 @@ const (
 
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
-	domainInputs       *inputs.DomainInputs        // discovered inputs from the domain
-	domainNodes        *nodes.DomainNodes          // discovered nodes from the domain
-	domainOutputs      *outputs.DomainOutputs      // discovered outputs from the domain
-	domainOutputValues *outputs.DomainOutputValues // output values from the domain
+	domainIdentities   *identities.DomainPublisherIdentities // discovered publisher identities
+	domainInputs       *inputs.DomainInputs                  // discovered inputs from the domain
+	domainNodes        *nodes.DomainNodes                    // discovered nodes from the domain
+	domainOutputs      *outputs.DomainOutputs                // discovered outputs from the domain
+	domainOutputValues *outputs.DomainOutputValues           // output values from the domain
 
-	inputFromHTTP        *inputs.InputFromHTTP        // trigger inputs with http poll result
-	inputFromFiles       *inputs.InputFromFiles       // trigger inputs on file changes
-	inputFromOutputs     *inputs.InputFromOutputs     // subscribe input to an output (latest) value
-	inputFromSetCommands *inputs.InputFromSetCommands // trigger inputs with set commands for registered inputs
+	inputFromHTTP        *inputs.ReceiveFromHTTP        // trigger inputs with http poll result
+	inputFromFiles       *inputs.ReceiveFromFiles       // trigger inputs on file changes
+	inputFromOutputs     *inputs.ReceiveFromOutputs     // subscribe input to an output (latest) value
+	inputFromSetCommands *inputs.ReceiveFromSetCommands // trigger inputs with set commands for registered inputs
 
-	receiveNodeConfigure     *nodes.ReceiveNodeConfigure       // listener for node configure for registered nodes
+	receiveMyIdentityUpdate *identities.ReceiveRegisteredIdentityUpdate
+	receiveDomainIdentities *identities.ReceiveDomainPublisherIdentities // listener for identity updates
+	receiveNodeConfigure    *nodes.ReceiveNodeConfigure                  // listener for node configure for registered nodes
+	receiveNodeSetAlias     *nodes.ReceiveNodeAlias                      // listener for set node alias
+
 	registeredForecastValues *outputs.RegisteredForecastValues // output forecasts values published by this publisher
+	registeredIdentity       *identities.RegisteredIdentity    // registered/published identity of this publisher
 	registeredInputs         *inputs.RegisteredInputs          // registered/published inputs from this publisher
 	registeredNodes          *nodes.RegisteredNodes            // registered/published nodes from this publisher
-	receiveNodeSetAlias      *nodes.ReceiveNodeAlias           // listener for set node alias
 	registeredOutputs        *outputs.RegisteredOutputs        // registered/published outputs from this publisher
 	registeredOutputValues   *outputs.RegisteredOutputValues   // registered/published output values from this publisher
 
-	configFolder     string                    // folder to save publisher, node, inputs and outputs configuration
-	domainPublishers *publishers.PublisherList // publishers on the network by discovery address
+	configFolder string // folder to save publisher, node, inputs and outputs configuration
+	// domainPublishers *publishers.PublisherList // publishers on the network by discovery address
 
-	fullIdentity        *types.PublisherFullIdentity                         // this publishers identity
-	identityPrivateKey  *ecdsa.PrivateKey                                    // key for signing and encryption
+	// fullIdentity        *types.PublisherFullIdentity                         // this publishers identity
+	// identityPrivateKey  *ecdsa.PrivateKey                                    // key for signing and encryption
 	isRunning           bool                                                 // publisher was started and is running
 	messenger           messaging.IMessenger                                 // Message bus messenger to use
 	messageSigner       *messaging.MessageSigner                             // publishing signed messages
@@ -69,86 +74,15 @@ type Publisher struct {
 	pollInterval        int                                                  // value polling interval in seconds
 
 	// background publications require a mutex to prevent concurrent access
-	exitChannel  chan bool
-	signMessages bool        // signing on or off
-	updateMutex  *sync.Mutex // mutex for async updating and publishing
+	heartbeatChannel chan bool
+	updateMutex      *sync.Mutex // mutex for async updating and publishing
 }
 
-// Address returns the publisher's identity address
-func (pub *Publisher) Address() string {
-	// identityAddr := nodes.MakePublisherIdentityAddress(pub.Domain(), pub.PublisherID())
-	// return identityAddr
-	return pub.fullIdentity.Address
-}
-
-// PublisherID returns the publisher's ID
-func (pub *Publisher) PublisherID() string {
-	return pub.fullIdentity.PublisherID
-}
-
-// Domain returns the publication domain
-func (pub *Publisher) Domain() string {
-	return pub.fullIdentity.Domain
-}
-
-// FullIdentity return a copy of this publisher's full identity
-func (pub *Publisher) FullIdentity() types.PublisherFullIdentity {
-	return *pub.fullIdentity
-}
-
-// SetLogging sets the logging level and output file for this publisher
-// Intended for setting logging from configuration
-// levelName is the requested logging level: error, warning, info, debug
-// filename is the output log file full name including path
-func (pub *Publisher) SetLogging(levelName string, filename string) {
-	loggingLevel := log.DebugLevel
-
-	if levelName != "" {
-		switch strings.ToLower(levelName) {
-		case "error":
-			loggingLevel = log.ErrorLevel
-		case "warn":
-		case "warning":
-			loggingLevel = log.WarnLevel
-		case "info":
-			loggingLevel = log.InfoLevel
-		case "debug":
-			loggingLevel = log.DebugLevel
-		}
-	}
-	logOut := os.Stderr
-	if filename != "" {
-		logFileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
-		if err != nil {
-			logrus.Errorf("Publisher.SetLogging: Unable to open logfile: %s", err)
-		} else {
-			logrus.Warnf("Publisher.SetLogging: Send logging output to %s", filename)
-			logOut = logFileHandle
-		}
-	}
-
-	logrus.SetFormatter(
-		&log.TextFormatter{
-			// LogFormat: "",
-			// DisableColors:   true,
-			// DisableLevelTruncation: true,
-			// PadLevelText:    true,
-			TimestampFormat: "2006-01-02 15:04:05.000",
-			FullTimestamp:   true,
-			// ForceFormatting: true,
-		})
-	logrus.SetOutput(logOut)
-	logrus.SetLevel(loggingLevel)
-
-	logrus.SetReportCaller(false) // publisher logging includes caller and file:line#
-}
-
-// SetNodeConfigHandler set the handler for updating node configuration
-func (pub *Publisher) SetNodeConfigHandler(
-	handler func(address string, config types.NodeAttrMap) types.NodeAttrMap) {
-
-	pub.receiveNodeConfigure.SetConfigureNodeHandler(handler)
-}
+// // FullIdentity return a copy of this publisher's full identity
+// func (pub *Publisher) FullIdentity() types.PublisherFullIdentity {
+// 	ident, _ := pub.registeredIdentity.GetIdentity()
+// 	return *ident
+// }
 
 // LoadConfig loads previously saved configuration
 // If a node file exists in the given folder the nodes will be added/updated. Existing nodes will be replaced.
@@ -174,6 +108,62 @@ func (pub *Publisher) LoadConfig(folder string, autosave bool) error {
 	return err
 }
 
+// SetLogging sets the logging level and output file for this publisher
+// Intended for setting logging from configuration
+//  levelName is the requested logging level: error, warning, info, debug
+//  filename is the output log file full name including path, use "" for stderr
+func (pub *Publisher) SetLogging(levelName string, filename string) error {
+	loggingLevel := log.DebugLevel
+	var err error
+
+	if levelName != "" {
+		switch strings.ToLower(levelName) {
+		case "error":
+			loggingLevel = log.ErrorLevel
+		case "warn":
+		case "warning":
+			loggingLevel = log.WarnLevel
+		case "info":
+			loggingLevel = log.InfoLevel
+		case "debug":
+			loggingLevel = log.DebugLevel
+		}
+	}
+	logOut := os.Stderr
+	if filename != "" {
+		logFileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+		if err != nil {
+			err = lib.MakeErrorf("Publisher.SetLogging: Unable to open logfile: %s", err)
+		} else {
+			logrus.Warnf("Publisher.SetLogging: Send logging output to %s", filename)
+			logOut = logFileHandle
+		}
+	}
+
+	logrus.SetFormatter(
+		&log.TextFormatter{
+			// LogFormat: "",
+			// DisableColors:   true,
+			// DisableLevelTruncation: true,
+			// PadLevelText:    true,
+			TimestampFormat: "2006-01-02 15:04:05.000",
+			FullTimestamp:   true,
+			// ForceFormatting: true,
+		})
+	logrus.SetOutput(logOut)
+	logrus.SetLevel(loggingLevel)
+
+	logrus.SetReportCaller(false) // publisher logging includes caller and file:line#
+	return err
+}
+
+// SetNodeConfigHandler set the handler for updating node configuration
+func (pub *Publisher) SetNodeConfigHandler(
+	handler func(nodeAddress string, config types.NodeAttrMap) types.NodeAttrMap) {
+
+	pub.receiveNodeConfigure.SetConfigureNodeHandler(handler)
+}
+
 // SetPollInterval is a convenience function for periodic polling of updates to registered
 // nodes, inputs, outputs and output values.
 // seconds interval to perform another poll. Default (0) is DefaultPollInterval
@@ -188,22 +178,12 @@ func (pub *Publisher) SetPollInterval(seconds int, handler func(pub *Publisher))
 	pub.pollHandler = handler
 }
 
-// SetPublisherID changes the publisher's ID. Use before calling Start
-// func (pub *Publisher) SetPublisherID(id string) {
-// 	pub.id = id
-// }
-
-// SetSigningOnOff turns signing of publications on or off.
-// the default is provided when creating the pub.
-func (pub *Publisher) SetSigningOnOff(on bool) {
-	pub.signMessages = on
-}
-
 // Start publishing and listen for configuration and input messages
 // This will create the publisher node and load previously saved nodes
 // Start will fail if no messenger has been provided.
 // persistNodes will load previously saved nodes at startup and save them on configuration change
 func (pub *Publisher) Start() {
+	logrus.Warningf("Publisher.Start: Starting publisher %s/%s", pub.Domain(), pub.PublisherID())
 
 	if pub.messenger == nil {
 		logrus.Errorf("Publisher.Start: Can't start publisher %s/%s without a messenger. See SetMessenger()",
@@ -211,32 +191,31 @@ func (pub *Publisher) Start() {
 		return
 	}
 	if !pub.isRunning {
-		logrus.Warningf("Publisher.Start: Starting publisher %s/%s", pub.Domain(), pub.PublisherID())
 		pub.updateMutex.Lock()
 		pub.isRunning = true
 		pub.updateMutex.Unlock()
 
 		go pub.heartbeatLoop()
 		// wait for the heartbeat to start
-		<-pub.exitChannel
+		<-pub.heartbeatChannel
+
+		// our own identity is first
+		myIdent, _ := pub.registeredIdentity.GetIdentity()
+		pub.domainIdentities.AddIdentity(&myIdent.PublisherIdentityMessage)
 
 		// TODO: support LWT
-		pub.messenger.Connect("", "")
-
+		// receive domain entities, eg identities, nodes, inputs and outputs
+		pub.receiveDomainIdentities.Start()
 		pub.domainNodes.Start()
 		pub.domainInputs.Start()
 		pub.domainOutputs.Start()
+		// receive commands
 		pub.receiveNodeSetAlias.Start()
 		pub.receiveNodeConfigure.Start()
-
-		// subscribe to publisher nodes to verify signature for input commands
-		pubAddr := publishers.MakePublisherIdentityAddress(pub.Domain(), "+")
-		pub.messenger.Subscribe(pubAddr, pub.handlePublisherDiscovery)
-
-		// publish discovery of this publisher
-		pub.PublishIdentity(*pub.messageSigner)
-
-		logrus.Infof("Publisher.Start: Publisher %s started", pub.PublisherID())
+		pub.receiveMyIdentityUpdate.Start()
+		//  listening
+		pub.messenger.Connect("", "")
+		pub.registeredIdentity.PublishIdentity(pub.messageSigner)
 	}
 }
 
@@ -248,14 +227,17 @@ func (pub *Publisher) Stop() {
 	if pub.isRunning {
 		pub.isRunning = false
 
+		pub.receiveMyIdentityUpdate.Stop()
+		pub.receiveDomainIdentities.Stop()
 		pub.receiveNodeConfigure.Stop()
+		pub.receiveNodeSetAlias.Stop()
 		pub.domainOutputs.Stop()
 		pub.domainInputs.Stop()
 		pub.domainNodes.Stop()
 
 		pub.updateMutex.Unlock()
 		// wait for heartbeat to end
-		<-pub.exitChannel
+		<-pub.heartbeatChannel
 	} else {
 		pub.updateMutex.Unlock()
 	}
@@ -280,7 +262,7 @@ func (pub *Publisher) WaitForSignal() {
 // Main heartbeat loop to publish, discove and poll value updates
 func (pub *Publisher) heartbeatLoop() {
 	logrus.Infof("Publisher.heartbeatLoop: starting heartbeat loop")
-	pub.exitChannel <- false
+	pub.heartbeatChannel <- false
 
 	for {
 		time.Sleep(time.Second)
@@ -302,7 +284,7 @@ func (pub *Publisher) heartbeatLoop() {
 			break
 		}
 	}
-	pub.exitChannel <- true
+	pub.heartbeatChannel <- true
 	logrus.Infof("Publisher.heartbeatLoop: Ending loop of publisher %s", pub.PublisherID())
 }
 
@@ -329,7 +311,6 @@ func NewPublisher(
 	cacheFolder string,
 	domain string,
 	publisherID string,
-	signMessages bool,
 	messenger messaging.IMessenger,
 ) *Publisher {
 
@@ -337,60 +318,70 @@ func NewPublisher(
 	if domain == "" {
 		domain = types.LocalDomainID
 	}
+	// ours and domain identities
+	registeredIdentity, privateKey := identities.NewRegisteredIdentity(
+		identityFolder, domain, publisherID)
+	domainIdentities := identities.NewDomainPublisherIdentities()
 
 	// These are the basis for signing and identifying publishers
-	identity, privateKey := SetupPublisherIdentity(identityFolder, domain, publisherID)
-	domainPublishers := publishers.NewPublisherList()
-	messageSigner := messaging.NewMessageSigner(signMessages, domainPublishers.GetPublisherKey, messenger, privateKey)
-	domainPublishers.UpdatePublisher(&identity.PublisherIdentityMessage)
+	messageSigner := messaging.NewMessageSigner(messenger, privateKey, domainIdentities.GetPublisherKey)
 
 	// application services
 	domainInputs := inputs.NewDomainInputs(messageSigner)
-	domainOutputs := outputs.NewDomainOutputs(messageSigner)
 	domainNodes := nodes.NewDomainNodes(messageSigner)
-	registeredNodes := nodes.NewRegisteredNodes(domain, publisherID)
+	domainOutputs := outputs.NewDomainOutputs(messageSigner)
+	domainOutputValues := outputs.NewDomainOutputValues(messageSigner)
 	registeredInputs := inputs.NewRegisteredInputs(domain, publisherID)
+	registeredNodes := nodes.NewRegisteredNodes(domain, publisherID)
 	registeredOutputs := outputs.NewRegisteredOutputs(domain, publisherID)
 	registeredOutputValues := outputs.NewRegisteredOutputValues(domain, publisherID)
 	registeredForecastValues := outputs.NewRegisteredForecastValues(domain, publisherID)
 
+	receiveMyIdentityUpdate := identities.NewReceiveRegisteredIdentityUpdate(
+		registeredIdentity, messageSigner)
+	receiveDomainIdentities := identities.NewReceivePublisherIdentities(domain,
+		domainIdentities, messageSigner)
 	receiveNodeConfigure := nodes.NewReceiveNodeConfigure(
 		domain, publisherID, nil, messageSigner, registeredNodes, privateKey)
 	receiveNodeSetAlias := nodes.NewReceiveNodeAlias(
 		domain, publisherID, nil, messageSigner, privateKey)
 
 	var publisher = &Publisher{
-		domainNodes:      domainNodes,
-		domainInputs:     domainInputs,
-		domainOutputs:    domainOutputs,
-		domainPublishers: domainPublishers,
+		domainIdentities:   domainIdentities,
+		domainInputs:       domainInputs,
+		domainNodes:        domainNodes,
+		domainOutputs:      domainOutputs,
+		domainOutputValues: domainOutputValues,
 
-		inputFromSetCommands: inputs.NewInputFromSetCommands(
+		inputFromSetCommands: inputs.NewReceiveFromSetCommands(
 			domain, publisherID, messageSigner, registeredInputs),
-		inputFromHTTP:    inputs.NewInputFromHTTP(registeredInputs),
-		inputFromFiles:   inputs.NewInputFromFiles(registeredInputs),
-		inputFromOutputs: inputs.NewInputFromOutputs(messageSigner, registeredInputs),
+		inputFromHTTP:    inputs.NewReceiveFromHTTP(registeredInputs),
+		inputFromFiles:   inputs.NewReceiveFromFiles(registeredInputs),
+		inputFromOutputs: inputs.NewReceiveFromOutputs(messageSigner, registeredInputs),
 
-		exitChannel:        make(chan bool),
-		fullIdentity:       identity,
-		identityPrivateKey: privateKey,
+		heartbeatChannel: make(chan bool),
+		// fullIdentity:       identity,
+		// identityPrivateKey: privateKey,
 
-		messenger:            messenger,
-		messageSigner:        messageSigner,
-		pollCountdown:        0,
-		pollInterval:         DefaultPollInterval,
-		receiveNodeConfigure: receiveNodeConfigure,
-		receiveNodeSetAlias:  receiveNodeSetAlias,
+		messenger:               messenger,
+		messageSigner:           messageSigner,
+		pollCountdown:           0,
+		pollInterval:            DefaultPollInterval,
+		receiveDomainIdentities: receiveDomainIdentities,
+		receiveMyIdentityUpdate: receiveMyIdentityUpdate,
+		receiveNodeConfigure:    receiveNodeConfigure,
+		receiveNodeSetAlias:     receiveNodeSetAlias,
 
 		registeredForecastValues: registeredForecastValues,
-		registeredNodes:          registeredNodes,
+		registeredIdentity:       registeredIdentity,
 		registeredInputs:         registeredInputs,
+		registeredNodes:          registeredNodes,
 		registeredOutputs:        registeredOutputs,
 		registeredOutputValues:   registeredOutputValues,
 
-		signMessages: signMessages,
-		updateMutex:  &sync.Mutex{},
+		updateMutex: &sync.Mutex{},
 	}
+	receiveNodeSetAlias.SetAliasHandler(publisher.HandleAliasCommand)
 
 	return publisher
 }

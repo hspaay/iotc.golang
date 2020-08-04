@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateInputFromOutputs(t *testing.T) {
+func TestReceiveFromOutputs(t *testing.T) {
 	const domain = "test"
 	const publisher1ID = "pub1"
-	const node1ID = "node1"
+	const device1ID = "node1"
 	const inputType = types.InputTypeImage
 	const instance = types.DefaultInputInstance
 	const outputAddrRaw = "test/pub1/node1/image/0/" + types.MessageTypeRaw       // pemberton, bc
@@ -24,28 +24,28 @@ func TestCreateInputFromOutputs(t *testing.T) {
 	var privKey = messaging.CreateAsymKeys()
 	var signatureVerificationKey = &privKey.PublicKey
 
-	handler := func(addr string, sender string, value string) {
+	handler := func(input *types.InputDiscoveryMessage, sender string, value string) {
 		inputReceived = value
 	}
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, func(addr string) *ecdsa.PublicKey {
+	signer := messaging.NewMessageSigner(msgr, privKey, func(addr string) *ecdsa.PublicKey {
 		return signatureVerificationKey
-	}, msgr, privKey)
+	})
 	regInputs := inputs.NewRegisteredInputs(domain, publisher1ID)
 
-	i := inputs.NewInputFromOutputs(signer, regInputs)
+	i := inputs.NewReceiveFromOutputs(signer, regInputs)
 
-	addr1 := i.CreateInput(node1ID, inputType, instance, outputAddrRaw, handler)
-	assert.NotEmpty(t, addr1, "No input address")
+	input1 := i.CreateInput(device1ID, inputType, instance, outputAddrRaw, handler)
+	assert.NotNil(t, input1, "No input")
 	// todo: add input that fails and an input that responds with error
 
-	// receive raw output
+	// receive a 'raw' output message
 	inputList := regInputs.GetAllInputs()
 	msgr.Publish(outputAddrRaw, false, "Hello")
 	assert.NotEmpty(t, inputReceived, "No input received")
 
-	// receive latest output
-	i.CreateInput(node1ID, inputType, "latest", outputAddrLatest, handler)
+	// receive a 'latest' output message
+	i.CreateInput(device1ID, inputType, "latest", outputAddrLatest, handler)
 	latest := types.OutputLatestMessage{
 		Address:   outputAddrLatest,
 		Value:     "World",
@@ -53,7 +53,7 @@ func TestCreateInputFromOutputs(t *testing.T) {
 	}
 	payload, _ := json.Marshal(&latest)
 	signer.PublishSigned(outputAddrLatest, false, string(payload))
-	time.Sleep(2 * time.Second)
+	// time.Sleep(2 * time.Second)
 	assert.Equal(t, "World", inputReceived, "No input received")
 
 	// older timestamp
@@ -71,11 +71,11 @@ func TestCreateInputFromOutputs(t *testing.T) {
 	// assert.Equal(t, "World", inputReceived, "No input received")
 
 	// delete
-	i.DeleteInput(node1ID, inputType, instance)
+	i.DeleteInput(input1.InputID)
 	inputList = regInputs.GetAllInputs()
 	assert.Equal(t, 1, len(inputList), "Deleting input doesn't seem to work")
 
 	// delete non existing input should not fail
-	i.DeleteInput(node1ID, inputType, instance)
+	i.DeleteInput(input1.InputID)
 
 }

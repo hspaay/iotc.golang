@@ -14,7 +14,6 @@ func PublishRegisteredInputs(
 
 	// publish updated registered inputs
 	for _, input := range inputs {
-		// aliasAddress := regInputs.getAliasAddress(input.Address, "")
 		logrus.Infof("PublishRegisteredInputs: publish input discovery: %s", input.Address)
 		// no encryption as this is for everyone to see
 		messageSigner.PublishObject(input.Address, true, input, nil)

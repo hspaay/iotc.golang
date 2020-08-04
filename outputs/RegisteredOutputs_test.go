@@ -17,7 +17,6 @@ func TestCreateOutputs(t *testing.T) {
 	const publisher1ID = "publisher1"
 	const node1ID = "node1"
 	var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
-	var node1Addr = node1Base + "/$node"
 	var node1Output1Addr = node1Base + "/switch/0/$output"
 	var node1Output1Type = types.OutputTypeSwitch
 
@@ -26,7 +25,7 @@ func TestCreateOutputs(t *testing.T) {
 
 	require.NotNil(t, output, "Failed creating output")
 
-	output2 := collection.GetOutput(node1ID, node1Output1Type, types.DefaultOutputInstance)
+	output2 := collection.GetOutputByDevice(node1ID, node1Output1Type, types.DefaultOutputInstance)
 	require.NotNil(t, output2, "Failed getting created output")
 
 	output2 = collection.GetOutputByAddress(node1Output1Addr)
@@ -43,11 +42,9 @@ func TestCreateOutputs(t *testing.T) {
 	outs := collection.GetAllOutputs()
 	assert.Equal(t, 1, len(outs), "Expected 1 output")
 
-	nodeOuts := collection.GetNodeOutputs(node1Addr)
+	nodeOuts := collection.GetOutputsByDeviceID(node1ID)
 	assert.Equal(t, 1, len(nodeOuts), "Expected 1 output")
 
-	nodeOuts = collection.GetOutputsByNode(node1ID)
-	assert.Equal(t, 1, len(nodeOuts), "Expected 1 output")
 }
 
 func TestUpdateOutputs(t *testing.T) {
@@ -76,15 +73,15 @@ func TestUpdateOutputs(t *testing.T) {
 func TestAlias(t *testing.T) {
 	const domain = "test"
 	const publisher1ID = "publisher1"
-	const node1ID = "node1"
+	const device1ID = "device1"
 	const Alias1 = "bob"
+	alias1Address := outputs.MakeOutputDiscoveryAddress(domain, publisher1ID, Alias1, types.OutputTypeSwitch, types.DefaultOutputInstance)
 	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
-	collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
-	collection.SetAlias(node1ID, Alias1)
+	collection.CreateOutput(device1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
+	collection.SetAlias(device1ID, Alias1)
 
-	output1b := collection.GetOutput(Alias1, types.OutputTypeSwitch, types.DefaultOutputInstance)
+	output1b := collection.GetOutputByAddress(alias1Address)
 	require.NotNilf(t, output1b, "Output not retrievable using alias nodeID")
-	assert.Equal(t, Alias1, output1b.NodeID, "Output doesn't have the alias NodeID")
 }
 
 func TestPublishOutputs(t *testing.T) {
@@ -100,7 +97,7 @@ func TestPublishOutputs(t *testing.T) {
 	}
 
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
+	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
 
 	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
 	output := collection.CreateOutput(node1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)

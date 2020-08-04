@@ -13,7 +13,7 @@ import (
 
 // NodeConfigureHandler application handler when command to update a node's configuration is received
 // This returns a new map with configuration values that can be applied immediately.
-type NodeConfigureHandler func(address string, params types.NodeAttrMap) types.NodeAttrMap
+type NodeConfigureHandler func(nodeAddress string, params types.NodeAttrMap) types.NodeAttrMap
 
 // ReceiveNodeConfigure with handling of node configure commands aimed at nodes managed by this publisher.
 // This decrypts incoming messages determines the sender and verifies the signature with
@@ -30,7 +30,7 @@ type ReceiveNodeConfigure struct {
 
 // SetConfigureNodeHandler set the handler for updating node inputs
 func (nodeConfigure *ReceiveNodeConfigure) SetConfigureNodeHandler(
-	handler func(address string, params types.NodeAttrMap) types.NodeAttrMap) {
+	handler func(nodeAddress string, params types.NodeAttrMap) types.NodeAttrMap) {
 	nodeConfigure.nodeConfigureHandler = handler
 }
 
@@ -52,39 +52,40 @@ func (nodeConfigure *ReceiveNodeConfigure) Stop() {
 }
 
 // handle an incoming a configuration command for one of our nodes. This:
+// - check if the message is encrypted
 // - check if the signature is valid
 // - check if the node is valid
-// - pass the configuration update to the adapter's callback set in Start()
+// - pass the configuration update to the actual handler
 // - save node configuration if persistence is set
 // TODO: support for authorization per node
-func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(address string, message string) error {
+func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(nodeAddress string, message string) error {
 	var configureMessage types.NodeConfigureMessage
 
 	isEncrypted, isSigned, err := nodeConfigure.messageSigner.DecodeMessage(message, &configureMessage)
 
 	if !isEncrypted {
-		return lib.MakeErrorf("receiveConfigureCommand: Configuration update of '%s' is not encrypted. Message discarded.", address)
+		return lib.MakeErrorf("receiveConfigureCommand: Configuration update of '%s' is not encrypted. Message discarded.", nodeAddress)
 	} else if !isSigned {
-		return lib.MakeErrorf("receiveConfigureCommand: Configuration update of '%s' is not signed. Message discarded.", address)
+		return lib.MakeErrorf("receiveConfigureCommand: Configuration update of '%s' is not signed. Message discarded.", nodeAddress)
 	} else if err != nil {
-		return lib.MakeErrorf("receiveConfigureCommand: Message to %s. Error %s'. Message discarded.", address, err)
+		return lib.MakeErrorf("receiveConfigureCommand: Message to %s. Error %s'. Message discarded.", nodeAddress, err)
 	}
 
 	// TODO: authorization check
-	node := nodeConfigure.registeredNodes.GetNodeByAddress(address)
+	node := nodeConfigure.registeredNodes.GetNodeByAddress(nodeAddress)
 	if node == nil || message == "" {
-		return lib.MakeErrorf("receiveConfigureCommand unknown node for address %s or missing message", address)
+		return lib.MakeErrorf("receiveConfigureCommand unknown node for address %s or missing message", nodeAddress)
 	}
-	logrus.Infof("receiveConfigureCommand configure command on address %s. isEncrypted=%t, isSigned=%t", address, isEncrypted, isSigned)
+	logrus.Infof("receiveConfigureCommand configure command on address %s. isEncrypted=%t, isSigned=%t", nodeAddress, isEncrypted, isSigned)
 
 	params := configureMessage.Attr
 	if nodeConfigure.nodeConfigureHandler != nil {
 		// A handler can filter which configuration updates take place
-		params = nodeConfigure.nodeConfigureHandler(address, params)
+		params = nodeConfigure.nodeConfigureHandler(nodeAddress, params)
 	}
 	// process the requested configuration, or ignore if none are applicable
 	if params != nil {
-		nodeConfigure.registeredNodes.UpdateNodeConfigValues(node.NodeID, params)
+		nodeConfigure.registeredNodes.UpdateNodeConfigValues(node.DeviceID, params)
 	}
 	return nil
 }

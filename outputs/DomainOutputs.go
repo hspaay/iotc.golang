@@ -12,7 +12,8 @@ import (
 
 // DomainOutputs for managing discovered outputs
 type DomainOutputs struct {
-	c lib.DomainCollection //
+	c             lib.DomainCollection //
+	messageSigner *messaging.MessageSigner
 }
 
 // AddOutput adds or replaces the output
@@ -70,13 +71,13 @@ func (domainOutputs *DomainOutputs) Start() {
 	// subscription address for all outputs domain/publisher/node/type/instance/$output
 	// TODO: Only subscribe to selected publishers
 	address := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainOutputs.c.MessageSigner.Subscribe(address, domainOutputs.handleDiscoverOutput)
+	domainOutputs.messageSigner.Subscribe(address, domainOutputs.handleDiscoverOutput)
 }
 
 // Stop polling for outputs
 func (domainOutputs *DomainOutputs) Stop() {
 	address := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainOutputs.c.MessageSigner.Unsubscribe(address, domainOutputs.handleDiscoverOutput)
+	domainOutputs.messageSigner.Unsubscribe(address, domainOutputs.handleDiscoverOutput)
 }
 
 // handleDiscoverOutput updates the domain output list with discovered outputs
@@ -98,6 +99,7 @@ func MakeOutputDiscoveryAddress(domain string, publisherID string, nodeID string
 // NewDomainOutputs creates a new instance for handling of discovered domain outputs
 func NewDomainOutputs(messageSigner *messaging.MessageSigner) *DomainOutputs {
 	return &DomainOutputs{
-		c: lib.NewDomainCollection(messageSigner, reflect.TypeOf(&types.OutputDiscoveryMessage{})),
+		c:             lib.NewDomainCollection(reflect.TypeOf(&types.OutputDiscoveryMessage{}), messageSigner.GetPublicKey),
+		messageSigner: messageSigner,
 	}
 }

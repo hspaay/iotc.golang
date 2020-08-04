@@ -1,0 +1,14 @@
+{
+  "address": "test/pub1/$identity",
+  "domain": "test",
+  "issuerId": "pub1",
+  "location": "local",
+  "organization": "",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5Pmj8q8TUM/fvDQwjz2jyV6/97Jx\nXolH4Gx++1z8Y3WBGFzl6fMMbPu3ZC+BRW8nrBlJ6m/0prFGWl+xyEOjJw==\n-----END PUBLIC KEY-----\n",
+  "publisherId": "pub1",
+  "validUntil": "2021-08-03T18:13:36.403-0700",
+  "signature": "MEUCIAdN-XFM40T-70QHRlHV1i3mUs2gmIC4NpdPcKKwsYbDAiEAhWHkRNzNZx3tVM6pufMYSYknWB4MUATGeTaqPTtkY1o=",
+  "timestamp": "2020-08-03T18:13:36.403-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIBBF3pd1OJBuDO1NRDQg2Gb7UATMBXCauKRMEVFxLk3soAoGCCqGSM49\nAwEHoUQDQgAE5Pmj8q8TUM/fvDQwjz2jyV6/97JxXolH4Gx++1z8Y3WBGFzl6fMM\nbPu3ZC+BRW8nrBlJ6m/0prFGWl+xyEOjJw==\n-----END PRIVATE KEY-----\n",
+  "sender": ""
+ }

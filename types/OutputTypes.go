@@ -165,7 +165,8 @@ type OutputDiscoveryMessage struct {
 	Timestamp  string        `json:"timestamp"`            // time the record is last updated
 	Unit       Unit          `json:"unit,omitempty"`       // unit of output value
 	// For convenience, filled when registering or receiving
-	NodeID      string     `json:"-"`
+	OutputID    string     `json:"-"`
+	DeviceID    string     `json:"-"`
 	PublisherID string     `json:"-"`
 	OutputType  OutputType `json:"-"`
 	Instance    string     `json:"-"`

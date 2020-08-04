@@ -10,8 +10,8 @@ import (
 	"github.com/iotdomain/iotdomain-go/types"
 )
 
-// InputFromOutputs subscribe to domain outputs to use as input
-type InputFromOutputs struct {
+// ReceiveFromOutputs subscribe to domain outputs to use as input
+type ReceiveFromOutputs struct {
 	errorHandler     func(url string, err error) // invoke when error handling input message
 	isRunning        bool                        // flag, subscriptions are active
 	messageSigner    *messaging.MessageSigner    // subscription and publication messenger
@@ -24,11 +24,10 @@ type InputFromOutputs struct {
 // If the given output address is already subscribed to, its handler will be replaced
 //  The given outputAddress is one of $raw or $latest output address
 //  The handler is provided with the address, the sender and the received output value.
-// This returns the new input address.
-func (ifout *InputFromOutputs) CreateInput(
+func (ifout *ReceiveFromOutputs) CreateInput(
 	nodeID string, inputType types.InputType, instance string,
 	outputAddress string,
-	handler func(address string, sender string, payload string)) string {
+	handler func(input *types.InputDiscoveryMessage, sender string, payload string)) *types.InputDiscoveryMessage {
 
 	input := ifout.registeredInputs.CreateInputWithSource(nodeID, inputType, instance, outputAddress, handler)
 
@@ -36,23 +35,23 @@ func (ifout *InputFromOutputs) CreateInput(
 	defer ifout.updateMutex.Unlock()
 
 	ifout.messageSigner.Subscribe(outputAddress, ifout.onReceiveOutput)
-	return input.Address
+	return input
 }
 
 // DeleteInput by address
-func (ifout *InputFromOutputs) DeleteInput(nodeID string, inputType types.InputType, instance string) {
+func (ifout *ReceiveFromOutputs) DeleteInput(inputID string) {
 	ifout.updateMutex.Lock()
 	defer ifout.updateMutex.Unlock()
 
-	input := ifout.registeredInputs.GetInput(nodeID, inputType, instance)
+	input := ifout.registeredInputs.GetInputByID(inputID)
 	if input != nil {
 		ifout.messageSigner.Unsubscribe(input.Source, ifout.onReceiveOutput)
-		ifout.registeredInputs.DeleteInput(nodeID, inputType, instance)
+		ifout.registeredInputs.DeleteInput(inputID)
 	}
 }
 
 // onReceiveOutput verifies the message sender (for 'latest' outputs)
-func (ifout *InputFromOutputs) onReceiveOutput(address string, message string) error {
+func (ifout *ReceiveFromOutputs) onReceiveOutput(address string, message string) error {
 	var value string
 	if strings.HasSuffix(address, types.MessageTypeRaw) {
 		value = message
@@ -75,18 +74,18 @@ func (ifout *InputFromOutputs) onReceiveOutput(address string, message string) e
 	// Find inputs that subscribe to this output
 	inputs := ifout.registeredInputs.GetInputsWithSource(address)
 	for _, input := range inputs {
-		ifout.registeredInputs.NotifyInputHandler(input.Address, address, value)
+		ifout.registeredInputs.NotifyInputHandler(input.InputID, address, value)
 	}
 	return nil
 }
 
-// NewInputFromOutputs creates a input list with subscriptions to outputs to use as input
-func NewInputFromOutputs(
+// NewReceiveFromOutputs creates a input list with subscriptions to outputs to use as input
+func NewReceiveFromOutputs(
 	messageSigner *messaging.MessageSigner,
 	registeredInputs *RegisteredInputs,
-) *InputFromOutputs {
+) *ReceiveFromOutputs {
 
-	ifo := InputFromOutputs{
+	ifo := ReceiveFromOutputs{
 		messageSigner:    messageSigner,
 		registeredInputs: registeredInputs,
 		senderTimestamp:  make(map[string]string),

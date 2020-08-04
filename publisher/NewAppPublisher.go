@@ -40,8 +40,7 @@ func NewAppPublisher(appID string, configFolder string, cacheFolder string, appC
 		pubID = appID
 	}
 	// identity lives in the config folder
-	pub := NewPublisher(configFolder, cacheFolder, messengerConfig.Domain, pubID,
-		messengerConfig.Signing, messenger)
+	pub := NewPublisher(configFolder, cacheFolder, messengerConfig.Domain, pubID, messenger)
 
 	// cache holds previously discovered nodes and external publisher
 	// Should node name and alias configuration updates be stored in config or cache?

@@ -14,68 +14,68 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// InputFromHTTP with inputs to periodically poll HTTP
+// ReceiveFromHTTP with inputs to periodically poll HTTP
 // Only a single handler per URL can be used.
-type InputFromHTTP struct {
+type ReceiveFromHTTP struct {
 	isRunning        bool              // flag, polling is active
 	pollDelay        map[string]int    // seconds until next poll for each input
 	pollInterval     int               // default poll interval
 	registeredInputs *RegisteredInputs // inputs of this publisher
-	subscriptions    map[string]string // http subscriptions of inputs [inputAddr]source
+	subscriptions    map[string]string // http subscriptions of inputs [inputID]source
 	updateMutex      *sync.Mutex       // mutex for async updating of inputs
 }
 
-// CreateInput creates a new input that periodically polls a URL address. If a login and password
+// CreateHttpInput creates a new input that periodically polls a URL address. If a login and password
 // is provided then it will be used for http basic authentication.
 // If an input of the given nodeID, type and instance already exists it will be replaced.
 // pollInterval is in seconds
-// This returns the discovery address of the new input
-func (ifhttp *InputFromHTTP) CreateInput(
-	nodeID string, inputType types.InputType, instance string,
+func (rxFromHttp *ReceiveFromHTTP) CreateHttpInput(
+	deviceID string, inputType types.InputType, instance string,
 	url string, login string, password string, pollInterval int,
-	handler func(inputAddress string, sender string, path string)) string {
+	handler func(input *types.InputDiscoveryMessage, sender string, path string)) *types.InputDiscoveryMessage {
 
+	inputID := MakeInputID(deviceID, inputType, instance)
 	// create the input then add it to the list of addresses to poll
-	input := ifhttp.registeredInputs.CreateInputWithSource(nodeID, inputType, instance, url, handler)
+	input := rxFromHttp.registeredInputs.CreateInputWithSource(deviceID, inputType, instance, url, handler)
 	input.Attr[types.NodeAttrURL] = url
 	input.Attr[types.NodeAttrPollInterval] = strconv.Itoa(pollInterval)
 	input.Attr[types.NodeAttrLoginName] = login
 	input.Attr[types.NodeAttrPassword] = password
-	ifhttp.registeredInputs.UpdateInput(input)
+	rxFromHttp.registeredInputs.UpdateInput(input)
 
-	ifhttp.updateMutex.Lock()
-	defer ifhttp.updateMutex.Unlock()
-	ifhttp.subscriptions[input.Address] = url
-	return input.Address
+	rxFromHttp.updateMutex.Lock()
+	defer rxFromHttp.updateMutex.Unlock()
+	rxFromHttp.subscriptions[inputID] = url
+	return input
 }
 
 // Start polling inputs for changes
-func (ifhttp *InputFromHTTP) Start() {
-	ifhttp.isRunning = true
-	go ifhttp.pollLoop()
+func (rxFromHttp *ReceiveFromHTTP) Start() {
+	rxFromHttp.isRunning = true
+	go rxFromHttp.pollLoop()
 }
 
 // Stop polling for inputs
-func (ifhttp *InputFromHTTP) Stop() {
-	ifhttp.isRunning = false
+func (rxFromHttp *ReceiveFromHTTP) Stop() {
+	rxFromHttp.isRunning = false
 }
 
 // DeleteInput deletes the input and stops polling the url
-func (ifhttp *InputFromHTTP) DeleteInput(nodeID string, inputType types.InputType, instance string) {
-	ifhttp.updateMutex.Lock()
-	defer ifhttp.updateMutex.Unlock()
-	existingInput := ifhttp.registeredInputs.GetInput(nodeID, inputType, instance)
+func (rxFromHttp *ReceiveFromHTTP) DeleteInput(inputID string) {
+	rxFromHttp.updateMutex.Lock()
+	defer rxFromHttp.updateMutex.Unlock()
+	existingInput := rxFromHttp.registeredInputs.GetInputByID(inputID)
 	if existingInput == nil {
-		logrus.Errorf("DeleteInput: input for node %s, type %s, instance %s not found", nodeID, inputType, instance)
+		logrus.Errorf("DeleteInput: input %s not found", inputID)
 		return
 	}
-	delete(ifhttp.subscriptions, existingInput.Address)
-	ifhttp.registeredInputs.DeleteInput(nodeID, inputType, instance)
+	delete(rxFromHttp.subscriptions, inputID)
+	rxFromHttp.registeredInputs.DeleteInput(inputID)
 }
 
 // Send a request to the URL and read the response
 // This supports basic authentication
-func (ifhttp *InputFromHTTP) readInput(input *types.InputDiscoveryMessage) (string, error) {
+func (rxFromHttp *ReceiveFromHTTP) readInput(input *types.InputDiscoveryMessage) (string, error) {
 	var err error
 	url := input.Source
 
@@ -123,47 +123,47 @@ func (ifhttp *InputFromHTTP) readInput(input *types.InputDiscoveryMessage) (stri
 }
 
 // Poll the source of the input and notify subscribers with the result
-func (ifhttp *InputFromHTTP) pollInputAndNotify(input *types.InputDiscoveryMessage) {
-	payload, err := ifhttp.readInput(input)
+func (rxFromHttp *ReceiveFromHTTP) pollInputAndNotify(input *types.InputDiscoveryMessage) {
+	payload, err := rxFromHttp.readInput(input)
 	if err == nil && payload != "" {
-		ifhttp.registeredInputs.NotifyInputHandler(input.Address, "", string(payload))
+		inputID := MakeInputID(input.DeviceID, input.InputType, input.Instance)
+		rxFromHttp.registeredInputs.NotifyInputHandler(inputID, "", string(payload))
 	}
 }
 
 // Poll handler called on a 1 second interval after calling Start()
 // Each input has its own interval.
-func (ifhttp *InputFromHTTP) pollInputs() {
+func (rxFromHttp *ReceiveFromHTTP) pollInputs() {
 	// Each second check which cameras need to be polled and poll
-
-	for inputAddr := range ifhttp.subscriptions {
+	for inputID := range rxFromHttp.subscriptions {
 
 		// Each input can have its own poll interval. The fallback value is the global poll interval
-		input := ifhttp.registeredInputs.GetInputByAddress(inputAddr)
-		pollDelay, _ := ifhttp.pollDelay[inputAddr]
+		input := rxFromHttp.registeredInputs.GetInputByID(inputID)
+		pollDelay, _ := rxFromHttp.pollDelay[inputID]
 		if pollDelay <= 0 {
 			pollDelay, _ = strconv.Atoi(input.Attr[types.NodeAttrPollInterval])
-			logrus.Debugf("readInput: reading input %s at interval of %d seconds", inputAddr, pollDelay)
-			go ifhttp.pollInputAndNotify(input)
+			logrus.Debugf("readInput: reading input %s at interval of %d seconds", inputID, pollDelay)
+			go rxFromHttp.pollInputAndNotify(input)
 		}
-		ifhttp.pollDelay[inputAddr] = pollDelay - 1
+		rxFromHttp.pollDelay[inputID] = pollDelay - 1
 	}
 }
 
 // Poll loop,
 // Each input has its own interval.
-func (ifhttp *InputFromHTTP) pollLoop() {
+func (rxFromHttp *ReceiveFromHTTP) pollLoop() {
 
-	for ifhttp.isRunning {
+	for rxFromHttp.isRunning {
 		time.Sleep(time.Second)
-		ifhttp.pollInputs()
+		rxFromHttp.pollInputs()
 	}
 }
 
-// NewInputFromHTTP creates a new instance of HTTP based inputs
+// NewReceiveFromHTTP creates a new instance of HTTP based inputs
 // Inputs must be created through CreateInput
-func NewInputFromHTTP(registeredInputs *RegisteredInputs) *InputFromHTTP {
+func NewReceiveFromHTTP(registeredInputs *RegisteredInputs) *ReceiveFromHTTP {
 
-	httpInput := &InputFromHTTP{
+	httpInput := &ReceiveFromHTTP{
 		pollDelay:        make(map[string]int),
 		pollInterval:     3600,
 		registeredInputs: registeredInputs,

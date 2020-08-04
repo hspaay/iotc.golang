@@ -64,26 +64,6 @@ func (publisher *Publisher) PublishUpdatedOutputValues(
 	}
 }
 
-// PublishUpdatedForecasts publishes the output forecasts
-// While every output has a history, forecasts are only available for outputs that are able to
-// provide a prediction. For example a weather forecast. This is therefore a separate collection
-func (publisher *Publisher) PublishUpdatedForecasts(
-	updatedForecastAddresses []string,
-	messageSigner *messaging.MessageSigner) {
-
-	for _, outputAddress := range updatedForecastAddresses {
-		output := publisher.registeredOutputs.GetOutputByAddress(outputAddress)
-		node := publisher.registeredNodes.GetNodeByAddress(outputAddress)
-
-		pubForecast, _ := publisher.registeredNodes.GetNodeConfigBool(node.Address, types.NodeAttrPublishForecast, true)
-		if pubForecast {
-			forecast := publisher.registeredForecastValues.GetForecast(
-				node.NodeID, output.OutputType, output.Instance)
-			PublishForecast(output, forecast, messageSigner)
-		}
-	}
-}
-
 // PublishOutputEvent publishes all node output values in the $event command
 // zone/publisher/nodealias/$event
 // TODO: decide when to invoke this
@@ -97,7 +77,7 @@ func PublishOutputEvent(
 	aliasAddress := outputs.ReplaceMessageType(node.Address, types.MessageTypeEvent)
 	logrus.Infof("Publisher.publishEvent: %s", aliasAddress)
 
-	nodeOutputs := registeredOutputs.GetNodeOutputs(node.Address)
+	nodeOutputs := registeredOutputs.GetOutputsByDeviceID(node.Address)
 	event := make(map[string]string)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	for _, output := range nodeOutputs {
@@ -111,26 +91,4 @@ func PublishOutputEvent(
 		Timestamp: timeStampStr,
 	}
 	messageSigner.PublishObject(aliasAddress, true, eventMessage, nil)
-}
-
-// PublishForecast publishes the $forecast output values retained=true
-// not thread-safe, using within a locked section
-func PublishForecast(
-	output *types.OutputDiscoveryMessage,
-	forecast outputs.OutputForecast,
-	messageSigner *messaging.MessageSigner,
-) {
-
-	aliasAddress := outputs.ReplaceMessageType(output.Address, types.MessageTypeForecast)
-	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
-
-	forecastMessage := &types.OutputForecastMessage{
-		Address:   aliasAddress,
-		Duration:  0, // tbd
-		Timestamp: timeStampStr,
-		Unit:      output.Unit,
-		Forecast:  forecast,
-	}
-	logrus.Debugf("Publisher.publishForecast: %d entries on %s", len(forecastMessage.Forecast), aliasAddress)
-	messageSigner.PublishObject(aliasAddress, true, forecastMessage, nil)
 }

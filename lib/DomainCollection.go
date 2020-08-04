@@ -2,6 +2,7 @@
 package lib
 
 import (
+	"crypto/ecdsa"
 	"reflect"
 	"strings"
 	"sync"
@@ -12,10 +13,11 @@ import (
 // DomainCollection for managing discovered nodes,inputs and outputs
 // Hopefully this can be replaced with generics soon
 type DomainCollection struct {
-	DiscoMap      map[string]interface{}   // discovered by addres
-	MessageSigner *messaging.MessageSigner // subscription to discovery messages
-	UpdateMutex   *sync.Mutex              // mutex for async updating
-	ItemPtr       reflect.Type             // pointer type of item in map
+	DiscoMap map[string]interface{} // discovered by addres
+	// MessageSigner *messaging.MessageSigner // subscription to discovery messages
+	GetPublicKey func(string) *ecdsa.PublicKey // get the public key for signature verification
+	UpdateMutex  *sync.Mutex                   // mutex for async updating
+	ItemPtr      reflect.Type                  // pointer type of item in map
 }
 
 // Add adds or replaces the discovered object
@@ -106,10 +108,12 @@ func (dc *DomainCollection) GetAll(resultSlicePtr interface{}) {
 //  For convenience this also set the PublisherID, NodeID in the target object. If the
 // discovery is of an input/output then the OutputType/Instance is also set. These
 // are derived from the address as they are not separate parameters in the standard.
-func (dc *DomainCollection) HandleDiscovery(address string, message string, newItem interface{}) error {
+func (dc *DomainCollection) HandleDiscovery(
+	address string, rawMessage string, newItem interface{}) error {
 
 	// verify the message signature and get the payload
-	_, err := dc.MessageSigner.VerifySignedMessage(message, newItem)
+	_, err := messaging.VerifySenderJWSSignature(rawMessage, newItem, dc.GetPublicKey)
+
 	if err != nil {
 		return MakeErrorf("HandleDiscovery: Failed verifying signature on address %s: %s", address, err)
 	}
@@ -162,13 +166,13 @@ func setObjectField(object interface{}, fieldName string, value string) {
 
 // NewDomainCollection creates an instance for generic handling of discovered inputs, outputs and nodes
 // itemPtr is a pointer to a dummy instance of the item
-func NewDomainCollection(messageSigner *messaging.MessageSigner, itemPtr reflect.Type) DomainCollection {
+func NewDomainCollection(itemPtr reflect.Type, getPublicKey func(string) *ecdsa.PublicKey) DomainCollection {
 
 	domainCollection := DomainCollection{
-		DiscoMap:      make(map[string]interface{}),
-		ItemPtr:       itemPtr,
-		MessageSigner: messageSigner,
-		UpdateMutex:   &sync.Mutex{},
+		DiscoMap:     make(map[string]interface{}),
+		GetPublicKey: getPublicKey,
+		ItemPtr:      itemPtr,
+		UpdateMutex:  &sync.Mutex{},
 	}
 	return domainCollection
 }

@@ -15,7 +15,7 @@ type DomainInputs struct {
 	c lib.DomainCollection //
 	// getPublisherKey func(address string) *ecdsa.PublicKey // get publisher key for signature verification
 	// inputMap      map[string]*types.InputDiscoveryMessage
-	// messageSigner *messaging.MessageSigner // subscription to input discovery messages
+	messageSigner *messaging.MessageSigner // subscription to input discovery messages
 	// updateMutex   *sync.Mutex              // mutex for async updating of inputs
 }
 
@@ -61,13 +61,13 @@ func (domainInputs *DomainInputs) Start() {
 	// subscription address for all inputs domain/publisher/node/type/instance/$input
 	// TODO: Only subscribe to selected publishers
 	addr := MakeInputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainInputs.c.MessageSigner.Subscribe(addr, domainInputs.handleDiscoverInput)
+	domainInputs.messageSigner.Subscribe(addr, domainInputs.handleDiscoverInput)
 }
 
 // Stop polling for inputs
 func (domainInputs *DomainInputs) Stop() {
 	addr := MakeInputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainInputs.c.MessageSigner.Unsubscribe(addr, domainInputs.handleDiscoverInput)
+	domainInputs.messageSigner.Unsubscribe(addr, domainInputs.handleDiscoverInput)
 }
 
 // handleDiscoverInput updates the domain input list with discovered inputs
@@ -90,7 +90,8 @@ func MakeInputDiscoveryAddress(domain string, publisherID string, nodeID string,
 func NewDomainInputs(messageSigner *messaging.MessageSigner) *DomainInputs {
 
 	inputs := DomainInputs{
-		c: lib.NewDomainCollection(messageSigner, reflect.TypeOf(&types.InputDiscoveryMessage{})),
+		c:             lib.NewDomainCollection(reflect.TypeOf(&types.InputDiscoveryMessage{}), messageSigner.GetPublicKey),
+		messageSigner: messageSigner,
 	}
 	return &inputs
 }

@@ -35,6 +35,12 @@ func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}
 	return isEncrypted, isSigned, err
 }
 
+// GetPublicKey is a convenience function for getting the public key of the given
+// publisher address. Intended for verification of signatures or encryption.
+func (signer *MessageSigner) GetPublicKey(addr string) *ecdsa.PublicKey {
+	return signer.getPublicKey(addr)
+}
+
 // VerifySignedMessage parses and verifies the message signature
 // as per standard, the sender and signer of the message is in the message 'Sender' field. If the
 // Sender field is missing then the 'address' field contains the publisher.
@@ -117,16 +123,15 @@ func (signer *MessageSigner) PublishSigned(
 
 // NewMessageSigner creates a new instance for signing and verifying published messages
 func NewMessageSigner(
-	signMessages bool,
-	getPublicKey func(address string) *ecdsa.PublicKey,
 	messenger IMessenger,
 	signingKey *ecdsa.PrivateKey,
+	getPublicKey func(address string) *ecdsa.PublicKey,
 ) *MessageSigner {
 
 	signer := &MessageSigner{
 		getPublicKey: getPublicKey,
 		messenger:    messenger,
-		signMessages: signMessages,
+		signMessages: true,
 		privateKey:   signingKey, // private key for signing
 	}
 	return signer
@@ -151,12 +156,13 @@ func CreateEcdsaSignature(payload []byte, privateKey *ecdsa.PrivateKey) string {
 	return base64.URLEncoding.EncodeToString(sig)
 }
 
-// CreateIdentitySignature returns a base64URL encoded ECDSA256 signature of the public identity.
-// Used in creating or updating a publisher's identity.
-func CreateIdentitySignature(publicIdent *types.PublisherIdentityMessage, privKey *ecdsa.PrivateKey) string {
-	payload, _ := json.Marshal(publicIdent)
+// SignIdentity updates the base64URL encoded ECDSA256 signature of the public identity
+func SignIdentity(publicIdent *types.PublisherIdentityMessage, privKey *ecdsa.PrivateKey) {
+	identCopy := *publicIdent
+	identCopy.IdentitySignature = ""
+	payload, _ := json.Marshal(identCopy)
 	sigStr := CreateEcdsaSignature(payload, privKey)
-	return sigStr
+	publicIdent.IdentitySignature = sigStr
 }
 
 // CreateJWSSignature signs the payload using JSE ES256 and return the JSE compact serialized message
@@ -204,8 +210,9 @@ func EncryptMessage(message string, publicKey *ecdsa.PublicKey) (serialized stri
 }
 
 // VerifyIdentitySignature verifies a base64URL encoded ECDSA256 signature in the identity
-// against the identity itself with signature set to empty.
+// against the identity itself using the sender's public key.
 func VerifyIdentitySignature(ident *types.PublisherIdentityMessage, pubKey *ecdsa.PublicKey) error {
+	// the signing took place with the signature field empty
 	identCopy := *ident
 	identCopy.IdentitySignature = ""
 	payload, _ := json.Marshal(identCopy)
@@ -263,12 +270,14 @@ func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload strin
 }
 
 // VerifySenderJWSSignature verifies if a message is JWS signed. If signed then the signature is verified
-// using the 'Sender' or 'Address' attributes to determine the public key to verify with. To verify correctly,
-// the sender has to be a known publisher and verified with the DSS.
+// using the 'Sender' or 'Address' attributes to determine the public key to verify with.
+// To verify correctly, the sender has to be a known publisher and verified with the DSS.
+//  object MUST be a pointer to the type otherwise unmarshal fails.
 //
 // getPublicKey is a lookup function for providing the public key from the given sender address.
 //  it should only provide a public key if the publisher is known and verified by the DSS, or
 //  if this zone does not use a DSS (publisher are protected through message bus ACLs)
+//  If not provided then signature verification will succeed.
 //
 // The rawMessage is json unmarshalled into the given object.
 //
@@ -285,8 +294,8 @@ func VerifySenderJWSSignature(rawMessage string, object interface{}, getPublicKe
 	err = json.Unmarshal([]byte(payload), object)
 	if err != nil {
 		// message doesn't have a json payload
-		err := errors.New("VerifySenderSignature: Signature okay but message unmarshal failed")
-		return true, err
+		errTxt := fmt.Sprintf("VerifySenderSignature: Signature okay but message unmarshal failed: %s", err)
+		return true, errors.New(errTxt)
 	}
 	// determine who the sender is
 	reflObject := reflect.ValueOf(object).Elem()
@@ -305,8 +314,7 @@ func VerifySenderJWSSignature(rawMessage string, object interface{}, getPublicKe
 	}
 	// verify the message signature using the sender's public key
 	if getPublicKey == nil {
-		err := errors.New("VerifySenderJWSSignature: Missing method to get public key for sender " + sender)
-		return true, err
+		return true, nil
 	}
 	publicKey := getPublicKey(sender)
 	if publicKey == nil {

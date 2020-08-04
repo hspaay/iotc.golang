@@ -18,65 +18,34 @@ const validDuration = time.Hour * 24 * 365
 
 // RegisteredIdentity for managing the publisher's full identity
 type RegisteredIdentity struct {
-	domain        string // domain of the publisher creating this identity
-	publisherID   string
-	FullIdentity  *types.PublisherFullIdentity
-	privateKey    *ecdsa.PrivateKey
-	messageSigner *messaging.MessageSigner
+	domain       string // domain of the publisher creating this identity
+	publisherID  string
+	fullIdentity *types.PublisherFullIdentity
+	dssPubKey    *ecdsa.PublicKey  // DSS pub key for verification (secure zones only)
+	privateKey   *ecdsa.PrivateKey // private key from the new identity
 }
 
-// HandleIdentityUpdate handles the set command for an update to this publisher identity.
-// The message must be encrypted and signed by the DSS or it will be discarded.
-func (regIdentity *RegisteredIdentity) HandleIdentityUpdate(address string, message string) error {
-	var fullIdentity types.PublisherFullIdentity
+// GetAddress returns the identity's publication address
+func (regIdentity *RegisteredIdentity) GetAddress() string {
+	return regIdentity.fullIdentity.Address
+}
 
-	isEncrypted, isSigned, err := regIdentity.messageSigner.DecodeMessage(message, &fullIdentity)
+// GetIdentity returns the full identity with private key
+func (regIdentity *RegisteredIdentity) GetIdentity() (fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey) {
+	return regIdentity.fullIdentity, regIdentity.privateKey
+}
 
+// UpdateIdentity verifies and sets a new registered identity
+func (regIdentity *RegisteredIdentity) UpdateIdentity(fullIdentity *types.PublisherFullIdentity) {
+
+	err := VerifyFullIdentity(fullIdentity, regIdentity.domain, regIdentity.publisherID, regIdentity.dssPubKey)
 	if err != nil {
-		return lib.MakeErrorf("HandleIdentityUpdate: Message to %s. Error %s'. Message discarded.", address, err)
-	} else if !isEncrypted {
-		return lib.MakeErrorf("HandleIdentityUpdate: Identity update '%s' is not encrypted. Message discarded.", address)
-	} else if !isSigned {
-		return lib.MakeErrorf("HandleIdentityUpdate: Identity update '%s' is not signed. Message discarded.", address)
+		logrus.Errorf("UpdateIdentity: verification failed. Identity not updated.")
+		return
 	}
-
-	dssAddress := MakePublisherIdentityAddress(regIdentity.domain, types.DSSPublisherID)
-	if fullIdentity.Sender != dssAddress {
-		return lib.MakeErrorf("HandleIdentityUpdate: Sender is %s instead of the DSS %s. Identity update discarded.",
-			fullIdentity.Sender, dssAddress)
-	}
-
 	privKey := messaging.PrivateKeyFromPem(fullIdentity.PrivateKey)
 	regIdentity.privateKey = privKey
-	regIdentity.FullIdentity = &fullIdentity
-	return nil
-}
-
-// PublishIdentity publishes this identity
-func (regIdentity *RegisteredIdentity) PublishIdentity() {
-	publicIdentity := &regIdentity.FullIdentity.PublisherIdentityMessage
-	logrus.Infof("PublishIdentity: publish identity: %s", publicIdentity.Address)
-	regIdentity.messageSigner.PublishObject(publicIdentity.Address, true, publicIdentity, nil)
-}
-
-// // SetIdentity sets the registered identity
-// func (regIdentity *RegisteredIdentity) SetIdentity(fullIdent *types.PublisherFullIdentity) {
-// 	panic("not implemented")
-// }
-
-// Start listening for updates to the registered identity
-// Intended to receive new keys from the DSS
-func (regIdentity *RegisteredIdentity) Start() {
-	addr := MakePublisherIdentityAddress(
-		regIdentity.domain, regIdentity.publisherID)
-	regIdentity.messageSigner.Subscribe(addr, regIdentity.HandleIdentityUpdate)
-}
-
-// Stop listening
-func (regIdentity *RegisteredIdentity) Stop() {
-	addr := MakePublisherIdentityAddress(
-		regIdentity.FullIdentity.Domain, regIdentity.FullIdentity.PublisherID)
-	regIdentity.messageSigner.Unsubscribe(addr, regIdentity.HandleIdentityUpdate)
+	regIdentity.fullIdentity = fullIdentity
 }
 
 // CreateIdentity creates and self-sign a new identity for the publisher
@@ -102,7 +71,7 @@ func CreateIdentity(domain string, publisherID string) (
 		Address:           addr,
 		IdentitySignature: "",
 		Domain:            domain,
-		IssuerName:        publisherID, // self issued, will be replaced by DSS
+		IssuerID:          publisherID, // self issued, will be replaced by DSS
 		Location:          "local",
 		Organization:      "", // todo: get from messenger configuration
 		// PublicKeyCrypto:  pubCryptoStr,
@@ -112,8 +81,7 @@ func CreateIdentity(domain string, publisherID string) (
 		ValidUntil:  validUntilStr,
 	}
 	// self signed identity.
-	identitySignature := messaging.CreateIdentitySignature(&publicIdentity, identityPrivKey)
-	publicIdentity.IdentitySignature = identitySignature
+	messaging.SignIdentity(&publicIdentity, identityPrivKey)
 
 	fullIdentity = &types.PublisherFullIdentity{
 		PublisherIdentityMessage: publicIdentity,
@@ -129,48 +97,6 @@ func IsIdentityExpired(identity *types.PublisherIdentityMessage) bool {
 	return (nowIsGreater > 0)
 }
 
-// VerifyIdentity verifies the given identity is correctly signed, matches the given
-// domain and publisher, and is not expired.
-func VerifyIdentity(ident *types.PublisherFullIdentity, domain string,
-	publisherID string, dssSigningKey *ecdsa.PublicKey) error {
-
-	// sanity check in case the file was edited
-	addr := MakePublisherIdentityAddress(domain, publisherID)
-
-	if ident.Address != addr ||
-		ident.Domain != domain ||
-		ident.PublisherID != publisherID ||
-		ident.PublicKey == "" ||
-		ident.IdentitySignature == "" ||
-		ident.PrivateKey == "" {
-		err := lib.MakeErrorf("Identity file for %s/%s is invalid.", domain, publisherID)
-		return err
-	}
-
-	expired := IsIdentityExpired(&ident.PublisherIdentityMessage)
-	if expired {
-		err := lib.MakeErrorf("Identity is expired")
-		return err
-	}
-	// identity signature must verify against its signer, eg using the DSS public key
-	if dssSigningKey != nil {
-		err := messaging.VerifyIdentitySignature(&ident.PublisherIdentityMessage, dssSigningKey)
-		if err != nil {
-			err := lib.MakeErrorf("Identity signature mismatch: %s", err)
-			return err
-		}
-	}
-	// public key in identity must be the PEM key that belongs to the private key
-	identPrivateKey := messaging.PrivateKeyFromPem(ident.PrivateKey)
-	publicPem := messaging.PublicKeyToPem(&identPrivateKey.PublicKey)
-	if publicPem != ident.PublicKey {
-		err := lib.MakeErrorf("Public key in signed identity doesn't belong to the identity private key")
-		return err
-	}
-
-	return nil
-}
-
 // MakePublisherIdentityAddress generates the address of a publisher:
 //   domain/publisherID/$identity
 // Intended for lookup of nodes in the node list.
@@ -179,6 +105,45 @@ func VerifyIdentity(ident *types.PublisherFullIdentity, domain string,
 func MakePublisherIdentityAddress(domain string, publisherID string) string {
 	address := fmt.Sprintf("%s/%s/%s", domain, publisherID, types.MessageTypeIdentity)
 	return address
+}
+
+// PublishIdentity signs and publishes the public part of this identity using
+// the given message signer.
+func (regIdentity *RegisteredIdentity) PublishIdentity(signer *messaging.MessageSigner) {
+	publicIdentity := &regIdentity.fullIdentity.PublisherIdentityMessage
+	logrus.Infof("PublishIdentity: publish identity: %s", publicIdentity.Address)
+
+	signer.PublishObject(publicIdentity.Address, true, publicIdentity, nil)
+}
+
+// SetDssKey sets the DSS public key. This is needed to allow the DSS to update the
+// registered identity. Without it, any updates are refused. Intended to be set by
+// the publisher when a verified DSS identity is received.
+func (regIdentity *RegisteredIdentity) SetDssKey(dssSigningKey *ecdsa.PublicKey) {
+	regIdentity.dssPubKey = dssSigningKey
+}
+
+// VerifyFullIdentity verifies the given full identity is correctly signed,
+// matches the given domain and publisher, and is not expired.
+// If the publisher joined with the DSS domain then a dssSigningKey is known and
+// the identity MUST be signed by the DSS.
+func VerifyFullIdentity(ident *types.PublisherFullIdentity, domain string,
+	publisherID string, dssSigningKey *ecdsa.PublicKey) error {
+
+	// the public identity must verify first
+	err := VerifyPublisherIdentity(ident.Address, &ident.PublisherIdentityMessage, dssSigningKey)
+	if err != nil {
+		return err
+	}
+
+	// public key in identity must be the PEM key that belongs to the private key
+	identPrivateKey := messaging.PrivateKeyFromPem(ident.PrivateKey)
+	publicPem := messaging.PublicKeyToPem(&identPrivateKey.PublicKey)
+	if publicPem != ident.PublicKey {
+		return lib.MakeErrorf("VerifyFullIdentity: Public key in signed identity '%s' doesn't belong to the identity private key", ident.Address)
+	}
+	// identity is valid
+	return nil
 }
 
 // SetupPublisherIdentity loads the publisher identity and keys from file in the identityFolder.
@@ -193,14 +158,15 @@ func MakePublisherIdentityAddress(domain string, publisherID string) string {
 // If any of these conditions are met in a secured domain then the publisher must
 // be re-added to the domain.
 func SetupPublisherIdentity(
-	identityFolder string, domain string, publisherID string, dssSigningKey *ecdsa.PublicKey) (
+	identityFolder string, domain string, publisherID string,
+	dssSigningKey *ecdsa.PublicKey) (
 	fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey) {
 
 	// If an identity is saved, load it
 	fullIdentity, privKey, err := persist.LoadIdentity(identityFolder, publisherID)
 	// must match domain and publisher
 	if err == nil {
-		err = VerifyIdentity(fullIdentity, domain, publisherID, dssSigningKey)
+		err = VerifyFullIdentity(fullIdentity, domain, publisherID, dssSigningKey)
 	}
 	// Recreate identity if invalid
 	if err != nil { // invalid identity or none exists, create a new one
@@ -211,16 +177,21 @@ func SetupPublisherIdentity(
 	return fullIdentity, privKey
 }
 
-// NewRegisteredIdentity creates a new instance of the registered identity management, including handling
-// of updates from the DSS.
-func NewRegisteredIdentity(domain string, publisherID string,
-	privateKey *ecdsa.PrivateKey, signer *messaging.MessageSigner) *RegisteredIdentity {
-	regIdent := &RegisteredIdentity{
-		messageSigner: signer,
-		domain:        domain,
-		FullIdentity:  &types.PublisherFullIdentity{},
-		privateKey:    privateKey,
-		publisherID:   publisherID,
+// NewRegisteredIdentity creates a new instance of the registered identity management,
+// including handling of updates from the DSS.
+// This first loads a previously saved identity if available and generates a new
+// identity when no valid identity is known.
+func NewRegisteredIdentity(identityFolder string, domain string, publisherID string,
+) (regIdent *RegisteredIdentity, privKey *ecdsa.PrivateKey) {
+
+	fullIdentity, privKey := SetupPublisherIdentity(
+		identityFolder, domain, publisherID, nil)
+
+	regIdent = &RegisteredIdentity{
+		domain:       domain,
+		fullIdentity: fullIdentity,
+		privateKey:   privKey,
+		publisherID:  publisherID,
 	}
-	return regIdent
+	return regIdent, privKey
 }

@@ -56,16 +56,22 @@ func TestUpdateIdentity(t *testing.T) {
 	const domain = "test"
 	const publisher1ID = "pub1"
 	const dssID = types.DSSPublisherID
+	var pubKeys = make(map[string]*ecdsa.PublicKey)
+
+	regIdentity, privKey := identities.NewRegisteredIdentity(configFolder, domain, publisher1ID)
+	pubKeys[regIdentity.GetAddress()] = &privKey.PublicKey
+
+	// privKey := messaging.CreateAsymKeys()
+	// var pubKey *ecdsa.PublicKey = &privKey.PublicKey
+	getPubKey := func(address string) *ecdsa.PublicKey {
+		return pubKeys[address]
+	}
+
 	var msgConfig *messaging.MessengerConfig = &messaging.MessengerConfig{Domain: domain}
 	messenger := messaging.NewDummyMessenger(msgConfig)
-	privKey := messaging.CreateAsymKeys()
-	var pubKey *ecdsa.PublicKey = &privKey.PublicKey
-	getPubKey := func(address string) *ecdsa.PublicKey {
-		return pubKey
-	}
-	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
-	regIdentity := identities.NewRegisteredIdentity(domain, publisher1ID, privKey, signer)
-	regIdentity.Start()
+	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
+	rxIdent := identities.NewReceiveRegisteredIdentityUpdate(regIdentity, signer)
+	rxIdent.Start()
 
 	// The DSS is the only one that can update an identity
 	// dssPub := identities.NewPublisher(configFolder, cacheFolder, domain, types.DSSPublisherID, false, messenger)
@@ -73,51 +79,72 @@ func TestUpdateIdentity(t *testing.T) {
 	// dssKeys := dssPub.GetIdentityKeys()
 	// time.Sleep(time.Second)
 
-	// Create the self-signed DSS identity
+	// Create the self-signed DSS identity who will publish the new identity
 	dssIdent, dssKeys := identities.CreateIdentity(domain, dssID)
-	dssIdent.IssuerName = "dss"
+	pubKeys[dssIdent.Address] = &dssKeys.PublicKey
+	dssIdent.IssuerID = dssIdent.PublisherID
 	dssIdent.Organization = "iotdomain.org"
 	dssIdent.Sender = identities.MakePublisherIdentityAddress(domain, dssID)
-	dssIdent.IdentitySignature = messaging.CreateIdentitySignature(&dssIdent.PublisherIdentityMessage, dssKeys)
-	// payload, _ := json.MarshalIndent(dssIdent, " ", " ")
-	// signedPMessage, err := messaging.CreateJWSSignature(string(payload), dssKeys)
-	// encryptedMessage, err := messaging.EncryptMessage(signedPMessage, &privKey.PublicKey)
-	// assert.NoErrorf(t, err, "Encryption of test message failed")
-	//
-	// next, create a new identity for this publisher and publish it
+	messaging.SignIdentity(&dssIdent.PublisherIdentityMessage, dssKeys)
+	regIdentity.SetDssKey(&dssKeys.PublicKey)
+
+	// next, create a new identity to publish
 	newFullIdent, _ := identities.CreateIdentity(domain, publisher1ID)
-	newFullIdent.IssuerName = "dss"
-	newFullIdent.Organization = "tester"
+	newFullIdent.IssuerID = dssIdent.PublisherID
+	newFullIdent.Organization = "tester1"
 	newFullIdent.Sender = dssIdent.Sender
-	newFullIdent.IdentitySignature = messaging.CreateIdentitySignature(&newFullIdent.PublisherIdentityMessage, dssKeys)
+	messaging.SignIdentity(&newFullIdent.PublisherIdentityMessage, dssKeys)
 	payload, _ := json.MarshalIndent(newFullIdent, " ", " ")
+
+	// test update the identity directly, if that doesn't work then the rest will fail too
+	regIdentity.UpdateIdentity(newFullIdent)
+	ident2, _ := regIdentity.GetIdentity()
+	require.Equal(t, "tester1", ident2.Organization, "Identity not updated")
+
+	// test through publishing
+	newFullIdent.Organization = "tester2"
+	messaging.SignIdentity(&newFullIdent.PublisherIdentityMessage, dssKeys)
+	payload, _ = json.MarshalIndent(newFullIdent, " ", " ")
 	signedMessage, _ := messaging.CreateJWSSignature(string(payload), dssKeys)
 	encryptedMessage, _ := messaging.EncryptMessage(signedMessage, &privKey.PublicKey)
 
-	// Signer to use dss for sig verification
-	pubKey = &dssKeys.PublicKey
-	regIdentity.HandleIdentityUpdate(newFullIdent.Address, encryptedMessage)
-	// compare results
-	assert.Equal(t, "tester", regIdentity.FullIdentity.Organization, "Identity not updated")
+	// publish and receive the identity
+	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, encryptedMessage)
+	ident2, _ = regIdentity.GetIdentity()
+	assert.Equal(t, "tester2", ident2.Organization, "Identity not updated")
 
-	// error cases - unsigned but encrypted
+	// error case - unsigned but encrypted
 	encryptedMessage, _ = messaging.EncryptMessage(string(payload), &privKey.PublicKey)
-	regIdentity.HandleIdentityUpdate(newFullIdent.Address, encryptedMessage)
-	// error cases - signed but not encrypted
-	regIdentity.HandleIdentityUpdate(newFullIdent.Address, signedMessage)
-	// error cases - sender is not dss
+	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, encryptedMessage)
+
+	// error case - signed but not encrypted
+	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, signedMessage)
+
+	// error case - sender is not the dss
 	newFullIdent.Sender = "someoneelse"
+	pubKeys[newFullIdent.Sender] = &dssKeys.PublicKey
 	payload, _ = json.MarshalIndent(newFullIdent, " ", " ")
 	signedMessage, _ = messaging.CreateJWSSignature(string(payload), dssKeys)
 	encryptedMessage, _ = messaging.EncryptMessage(signedMessage, &privKey.PublicKey)
-	regIdentity.HandleIdentityUpdate(newFullIdent.Address, encryptedMessage)
-	assert.Equal(t, dssIdent.Sender, regIdentity.FullIdentity.Sender, "Identity with invalid sender should not be accepted")
+	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, encryptedMessage)
+	ident3, _ := regIdentity.GetIdentity()
+	assert.Equal(t, dssIdent.Sender, ident3.Sender, "Identity with invalid sender should not be accepted")
+
+	// error case - domain doesn't match
+	newFullIdent.Sender = dssIdent.Sender
+	newFullIdent.Domain = "wrong"
+	payload, _ = json.MarshalIndent(newFullIdent, " ", " ")
+	signedMessage, _ = messaging.CreateJWSSignature(string(payload), dssKeys)
+	encryptedMessage, _ = messaging.EncryptMessage(signedMessage, &privKey.PublicKey)
+	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, encryptedMessage)
+	ident4, _ := regIdentity.GetIdentity()
+	assert.Equal(t, domain, ident4.Domain, "Identity with invalid domain should not be accepted")
 
 	// update and re-publish, verification should fail as the signature no longer matches
-	regIdentity.FullIdentity.Location = "here"
-	regIdentity.PublishIdentity()
+	ident3.Location = "here"
+	regIdentity.PublishIdentity(signer)
 
-	regIdentity.Stop()
+	rxIdent.Stop()
 
 }
 
@@ -126,31 +153,32 @@ func TestVerifyIdentity(t *testing.T) {
 
 	const publisherID = "publisher1"
 	// regIdent := identities.NewRegisteredIdentity(nil)
+	// create and verify self-signed identity
 	ident, privKey := identities.CreateIdentity(domain, publisherID)
 	_ = privKey
 	assert.NotEmpty(t, ident, "Identity not created")
 	assert.Equal(t, domain, ident.Domain)
 	assert.Equal(t, publisherID, ident.PublisherID)
 
-	err := identities.VerifyIdentity(ident, domain, publisherID, &privKey.PublicKey)
+	err := identities.VerifyFullIdentity(ident, domain, publisherID, &privKey.PublicKey)
 	assert.NoError(t, err, "Self signed signature should verify against the identity")
 
 	// error case - missing public key in identity
 	ident2 := *ident
 	ident2.PublicKey = ""
-	err = identities.VerifyIdentity(&ident2, domain, publisherID, nil)
+	err = identities.VerifyFullIdentity(&ident2, domain, publisherID, nil)
 	assert.Errorf(t, err, "Identity without public key should fail")
 
 	// error case - identity signature doesn't match content
 	ident2.Location = "not a location"
-	err = identities.VerifyIdentity(&ident2, domain, publisherID, nil)
+	err = identities.VerifyFullIdentity(&ident2, domain, publisherID, nil)
 	assert.Errorf(t, err, "Identity signature should mispatch")
 
 	// error case - identity expired after 366 days
 	ident3 := *ident
 	expiredTime := time.Now().Add(-time.Hour * 24 * 366)
 	ident3.ValidUntil = expiredTime.Format(types.TimeFormat)
-	err = identities.VerifyIdentity(&ident3, domain, publisherID, nil)
+	err = identities.VerifyFullIdentity(&ident3, domain, publisherID, nil)
 	assert.Errorf(t, err, "Identity is expired")
 
 	// error case - identity public key must match its private key
@@ -165,19 +193,18 @@ func TestVerifyIdentity(t *testing.T) {
 	err = messaging.VerifyEcdsaSignature(payload, sig, &privKey.PublicKey)
 	assert.NoError(t, err)
 	ident4.IdentitySignature = sig
-	err = identities.VerifyIdentity(&ident4, domain, publisherID, &privKey.PublicKey)
+	err = identities.VerifyFullIdentity(&ident4, domain, publisherID, &privKey.PublicKey)
 	assert.NoError(t, err, "Signature should verify against the identity")
-	// but not when modified
+	// verification fails when identity is modified
 	ident4.Location = "not a location"
-	ident4.IdentitySignature = messaging.CreateIdentitySignature(&ident4.PublisherIdentityMessage, privKey)
-	err = identities.VerifyIdentity(&ident4, domain, publisherID, &privKey.PublicKey)
+	err = identities.VerifyFullIdentity(&ident4, domain, publisherID, &privKey.PublicKey)
 	assert.Error(t, err, "Signature should fail against a modified identity")
 
 	// mismatch in public/private key of identity
 	ident4 = *ident
 	newPrivKey := messaging.CreateAsymKeys()
 	ident4.PrivateKey = messaging.PrivateKeyToPem(newPrivKey)
-	err = identities.VerifyIdentity(&ident4, domain, publisherID, &privKey.PublicKey)
+	err = identities.VerifyFullIdentity(&ident4, domain, publisherID, &privKey.PublicKey)
 	assert.Error(t, err, "Signature should fail against a mismatched public/private key pem in the identity ")
 
 }

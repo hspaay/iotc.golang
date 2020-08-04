@@ -19,7 +19,7 @@ const (
 	MessageTypeNodeDiscovery   = "$node"      // node discovery, payload is Node object
 	MessageTypeNodeAlias       = "$alias"     // set node alias, payload is NodeAliasMessage
 	MessageTypeOutputDiscovery = "$output"    // output discovery, payload output definition
-	MessageTypeSet             = "$set"       // control input command, payload is input value
+	MessageTypeSet             = "$set"       // command to set input value, payload is input value
 	MessageTypeUpgrade         = "$upgrade"   // perform firmware upgrade, payload is UpgradeMessage
 	MessageTypeRaw             = "$raw"       // raw output value
 	// LocaldomainID for local-only domains (eg, no sharing outside this domain)

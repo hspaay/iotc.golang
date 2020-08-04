@@ -13,8 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// NodeAliasHandler callback when command to change a node alias
-type NodeAliasHandler func(address string, message *types.NodeAliasMessage)
+// SetNodeAliasHandler callback when command to change a node alias
+type SetNodeAliasHandler func(nodeAddress string, message *types.NodeAliasMessage)
 
 // ReceiveNodeAlias listener
 // This decrypts incoming messages, determines the sender and verifies the signature with
@@ -24,12 +24,12 @@ type ReceiveNodeAlias struct {
 	publisherID     string                   // the registered publisher for the inputs
 	messageSigner   *messaging.MessageSigner // subscription and publication messenger
 	privateKey      *ecdsa.PrivateKey        // private key for decrypting set command messages
-	setAliasHandler NodeAliasHandler         // handler to pass the set command to
+	setAliasHandler SetNodeAliasHandler      // handler to pass the set alias command to
 	updateMutex     *sync.Mutex              // mutex for async handling of inputs
 }
 
 // SetAliasHandler set the handler for updating node inputs
-func (setAlias *ReceiveNodeAlias) SetAliasHandler(handler func(address string, message *types.NodeAliasMessage)) {
+func (setAlias *ReceiveNodeAlias) SetAliasHandler(handler func(nodeAddress string, message *types.NodeAliasMessage)) {
 	setAlias.setAliasHandler = handler
 }
 
@@ -37,7 +37,7 @@ func (setAlias *ReceiveNodeAlias) SetAliasHandler(handler func(address string, m
 func (setAlias *ReceiveNodeAlias) Start() {
 	setAlias.updateMutex.Lock()
 	defer setAlias.updateMutex.Unlock()
-	addr := MakeAliasAddress(setAlias.domain, setAlias.publisherID, "+")
+	addr := MakeSetAliasAddress(setAlias.domain, setAlias.publisherID, "+")
 	setAlias.messageSigner.Subscribe(addr, setAlias.decodeAliasCommand)
 }
 
@@ -45,20 +45,20 @@ func (setAlias *ReceiveNodeAlias) Start() {
 func (setAlias *ReceiveNodeAlias) Stop() {
 	setAlias.updateMutex.Lock()
 	defer setAlias.updateMutex.Unlock()
-	addr := MakeAliasAddress(setAlias.domain, setAlias.publisherID, "+")
+	addr := MakeSetAliasAddress(setAlias.domain, setAlias.publisherID, "+")
 	setAlias.messageSigner.Unsubscribe(addr, setAlias.decodeAliasCommand)
 }
 
 // decodeSetCommand decrypts and verifies the signature of an incoming set command.
 // If successful this passes the set command to the setInputHandler callback
-func (setAlias *ReceiveNodeAlias) decodeAliasCommand(address string, message string) error {
+func (setAlias *ReceiveNodeAlias) decodeAliasCommand(setAddress string, message string) error {
 	var aliasMessage types.NodeAliasMessage
 
 	// Check that address is one of our inputs
-	segments := strings.Split(address, "/")
+	segments := strings.Split(setAddress, "/")
 	// a full address is required: domain/pub/node/$alias
 	if len(segments) < 4 {
-		return lib.MakeErrorf("decodeAliasCommand: address '%s' is incomplete", address)
+		return lib.MakeErrorf("decodeAliasCommand: address '%s' is incomplete", setAddress)
 	}
 	// determine which node this message is for
 	segments[3] = types.MessageTypeNodeDiscovery
@@ -67,26 +67,26 @@ func (setAlias *ReceiveNodeAlias) decodeAliasCommand(address string, message str
 	isEncrypted, isSigned, err := setAlias.messageSigner.DecodeMessage(message, &aliasMessage)
 
 	if !isEncrypted {
-		return lib.MakeErrorf("decodeAliasCommand: Alias update of '%s' is not encrypted. Message discarded.", address)
+		return lib.MakeErrorf("decodeAliasCommand: Alias update of '%s' is not encrypted. Message discarded.", setAddress)
 	} else if !isSigned {
-		return lib.MakeErrorf("decodeAliasCommand: Alias update of '%s' is not signed. Message discarded.", address)
+		return lib.MakeErrorf("decodeAliasCommand: Alias update of '%s' is not signed. Message discarded.", setAddress)
 	} else if err != nil {
-		return lib.MakeErrorf("decodeAliasCommand: Message to %s. Error %s'. Message discarded.", address, err)
+		return lib.MakeErrorf("decodeAliasCommand: Message to %s. Error %s'. Message discarded.", setAddress, err)
 	}
 
-	logrus.Infof("decodeAliasCommand on address %s. isEncrypted=%t, isSigned=%t", address, isEncrypted, isSigned)
+	logrus.Infof("decodeAliasCommand on address %s. isEncrypted=%t, isSigned=%t", setAddress, isEncrypted, isSigned)
 
 	if setAlias.setAliasHandler != nil {
 		setAlias.setAliasHandler(nodeAddr, &aliasMessage)
 	} else {
-		logrus.Errorf("decodeAliasCommand input command on address %s, but SetNodeInputHandler was used. Ignored.", address)
+		logrus.Errorf("decodeAliasCommand: set alias command on address %s received, but no handler is configured.", setAddress)
 	}
 	return nil
 }
 
-// MakeAliasAddress creates the address used to update a node's alias
+// MakeSetAliasAddress creates the address used to update a node's alias
 // nodeAddress is an address containing the node.
-func MakeAliasAddress(domain string, publisherID string, nodeID string) string {
+func MakeSetAliasAddress(domain string, publisherID string, nodeID string) string {
 
 	address := fmt.Sprintf("%s/%s/%s/"+types.MessageTypeNodeAlias, domain, publisherID, nodeID)
 	return address

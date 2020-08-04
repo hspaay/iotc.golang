@@ -24,14 +24,15 @@ func TestCreateSetInput(t *testing.T) {
 	const input1Type = types.InputTypeTemperature
 
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
+	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
 	registeredInputs := inputs.NewRegisteredInputs(domain, publisher1ID)
 
-	receiver := inputs.NewInputFromSetCommands(domain, publisher1ID,
+	receiver := inputs.NewReceiveFromSetCommands(domain, publisher1ID,
 		signer, registeredInputs)
 
+	inputID := inputs.MakeInputID(node1ID, input1Type, types.DefaultInputInstance)
 	receiver.CreateInput(node1ID, input1Type, types.DefaultInputInstance, nil)
-	receiver.DeleteInput(node1ID, input1Type, types.DefaultInputInstance)
+	receiver.DeleteInput(inputID)
 
 }
 
@@ -47,18 +48,18 @@ func TestPublishSetInput(t *testing.T) {
 	var signatureVerificationKey = &privKey.PublicKey
 
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, func(addr string) *ecdsa.PublicKey {
+	signer := messaging.NewMessageSigner(msgr, privKey, func(addr string) *ecdsa.PublicKey {
 		return signatureVerificationKey
-	}, msgr, privKey)
+	})
 
-	inputHandler := func(address string, sender string, value string) {
-		logrus.Printf("Received set message for input %s from %s", address, sender)
-		receivedInputs[address] = value
+	inputHandler := func(input *types.InputDiscoveryMessage, sender string, value string) {
+		logrus.Printf("Received set message for input %s from %s", input.InputID, sender)
+		receivedInputs[input.Address] = value
 	}
 
 	registeredInputs := inputs.NewRegisteredInputs(domain, publisher1ID)
 	// the receiver registers the inputs and listens for set commands
-	receiver := inputs.NewInputFromSetCommands(domain, publisher1ID, signer, registeredInputs)
+	receiver := inputs.NewReceiveFromSetCommands(domain, publisher1ID, signer, registeredInputs)
 
 	// publish the encrypted set input message for node 1 temperature
 	receiver.CreateInput(node1ID, input1Type, types.DefaultInputInstance, inputHandler)
@@ -102,6 +103,10 @@ func TestPublishSetInput(t *testing.T) {
 	// signer.PublishObject(setInput1Addr, false, setMsg, &privKey.PublicKey)
 	rxMsg = receivedInputs[input1Addr]
 	assert.Equal(t, "content1", rxMsg, "Set message content doesnt match")
+
+	// using a non input address should return an error
+	err := inputs.PublishSetInput(node1Base, setMsg.Value, setMsg.Sender, signer, &privKey.PublicKey)
+	assert.Error(t, err, "Non input address should result in error")
 
 	// older message should be rejected - protect against replay attack
 	signer.PublishObject(setInput1Addr, false, setMsgOld, &privKey.PublicKey)

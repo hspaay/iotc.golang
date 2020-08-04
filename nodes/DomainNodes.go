@@ -13,11 +13,8 @@ import (
 
 // DomainNodes manages nodes discovered on the domain
 type DomainNodes struct {
-	c lib.DomainCollection //
-
-	// nodeMap       map[string]*types.NodeDiscoveryMessage // registered nodes by node address
-	// messageSigner *messaging.MessageSigner               // subscription to input discovery messages
-	// updateMutex   *sync.Mutex                            // mutex for async updating of nodes
+	c             lib.DomainCollection     //
+	messageSigner *messaging.MessageSigner // subscription to input discovery messages
 }
 
 // AddNode adds or replaces a discovered node
@@ -101,13 +98,13 @@ func (domainNodes *DomainNodes) Start() {
 	// subscription address for all inputs domain/publisher/node/$node
 	// TODO: Only subscribe to selected publishers
 	address := MakeNodeDiscoveryAddress("+", "+", "+")
-	domainNodes.c.MessageSigner.Subscribe(address, domainNodes.handleDiscoverNode)
+	domainNodes.messageSigner.Subscribe(address, domainNodes.handleDiscoverNode)
 }
 
 // Stop polling for nodes
 func (domainNodes *DomainNodes) Stop() {
 	address := MakeNodeDiscoveryAddress("+", "+", "+")
-	domainNodes.c.MessageSigner.Unsubscribe(address, domainNodes.handleDiscoverNode)
+	domainNodes.messageSigner.Unsubscribe(address, domainNodes.handleDiscoverNode)
 }
 
 // getNode returns a node by its discovery address
@@ -140,8 +137,12 @@ func (domainNodes *DomainNodes) handleDiscoverNode(address string, message strin
 // NewDomainNodes creates a new instance for domain node management.
 //  messageSigner is used to receive signed node discovery messages
 func NewDomainNodes(messageSigner *messaging.MessageSigner) *DomainNodes {
+	domainCollection := lib.NewDomainCollection(
+		reflect.TypeOf(&types.NodeDiscoveryMessage{}), messageSigner.GetPublicKey)
+
 	domainNodes := DomainNodes{
-		c: lib.NewDomainCollection(messageSigner, reflect.TypeOf(&types.NodeDiscoveryMessage{})),
+		c:             domainCollection,
+		messageSigner: messageSigner,
 	}
 	return &domainNodes
 }

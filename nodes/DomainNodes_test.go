@@ -27,7 +27,7 @@ func TestNewDomainNodes(t *testing.T) {
 		return &privKey.PublicKey
 	}
 	messenger := messaging.NewDummyMessenger(dummyConfig)
-	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
+	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
 
 	collection := nodes.NewDomainNodes(signer)
 	require.NotNil(t, collection, "Failed creating registered node collection")
@@ -86,7 +86,7 @@ func TestDiscoverDomainNodes(t *testing.T) {
 		return &privKey.PublicKey
 	}
 	messenger := messaging.NewDummyMessenger(dummyConfig)
-	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
+	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
 
 	collection := nodes.NewDomainNodes(signer)
 	require.NotNil(t, collection, "Failed creating registered node collection")

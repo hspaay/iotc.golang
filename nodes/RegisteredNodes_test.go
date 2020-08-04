@@ -45,7 +45,7 @@ func TestNewNode(t *testing.T) {
 	}
 	node2 := collection.GetNodeByAddress(node1Addr)
 	require.NotNil(t, node2, "Failed getting created node")
-	node2b := collection.GetNodeByID(node1ID)
+	node2b := collection.GetNodeByNodeID(node1ID)
 	require.NotNil(t, node2b)
 	node3 := collection.GetNodeByAddress("not/valid")
 	require.Nil(t, node3, "Get node invalid address")
@@ -214,7 +214,7 @@ func TestReceiveConfig(t *testing.T) {
 	node1 := collection.CreateNode(node1ID, types.NodeTypeUnknown)
 
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
+	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
 	// receive
 	receiver := nodes.NewReceiveNodeConfigure(domain, publisher1ID, nil, signer, collection, privKey)
 	receiver.SetConfigureNodeHandler(handler)
@@ -247,18 +247,18 @@ func TestAlias(t *testing.T) {
 	// var testMessenger = messaging.NewDummyMessenger(&msgConfig)
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 
-	collection.CreateNode(node1ID, types.NodeTypeUnknown)
-	collection.SetAlias(node1ID, node1AliasID)
+	node1 := collection.CreateNode(node1ID, types.NodeTypeUnknown)
+	collection.SetAlias(node1, node1AliasID)
 
-	node2 := collection.GetNodeByID(node1AliasID)
+	node2 := collection.GetNodeByNodeID(node1AliasID)
 	assert.NotNil(t, node2, "Node not found using alias")
-	collection.SetAlias(node1AliasID, "") // clear alias
-	node2 = collection.GetNodeByID(node1AliasID)
+	collection.SetAlias(node2, "") // clear alias
+	node2 = collection.GetNodeByNodeID(node1AliasID)
 	// assert.Nil(t, node2, "Node found using alias")
 
 	// error cases
-	collection.SetAlias("invalid", node1AliasID) // invalid nodeID
-	collection.SetAlias(node1AliasID, node1ID)   // ignored as this is an existing device
+	collection.SetAlias(nil, node1AliasID) // invalid nodeID
+	collection.SetAlias(node2, node1ID)    // ignored as this is an existing device
 
 	var privKey = messaging.CreateAsymKeys()
 
@@ -267,19 +267,22 @@ func TestAlias(t *testing.T) {
 	}
 
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
+	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
 	aliasHandler := func(address string, message *types.NodeAliasMessage) {
-		// collection.HandleAlias()
+		collection.HandleSetAliasMessage(address, message)
 	}
 	receiver := nodes.NewReceiveNodeAlias(domain, publisher1ID, nil, signer, privKey)
 	receiver.SetAliasHandler(aliasHandler)
 	receiver.Start()
 
-	err := nodes.PublishNodeAlias(node1Addr, node1AliasID, "sender", signer, &privKey.PublicKey)
+	//
+	err := nodes.PublishNodeAliasCommand(node1Addr, node1AliasID, "sender", signer, &privKey.PublicKey)
 	assert.NoErrorf(t, err, "Publish set alias failed: %s", err)
-	node2 = collection.GetNodeByID(node1AliasID)
+	node2 = collection.GetNodeByNodeID(node1AliasID)
 	assert.NotNil(t, node2, "Node not found using alias")
-	err = nodes.PublishNodeAlias("Invalid Address", node1AliasID, "sender", signer, &privKey.PublicKey)
+
+	// error case - publish alias command to non existing address
+	err = nodes.PublishNodeAliasCommand("Invalid Address", node1AliasID, "sender", signer, &privKey.PublicKey)
 	assert.Errorf(t, err, "Publish with invalid address didnt fail")
 
 	receiver.Stop()
@@ -302,7 +305,7 @@ func TestPublishReceive(t *testing.T) {
 	}
 
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
+	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 
 	node := collection.CreateNode(node1ID, types.NodeTypeUnknown)

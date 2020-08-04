@@ -1,14 +1,14 @@
 {
   "address": "test/publisher1/$identity",
   "domain": "test",
-  "issuerName": "publisher1",
+  "issuerId": "publisher1",
   "location": "local",
   "organization": "",
-  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXXmyMerQVL4N0Tf8cjWCmcmyFl9+\nnUhhJQee9AalIpeZ8DoWm+zq7nUhj5Mf1khBsOVciVfqwdsmNdTT0fjnNw==\n-----END PUBLIC KEY-----\n",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgzH56B5dwQ+3tBm3q4jhLOkX0Ncd\nNXMqunjvDHfd1LbZ9unnHVv1ezUjOoXesRbWGyX8cwBcOzmuN3jLmchNMg==\n-----END PUBLIC KEY-----\n",
   "publisherId": "publisher1",
-  "validUntil": "2021-07-29T22:21:16.380-0700",
-  "signature": "MEUCIQDnB61_j1R257onVAlzrPeJKimVcxzelZlQaojBZwTLqgIgFG061BGSBNHmW0oN7jUvBmcJv9YQkbe3BRNxwXa3YfU=",
-  "timestamp": "2020-07-29T22:21:16.380-0700",
-  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIPpEXaNoBMVChR8tVIb4IyvoGBbUjqOxJeqapCRbJYWAoAoGCCqGSM49\nAwEHoUQDQgAEXXmyMerQVL4N0Tf8cjWCmcmyFl9+nUhhJQee9AalIpeZ8DoWm+zq\n7nUhj5Mf1khBsOVciVfqwdsmNdTT0fjnNw==\n-----END PRIVATE KEY-----\n",
+  "validUntil": "2021-08-03T18:13:18.554-0700",
+  "signature": "MEUCIB6q5JH0RPoWFKKOadNAu9eztV41sh_ZEXKBZrECjaGeAiEAukeshJ25RWc1smjqpUGN7r4dIbd2vSIMN8qFYSUszxo=",
+  "timestamp": "2020-08-03T18:13:18.554-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEIL2rOSEzareaaofrJEi42uJeSTYpOSTzhIjO5kKDgr3hoAoGCCqGSM49\nAwEHoUQDQgAEgzH56B5dwQ+3tBm3q4jhLOkX0NcdNXMqunjvDHfd1LbZ9unnHVv1\nezUjOoXesRbWGyX8cwBcOzmuN3jLmchNMg==\n-----END PRIVATE KEY-----\n",
   "sender": ""
  }

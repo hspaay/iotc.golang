@@ -16,8 +16,13 @@ func PublishRegisteredNodes(
 
 	// publish updated nodes
 	for _, node := range updatedNodes {
-		logrus.Infof("PublishRegisteredNodes: publish node discovery: %s", node.Address)
-		messageSigner.PublishObject(node.Address, true, node, nil)
+		if node != nil {
+			logrus.Infof("PublishRegisteredNodes: publish node discovery: %s", node.Address)
+			messageSigner.PublishObject(node.Address, true, node, nil)
+		} else {
+			// node was deleted
+			// TODO: remove node from the message bus
+		}
 	}
 	// todo: move to appropriate spot
 	// if len(updatedNodes) > 0 && configFolder != "" {

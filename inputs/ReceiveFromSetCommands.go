@@ -13,10 +13,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// InputFromSetCommands handles set commands aimed at inputs managed by this publisher.
+// ReceiveFromSetCommands handles set commands aimed at inputs managed by this publisher.
 // This decrypts incoming messages determines the sender and verifies the signature with
-// the sender public key.
-type InputFromSetCommands struct {
+// the sender public key. Last it translates from the publishing address to the input ID
+// before passing the request to the handler associated with the input.
+type ReceiveFromSetCommands struct {
 	domain           string // the domain of this publisher
 	publisherID      string // the registered publisher for the inputs
 	isRunning        bool
@@ -29,32 +30,33 @@ type InputFromSetCommands struct {
 }
 
 // CreateInput creates a new input that responds to a set command from the message bus.
-// If an input of the given nodeID, type and instance already exist it will be replaced.
+// If an input of the given deviceID, type and instance already exist it will be replaced.
 // This returns the new input
-func (ifset *InputFromSetCommands) CreateInput(
-	nodeID string, inputType types.InputType, instance string,
-	handler func(inputAddress string, sender string, value string)) *types.InputDiscoveryMessage {
+func (ifset *ReceiveFromSetCommands) CreateInput(
+	deviceID string, inputType types.InputType, instance string,
+	handler func(input *types.InputDiscoveryMessage, sender string, value string)) *types.InputDiscoveryMessage {
 
 	ifset.updateMutex.Lock()
 	defer ifset.updateMutex.Unlock()
 
-	input := ifset.registeredInputs.CreateInput(nodeID, inputType, instance, handler)
-	ifset.subscribeToSetCommand(nodeID, inputType, instance)
+	input := ifset.registeredInputs.CreateInput(deviceID, inputType, instance, handler)
+	// only subscribe if this is a new input
+	ifset.subscribeToSetCommand(input)
 	return input
 }
 
 // DeleteInput deletes the input and unsubscribes to the input's set command
-func (ifset *InputFromSetCommands) DeleteInput(nodeID string, inputType types.InputType, instance string) {
+func (ifset *ReceiveFromSetCommands) DeleteInput(inputID string) {
 	ifset.updateMutex.Lock()
 	defer ifset.updateMutex.Unlock()
 
-	ifset.unsubscribeFromSetCommand(nodeID, inputType, instance)
-	ifset.registeredInputs.DeleteInput(nodeID, inputType, instance)
+	ifset.unsubscribeFromSetCommand(inputID)
+	ifset.registeredInputs.DeleteInput(inputID)
 }
 
 // decodeSetCommand decrypts and verifies the signature of an incoming set command.
 // If successful this passes the set command to the setInputHandler callback
-func (ifset *InputFromSetCommands) decodeSetCommand(address string, message string) error {
+func (ifset *ReceiveFromSetCommands) decodeSetCommand(address string, message string) error {
 	var setMessage types.SetInputMessage
 
 	// Check that address is one of our inputs
@@ -81,23 +83,30 @@ func (ifset *InputFromSetCommands) decodeSetCommand(address string, message stri
 	// Verify this is the most recent message to protect against replay attacks
 	prevTimestamp := ifset.senderTimestamp[setMessage.Sender]
 	if prevTimestamp > setMessage.Timestamp {
-		errText := fmt.Sprintf("decodeSetCommand: earlier timestamp of message to input %s from sender %s. Message discarded.", address, setMessage.Sender)
+		errText := fmt.Sprintf("decodeSetCommand: earlier timestamp of message to input %s from sender %s."+
+			" Message discarded.", address, setMessage.Sender)
 		logrus.Warning(errText)
 		return errors.New(errText)
 	}
 	ifset.senderTimestamp[setMessage.Sender] = setMessage.Timestamp
-	logrus.Infof("decodeSetCommand successful for input %s. isEncrypted=%t, isSigned=%t", address, isEncrypted, isSigned)
+	logrus.Infof("decodeSetCommand successful for input %s. isEncrypted=%t, isSigned=%t",
+		address, isEncrypted, isSigned)
 
 	// the handler is responsible for authorization
-	ifset.registeredInputs.NotifyInputHandler(inputAddr, setMessage.Sender, setMessage.Value)
+	inputID := ifset.registeredInputs.addressMap[inputAddr]
+	ifset.registeredInputs.NotifyInputHandler(inputID, setMessage.Sender, setMessage.Value)
 	return nil
 }
 
 // subscribeToSetCommand to receive set input commands for the given node, type and instance
-func (ifset *InputFromSetCommands) subscribeToSetCommand(nodeID string, inputType types.InputType, instance string) {
-	setAddr := MakeSetInputAddress(ifset.domain, ifset.publisherID, nodeID, inputType, instance)
+func (ifset *ReceiveFromSetCommands) subscribeToSetCommand(input *types.InputDiscoveryMessage) {
+	// change message type $input to $set to make the set address from the input address
+	segments := strings.Split(input.Address, "/")
+	segments[5] = types.MessageTypeSet
+	setAddr := strings.Join(segments, "/")
+
 	// prevent double subscription
-	_, hasSubscription := ifset.subscriptions[setAddr]
+	_, hasSubscription := ifset.subscriptions[input.Address]
 	if !hasSubscription {
 		ifset.subscriptions[setAddr] = setAddr
 		ifset.messageSigner.Subscribe(setAddr, ifset.decodeSetCommand)
@@ -105,8 +114,13 @@ func (ifset *InputFromSetCommands) subscribeToSetCommand(nodeID string, inputTyp
 }
 
 // unsubscribeFromSetCommand removes previous subscription
-func (ifset *InputFromSetCommands) unsubscribeFromSetCommand(nodeID string, inputType types.InputType, instance string) {
-	setAddr := MakeSetInputAddress(ifset.domain, ifset.publisherID, nodeID, inputType, instance)
+func (ifset *ReceiveFromSetCommands) unsubscribeFromSetCommand(inputID string) {
+	// change message type $input to $set to make the set address from the input address
+	input := ifset.registeredInputs.GetInputByID(inputID)
+	segments := strings.Split(input.Address, "/")
+	segments[5] = types.MessageTypeSet
+	setAddr := strings.Join(segments, "/")
+
 	_, hasSubscription := ifset.subscriptions[setAddr]
 	if hasSubscription {
 		delete(ifset.subscriptions, setAddr)
@@ -124,15 +138,15 @@ func MakeSetInputAddress(domain string, publisherID string, nodeID string,
 	return address
 }
 
-// NewInputFromSetCommands returns a new instance of handling of set input commands.
+// NewReceiveFromSetCommands returns a new instance of handling of set input commands.
 // The private key is used to decrypt set commands. Without it, decryption is disabled.
-func NewInputFromSetCommands(
+func NewReceiveFromSetCommands(
 	domain string,
 	publisherID string,
 	messageSigner *messaging.MessageSigner,
-	registeredInputs *RegisteredInputs) *InputFromSetCommands {
+	registeredInputs *RegisteredInputs) *ReceiveFromSetCommands {
 
-	recvsetin := &InputFromSetCommands{
+	recvsetin := &ReceiveFromSetCommands{
 		domain:           domain,
 		messageSigner:    messageSigner,
 		publisherID:      publisherID,

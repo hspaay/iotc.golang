@@ -28,7 +28,7 @@ func TestCreateDomainOutputs(t *testing.T) {
 	getPubKey := func(address string) *ecdsa.PublicKey {
 		return &privKey.PublicKey
 	}
-	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
+	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
 	collection := outputs.NewDomainOutputs(signer)
 
 	output1 := outputs.NewOutput(domain, publisherID, node1ID, out1Type, types.DefaultOutputInstance)
@@ -75,7 +75,7 @@ func TestDiscoverDomainOutputs(t *testing.T) {
 		return &privKey.PublicKey
 	}
 	messenger := messaging.NewDummyMessenger(dummyConfig)
-	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
+	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
 
 	collection := outputs.NewDomainOutputs(signer)
 	require.NotNil(t, collection, "Failed creating registered output collection")

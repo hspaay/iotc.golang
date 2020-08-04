@@ -2,7 +2,6 @@
 package outputs
 
 import (
-	"strings"
 	"sync"
 	"time"
 
@@ -11,17 +10,19 @@ import (
 
 // RegisteredOutputs manages registration of publisher outputs
 type RegisteredOutputs struct {
-	domain         string                                   // the domain of this publisher
-	publisherID    string                                   // the registered publisher for the inputs
-	outputMap      map[string]*types.OutputDiscoveryMessage // output discovery address - object map
-	updatedOutputs map[string]*types.OutputDiscoveryMessage // address of outputs that have been rediscovered/updated since last publication
-	updateMutex    *sync.Mutex                              // mutex for async updating of outputs
+	addressMap       map[string]string                        // lookup outputID by output publication address
+	domain           string                                   // the domain of this publisher
+	publisherID      string                                   // the registered publisher for the inputs
+	outputsByID      map[string]*types.OutputDiscoveryMessage // lookup output by output ID
+	updatedOutputIDs map[string]string                        // IDs of updated outputs
+	updateMutex      *sync.Mutex                              // mutex for async updating of outputs
 }
 
 // CreateOutput creates and registers a new output. If the output already exists, it is replaced.
 func (regOutputs *RegisteredOutputs) CreateOutput(
-	nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
-	output := NewOutput(regOutputs.domain, regOutputs.publisherID, nodeID, outputType, instance)
+	deviceID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
+
+	output := NewOutput(regOutputs.domain, regOutputs.publisherID, deviceID, outputType, instance)
 
 	regOutputs.updateMutex.Lock()
 	defer regOutputs.updateMutex.Unlock()
@@ -35,62 +36,53 @@ func (regOutputs *RegisteredOutputs) GetAllOutputs() []*types.OutputDiscoveryMes
 	defer regOutputs.updateMutex.Unlock()
 
 	var outputList = make([]*types.OutputDiscoveryMessage, 0)
-	for _, output := range regOutputs.outputMap {
+	for _, output := range regOutputs.outputsByID {
 		outputList = append(outputList, output)
 	}
 	return outputList
 }
 
-// GetNodeOutputs returns all outputs for the given node in this list
-// This method is concurrent safe
-func (regOutputs *RegisteredOutputs) GetNodeOutputs(nodeAddress string) []*types.OutputDiscoveryMessage {
-	nodeOutputs := []*types.OutputDiscoveryMessage{}
-	segments := strings.Split(nodeAddress, "/")
-	prefix := strings.Join(segments[:3], "/")
-
-	for _, output := range regOutputs.outputMap {
-		if strings.HasPrefix(output.Address, prefix) {
-			nodeOutputs = append(nodeOutputs, output)
-		}
-	}
-	return nodeOutputs
-}
-
-// GetOutput returns one of this publisher's registered outputs
-// This method is concurrent safe
-// Returns nil if address has no known output
-func (regOutputs *RegisteredOutputs) GetOutput(
-	nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
-	outputAddr := MakeOutputDiscoveryAddress(regOutputs.domain, regOutputs.publisherID, nodeID, outputType, instance)
-
-	regOutputs.updateMutex.Lock()
-	defer regOutputs.updateMutex.Unlock()
-	var output = regOutputs.outputMap[outputAddr]
-	return output
-}
-
 // GetOutputByAddress returns an output by its address
 // outputAddr must contain the full output address, eg <zone>/<publisher>/<node>/"$output"/<type>/<instance>
 // Returns nil if address has no known output
-// This method is concurrent safe
 func (regOutputs *RegisteredOutputs) GetOutputByAddress(outputAddr string) *types.OutputDiscoveryMessage {
 	regOutputs.updateMutex.Lock()
-	var output = regOutputs.outputMap[outputAddr]
-	regOutputs.updateMutex.Unlock()
+	defer regOutputs.updateMutex.Unlock()
+	var outputID = regOutputs.addressMap[outputAddr]
+	output := regOutputs.outputsByID[outputID]
 	return output
 }
 
-// GetOutputsByNode returns a list of all outputs of a given node
-func (regOutputs *RegisteredOutputs) GetOutputsByNode(nodeID string) []*types.OutputDiscoveryMessage {
+// GetOutputsByDeviceID returns a list of all outputs of a given device
+func (regOutputs *RegisteredOutputs) GetOutputsByDeviceID(deviceID string) []*types.OutputDiscoveryMessage {
 	outputList := make([]*types.OutputDiscoveryMessage, 0)
 	regOutputs.updateMutex.Lock()
 	defer regOutputs.updateMutex.Unlock()
-	for _, output := range regOutputs.outputMap {
-		if output.NodeID == nodeID {
+	for _, output := range regOutputs.outputsByID {
+		if output.DeviceID == deviceID {
 			outputList = append(outputList, output)
 		}
 	}
 	return outputList
+}
+
+// GetOutputByDevice returns one of this publisher's registered outputs
+// This method is concurrent safe
+// Returns nil if no known output
+func (regOutputs *RegisteredOutputs) GetOutputByDevice(
+	deviceID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
+
+	outputID := MakeOutputID(deviceID, outputType, instance)
+	return regOutputs.GetOutputByID(outputID)
+}
+
+// GetOutputByID returns an output by its ID (device.type.instance)
+// Returns nil if there is no known output
+func (regOutputs *RegisteredOutputs) GetOutputByID(outputID string) *types.OutputDiscoveryMessage {
+	regOutputs.updateMutex.Lock()
+	defer regOutputs.updateMutex.Unlock()
+	var output = regOutputs.outputsByID[outputID]
+	return output
 }
 
 // GetUpdatedOutputs returns the list of discovered outputs that have been updated
@@ -99,31 +91,31 @@ func (regOutputs *RegisteredOutputs) GetUpdatedOutputs(clearUpdates bool) []*typ
 	var updateList []*types.OutputDiscoveryMessage = make([]*types.OutputDiscoveryMessage, 0)
 
 	regOutputs.updateMutex.Lock()
-	if regOutputs.updatedOutputs != nil {
-		for _, output := range regOutputs.updatedOutputs {
-			updateList = append(updateList, output)
+	if regOutputs.updatedOutputIDs != nil {
+		for _, outputID := range regOutputs.updatedOutputIDs {
+			output := regOutputs.outputsByID[outputID]
+			if output != nil {
+				updateList = append(updateList, output)
+			}
 		}
 		if clearUpdates {
-			regOutputs.updatedOutputs = nil
+			regOutputs.updatedOutputIDs = nil
 		}
 	}
 	regOutputs.updateMutex.Unlock()
 	return updateList
 }
 
-// SetAlias updates the address of all inputs of the given nodeID using the alias instead
-func (regOutputs *RegisteredOutputs) SetAlias(nodeID string, alias string) {
-	nodeOutputs := regOutputs.GetOutputsByNode(nodeID)
-	for _, output := range nodeOutputs {
-		oldAddress := output.Address
+// SetAlias updates the address of all inputs with the given deviceID using the alias instead
+func (regOutputs *RegisteredOutputs) SetAlias(deviceID string, alias string) {
+	outputList := regOutputs.GetOutputsByDeviceID(deviceID)
+	for _, output := range outputList {
 		newAddress := MakeOutputDiscoveryAddress(
 			regOutputs.domain, regOutputs.publisherID, alias, output.OutputType, output.Instance)
 		output.Address = newAddress
-		output.NodeID = alias
 
 		regOutputs.updateMutex.Lock()
 		defer regOutputs.updateMutex.Unlock()
-		delete(regOutputs.outputMap, oldAddress)
 		regOutputs.updateOutput(output)
 	}
 }
@@ -131,28 +123,40 @@ func (regOutputs *RegisteredOutputs) SetAlias(nodeID string, alias string) {
 // UpdateOutput replaces the output and updates its timestamp.
 // For internal use only. Use within locked section.
 func (regOutputs *RegisteredOutputs) updateOutput(output *types.OutputDiscoveryMessage) {
-	regOutputs.outputMap[output.Address] = output
-	if regOutputs.updatedOutputs == nil {
-		regOutputs.updatedOutputs = make(map[string]*types.OutputDiscoveryMessage)
+
+	regOutputs.outputsByID[output.OutputID] = output
+	regOutputs.addressMap[output.Address] = output.OutputID
+
+	if regOutputs.updatedOutputIDs == nil {
+		regOutputs.updatedOutputIDs = make(map[string]string)
 	}
 	output.Timestamp = time.Now().Format(types.TimeFormat)
-
-	regOutputs.updatedOutputs[output.Address] = output
+	regOutputs.updatedOutputIDs[output.OutputID] = output.OutputID
 }
 
-// NewOutput creates a new output for the given node address.
+// MakeOutputID creates the internal ID to identify the output of the owning deviceID or serviceID.
+func MakeOutputID(deviceID string, outputType types.OutputType, instance string) string {
+	outputID := deviceID + "." + string(outputType) + "." + instance
+	return outputID
+}
+
+// NewOutput creates a new output for the given device .
 // It is not immediately added to allow for further updates of the ouput definition.
 // To add it to the list use 'UpdateOutput'
-func NewOutput(domain string, publisherID string, nodeID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
-	address := MakeOutputDiscoveryAddress(domain, publisherID, nodeID, outputType, instance)
+func NewOutput(domain string, publisherID string, deviceID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
+	address := MakeOutputDiscoveryAddress(domain, publisherID, deviceID, outputType, instance)
+
+	outputID := MakeOutputID(deviceID, outputType, instance)
 
 	output := &types.OutputDiscoveryMessage{
-		Address:     address,
-		PublisherID: publisherID,
-		NodeID:      nodeID,
-		OutputType:  outputType,
+		Address:   address,
+		Timestamp: time.Now().Format(types.TimeFormat),
+		// internal use only
+		DeviceID:    deviceID,
 		Instance:    instance,
-		Timestamp:   time.Now().Format(types.TimeFormat),
+		OutputID:    outputID,
+		OutputType:  outputType,
+		PublisherID: publisherID,
 	}
 	return output
 }
@@ -162,7 +166,8 @@ func NewRegisteredOutputs(domain string, publisherID string) *RegisteredOutputs 
 	regOutputs := RegisteredOutputs{
 		domain:      domain,
 		publisherID: publisherID,
-		outputMap:   make(map[string]*types.OutputDiscoveryMessage),
+		addressMap:  make(map[string]string),
+		outputsByID: make(map[string]*types.OutputDiscoveryMessage),
 		updateMutex: &sync.Mutex{},
 	}
 	return &regOutputs

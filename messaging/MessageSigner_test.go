@@ -186,7 +186,7 @@ func TestVerifySender(t *testing.T) {
 	payload2, err = json.Marshal(testObject2)
 	sig2, err = messaging.CreateJWSSignature(string(payload2), privKey)
 	isSigned, err = messaging.VerifySenderJWSSignature(sig2, &received2, nil)
-	assert.Errorf(t, err, "Verification with invalid message succeeded")
+	assert.NoErrorf(t, err, "Verification without public key lookup function should succeed")
 	assert.True(t, isSigned, "Message wasn't signed")
 
 	// no public key for sender
@@ -245,7 +245,7 @@ func TestSigner(t *testing.T) {
 	getPubKey := func(address string) *ecdsa.PublicKey {
 		return &privKey.PublicKey
 	}
-	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
+	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
 
 	handler := func(address string, rawMessage string) error {
 		obj := TestObjectWithSender{}
@@ -292,13 +292,15 @@ func TestSigner(t *testing.T) {
 func TestSignIdentity(t *testing.T) {
 	dssKeys := messaging.CreateAsymKeys()
 	newIdent := types.PublisherFullIdentity{}
-	newIdent.IssuerName = "dss"
+	newIdent.IssuerID = types.DSSPublisherID
 	newIdent.Organization = "iotdomain.org"
 	newIdent.IdentitySignature = ""
-	identSignature := messaging.CreateIdentitySignature(&newIdent.PublisherIdentityMessage, dssKeys)
-	assert.NotNil(t, identSignature, "Signing identity fails")
 
-	// verify the signature
+	// signing identity should generate the signature
+	messaging.SignIdentity(&newIdent.PublisherIdentityMessage, dssKeys)
+	assert.NotEmpty(t, newIdent.IdentitySignature, "Signing identity fails")
+
+	// the generated signature must verify correctly
 	err := messaging.VerifyIdentitySignature(&newIdent.PublisherIdentityMessage, &dssKeys.PublicKey)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 }

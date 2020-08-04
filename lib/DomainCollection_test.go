@@ -24,9 +24,9 @@ func TestCreateCollection(t *testing.T) {
 	item2InputAddr := item2InputBase + "/$input"
 	config := messaging.MessengerConfig{}
 	msg := messaging.NewDummyMessenger(&config)
-	signer := messaging.NewMessageSigner(false, nil, msg, nil)
+	signer := messaging.NewMessageSigner(msg, nil, nil)
 
-	c := lib.NewDomainCollection(signer, reflect.TypeOf(&item1))
+	c := lib.NewDomainCollection(reflect.TypeOf(&item1), signer.GetPublicKey)
 	require.NotNil(t, c)
 	c.Add(item1Addr, &item1)
 	c.Add(item2InputAddr, &item2)
@@ -71,9 +71,9 @@ func TestDiscovery(t *testing.T) {
 	item1 := ItemType{PublisherID: "Hello", Name: "World"}
 	config := messaging.MessengerConfig{}
 	msg := messaging.NewDummyMessenger(&config)
-	signer := messaging.NewMessageSigner(false, nil, msg, privKey)
+	signer := messaging.NewMessageSigner(msg, privKey, nil)
 
-	c := lib.NewDomainCollection(signer, reflect.TypeOf(&ItemType{}))
+	c := lib.NewDomainCollection(reflect.TypeOf(&ItemType{}), signer.GetPublicKey)
 	require.NotNil(t, c)
 	signer.Subscribe("domain/+/#", func(addr string, msg string) error {
 		err := c.HandleDiscovery(addr, msg, &ItemType{})

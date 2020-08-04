@@ -27,7 +27,7 @@ func TestCreateDomainOutputValues(t *testing.T) {
 	getPubKey := func(address string) *ecdsa.PublicKey {
 		return &privKey.PublicKey
 	}
-	signer := messaging.NewMessageSigner(true, getPubKey, messenger, privKey)
+	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
 
 	collection := outputs.NewDomainOutputValues(signer)
 	assert.NotNil(t, collection)

@@ -17,58 +17,51 @@ type RegisteredForecastValues struct {
 	publisherID      string // publisher of the forcasts
 	forecastMap      map[string]OutputForecast
 	updateMutex      *sync.Mutex
-	updatedForecasts map[string]string // address of updated forecasts
+	updatedForecasts map[string]string // map of output IDs with updated forecasts
 }
 
-// GetForecast returns the output's forecast by output address
-// outputAddress is the discovery address of the output
-// Returns nil if the type or instance is unknown or no forecast is available
-func (regForecasts *RegisteredForecastValues) GetForecast(
-	nodeID string, outputType types.OutputType, instance string) OutputForecast {
+// GetForecast returns the output's forecast by outputID
+// Returns nil if the output has no forecast
+func (regForecasts *RegisteredForecastValues) GetForecast(outputID string) OutputForecast {
 	regForecasts.updateMutex.Lock()
 	defer regForecasts.updateMutex.Unlock()
 
-	outputAddress := MakeOutputDiscoveryAddress(regForecasts.domain, regForecasts.publisherID, nodeID, outputType, instance)
-	var forecast = regForecasts.forecastMap[outputAddress]
+	var forecast = regForecasts.forecastMap[outputID]
 	return forecast
 }
 
-// GetUpdatedForecasts returns a list of output addresses that have updated forecasts
+// GetUpdatedForecasts returns a list of output IDs that have updated forecasts
 // clearUpdates clears the update list on return
 func (regForecasts *RegisteredForecastValues) GetUpdatedForecasts(clearUpdates bool) []string {
-	var addrList []string = make([]string, 0)
+	var idList []string = make([]string, 0)
 
 	regForecasts.updateMutex.Lock()
 	defer regForecasts.updateMutex.Unlock()
 
 	if regForecasts.updatedForecasts != nil {
-		for _, addr := range regForecasts.updatedForecasts {
-			addrList = append(addrList, addr)
+		for _, fcID := range regForecasts.updatedForecasts {
+			idList = append(idList, fcID)
 		}
 		if clearUpdates {
 			regForecasts.updatedForecasts = nil
 		}
 	}
-	return addrList
+	return idList
 }
 
 // UpdateForecast updates the output forecast list of values
 func (regForecasts *RegisteredForecastValues) UpdateForecast(
-	nodeID string, outputType types.OutputType, instance string, forecast OutputForecast) {
-
-	outputAddress := MakeOutputDiscoveryAddress(regForecasts.domain, regForecasts.publisherID, nodeID, outputType, instance)
+	outputID string, forecast OutputForecast) {
 
 	regForecasts.updateMutex.Lock()
 	defer regForecasts.updateMutex.Unlock()
 
-	regForecasts.forecastMap[outputAddress] = forecast
-	// output := publisher.Outputs.GetOutputByAddress(addr)
-	// aliasAddress := publisher.getOutputAliasAddress(addr)
+	regForecasts.forecastMap[outputID] = forecast
 
 	if regForecasts.updatedForecasts == nil {
 		regForecasts.updatedForecasts = make(map[string]string)
 	}
-	regForecasts.updatedForecasts[outputAddress] = outputAddress
+	regForecasts.updatedForecasts[outputID] = outputID
 
 	// publisher.publishForecast(aliasAddress, output)
 }

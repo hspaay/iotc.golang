@@ -39,9 +39,11 @@ func TestNewRegisteredInput(t *testing.T) {
 	require.NotNil(t, input, "Failed creating input")
 
 	// must be able to get the newly created input
-	input2 := collection.GetInput(node1ID, node1Input1Type, types.DefaultInputInstance)
+	input2 := collection.GetInputByDevice(node1ID, node1Input1Type, types.DefaultInputInstance)
 	require.NotNil(t, input2, "Failed getting created input")
 	input2 = collection.GetInputByAddress(node1InputAddr)
+	require.NotNil(t, input2, "Failed getting created input")
+	input2 = collection.GetInputByID(input.InputID)
 	require.NotNil(t, input2, "Failed getting created input")
 
 	// the new input must show in the list of updated inputs
@@ -52,7 +54,7 @@ func TestNewRegisteredInput(t *testing.T) {
 	require.Equal(t, 0, len(updated), "Expected no more updated inputs")
 
 	// delete input
-	collection.DeleteInput(node1ID, node1Input1Type, types.DefaultInputInstance)
+	collection.DeleteInput(input.InputID)
 
 	// input with source
 	collection.CreateInputWithSource(node1ID, types.InputTypeSwitch, types.DefaultInputInstance, Source1ID, nil)
@@ -97,9 +99,13 @@ func TestAlias(t *testing.T) {
 	collection.CreateInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance, nil)
 	collection.SetAlias(node1ID, Alias1)
 
-	input1b := collection.GetInput(Alias1, types.InputTypeSwitch, types.DefaultInputInstance)
+	aliasAddr := inputs.MakeInputDiscoveryAddress(domain, publisher1ID, Alias1, types.InputTypeSwitch, types.DefaultInputInstance)
+	input1b := collection.GetInputByAddress(aliasAddr)
 	require.NotNilf(t, input1b, "Input not retrievable using alias nodeID")
-	assert.Equal(t, Alias1, input1b.NodeID, "Input doesn't have the alias NodeID")
+	assert.Equal(t, aliasAddr, input1b.Address, "Input doesn't have the alias NodeID")
+
+	input1c := collection.GetInputByDevice(node1ID, types.InputTypeSwitch, types.DefaultInputInstance)
+	assert.Equal(t, aliasAddr, input1c.Address, "Input doesn't have the alias NodeID")
 }
 
 func TestPublish(t *testing.T) {
@@ -111,7 +117,7 @@ func TestPublish(t *testing.T) {
 	}
 
 	msgr := messaging.NewDummyMessenger(nil)
-	signer := messaging.NewMessageSigner(true, getPublisherKey, msgr, privKey)
+	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
 
 	collection := inputs.NewRegisteredInputs(domain, publisher1ID)
 	input := collection.CreateInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance, nil)

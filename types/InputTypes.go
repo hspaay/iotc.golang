@@ -57,8 +57,9 @@ type InputDiscoveryMessage struct {
 	Source     string        `json:"source,omitempty"`     // the input source URL, empty for set commands
 	Timestamp  string        `json:"timestamp"`            // Time the record is last updated
 	Unit       Unit          `json:"unit,omitempty"`       // unit of value
-	// For convenience, filled when registering or receiving:
-	NodeID      string    `json:"-"`
+	// For internal use. Filled when registering inputs
+	InputID     string    `json:"-"`
+	DeviceID    string    `json:"-"`
 	PublisherID string    `json:"-"`
 	InputType   InputType `json:"-"`
 	Instance    string    `json:"-"`

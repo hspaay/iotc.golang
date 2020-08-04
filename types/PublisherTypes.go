@@ -13,25 +13,12 @@ const LWTStatusDisconnected = "disconnected"
 // LWTStatusLost when connection unexpectedly drops
 const LWTStatusLost = "lost"
 
-// // PublisherPublicIdentity public record
-// type PublisherPublicIdentity struct {
-// 	Certificate  string `json:"certificate,omitempty"` // optional x509 cert base64 encoded
-// 	Domain       string `json:"domain"`                // IoT domain name for this publisher
-// 	IssuerName   string `json:"issuerName"`            // Issuer of the identity, usually the DSS
-// 	Location     string `json:"location,omitempty"`    // city, province, country
-// 	Organization string `json:"organization"`          // publishing organization
-// 	PublicKey    string `json:"publicKey"`             // public key in PEM format for signature verification and encryption
-// 	PublisherID  string `json:"publisherId"`           // This publisher's ID for this domain
-// 	Timestamp    string `json:"timestamp"`             // timestamp this identity was signed
-// 	ValidUntil   string `json:"validUntil"`            // timestamp this identity expires
-// }
-
-// PublisherIdentityMessage for publisher discovery
+// PublisherIdentityMessage contains the public identity of a publisher
 type PublisherIdentityMessage struct {
 	Address           string `json:"address"`               // publication address of this identity, eg domain/publisherId/\$identity
 	Certificate       string `json:"certificate,omitempty"` // optional x509 cert base64 encoded
 	Domain            string `json:"domain"`                // IoT domain name for this publisher
-	IssuerName        string `json:"issuerName"`            // Issuer of the identity, usually the DSS
+	IssuerID          string `json:"issuerId"`              // Issuer of the identity, the DSS, publisherId or CA
 	Location          string `json:"location,omitempty"`    // city, province, country
 	Organization      string `json:"organization"`          // publishing organization
 	PublicKey         string `json:"publicKey"`             // public key in PEM format for signature verification and encryption

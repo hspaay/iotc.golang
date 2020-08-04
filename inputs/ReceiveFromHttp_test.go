@@ -23,19 +23,19 @@ func TestCreateInputFromHttp(t *testing.T) {
 	const interval = 10
 	var inputReceived = ""
 
-	handler := func(addr string, sender string, value string) {
+	handler := func(input *types.InputDiscoveryMessage, sender string, value string) {
 		inputReceived = value
 	}
 	regInputs := inputs.NewRegisteredInputs(domain, publisher1ID)
 
-	i := inputs.NewInputFromHTTP(regInputs)
+	i := inputs.NewReceiveFromHTTP(regInputs)
 	i.Start()
 
-	addr1 := i.CreateInput(node1ID, inputType, instance1, imageUrl, login, password, interval, handler)
-	assert.NotEmpty(t, addr1, "No input address")
+	input1 := i.CreateHttpInput(node1ID, inputType, instance1, imageUrl, login, password, interval, handler)
+	assert.NotNil(t, input1, "Input1 not created")
 
-	addr2 := i.CreateInput(node1ID, inputType, instance2, badUrl, "", "", interval, handler)
-	assert.NotEmpty(t, addr2, "No input address")
+	input2 := i.CreateHttpInput(node1ID, inputType, instance2, badUrl, "", "", interval, handler)
+	assert.NotEmpty(t, input2, "Input2 not created")
 
 	inputList := regInputs.GetAllInputs()
 	assert.Equal(t, 2, len(inputList), "Deleting http input doesn't seem to work")
@@ -45,12 +45,12 @@ func TestCreateInputFromHttp(t *testing.T) {
 	assert.NotEmpty(t, inputReceived, "No input received")
 
 	// deleting input
-	i.DeleteInput(node1ID, inputType, instance1)
+	i.DeleteInput(input1.InputID)
 	inputList = regInputs.GetAllInputs()
 	assert.Equal(t, 1, len(inputList), "Deleting http input doesn't seem to work")
 
-	// delete non existing input should not fail
-	i.DeleteInput(node1ID, inputType, instance1)
+	// delete an already deleted input should not fail nor blow up
+	i.DeleteInput(input1.InputID)
 
 	i.Stop()
 }

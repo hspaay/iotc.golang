@@ -12,9 +12,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PublishNodeAlias publishes the command to set a remote node alias
-// This signs and encrypts the message for the destination
-func PublishNodeAlias(
+// PublishNodeAliasCommand publishes the command to set a remote node alias using the existing
+// node address. This signs and encrypts the message for the destination
+func PublishNodeAliasCommand(
 	nodeAddress string, alias, sender string,
 	messageSigner *messaging.MessageSigner, encryptionKey *ecdsa.PublicKey) error {
 
@@ -23,7 +23,7 @@ func PublishNodeAlias(
 	if len(segments) < 3 {
 		return lib.MakeErrorf("PublishNodeAlias: Node address %s is invalid", nodeAddress)
 	}
-	aliasAddr := MakeAliasAddress(segments[0], segments[1], segments[2])
+	aliasAddr := MakeSetAliasAddress(segments[0], segments[1], segments[2])
 	// Encecode the SetMessage
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	var aliasMessage = types.NodeAliasMessage{
