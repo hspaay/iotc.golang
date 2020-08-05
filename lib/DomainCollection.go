@@ -112,7 +112,8 @@ func (dc *DomainCollection) HandleDiscovery(
 	address string, rawMessage string, newItem interface{}) error {
 
 	// verify the message signature and get the payload
-	_, err := messaging.VerifySenderJWSSignature(rawMessage, newItem, dc.GetPublicKey)
+	_, err := messaging.VerifySenderJWSSignature(rawMessage, newItem,
+		dc.GetPublicKey)
 
 	if err != nil {
 		return MakeErrorf("HandleDiscovery: Failed verifying signature on address %s: %s", address, err)

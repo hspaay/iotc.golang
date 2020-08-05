@@ -2,13 +2,16 @@
 package nodes
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
 )
@@ -286,6 +289,39 @@ func (regNodes *RegisteredNodes) HandleSetAliasMessage(nodeAddress string, msg *
 	nodeID := segments[2]
 	node := regNodes.GetNodeByNodeID(nodeID)
 	regNodes.SetAlias(node, msg.Alias)
+}
+
+// LoadNodes loads previously saved registered nodes.
+// Intended to persist changes to node configuration.
+func (regNodes *RegisteredNodes) LoadNodes(filename string) error {
+	nodeList := make([]*types.NodeDiscoveryMessage, 0)
+
+	jsonNodes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return lib.MakeErrorf("LoadNodes: Unable to open file %s: %s", filename, err)
+	}
+	err = json.Unmarshal(jsonNodes, &nodeList)
+	if err != nil {
+		return lib.MakeErrorf("LoadNodes: Error parsing JSON node file %s: %v", filename, err)
+	}
+	logrus.Infof("LoadNodes: Node list loaded successfully from %s", filename)
+	regNodes.UpdateNodes(nodeList)
+	return nil
+}
+
+// SaveNodes saves the current registered nodes to a JSON file
+func (regNodes *RegisteredNodes) SaveNodes(filename string) error {
+	collection := regNodes.GetAllNodes()
+	jsonText, err := json.MarshalIndent(collection, "", "  ")
+	if err != nil {
+		return lib.MakeErrorf("SaveNodes: Error Marshalling JSON collection '%s': %v", filename, err)
+	}
+	err = ioutil.WriteFile(filename, jsonText, 0664)
+	if err != nil {
+		return lib.MakeErrorf("SaveNodes: Error saving collection to JSON file %s: %v", filename, err)
+	}
+	logrus.Infof("SaveNodes: Collection saved successfully to JSON file %s", filename)
+	return nil
 }
 
 // SetAlias changes the nodeID and address of the node with the given deviceID.

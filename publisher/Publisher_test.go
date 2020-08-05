@@ -19,7 +19,7 @@ const node1ID = "node1"
 const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
 const publisher2ID = "publisher2"
-const identityFolder = "../test"
+const configFolder = "../test"
 const cacheFolder = "../test/cache"
 
 var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
@@ -50,18 +50,28 @@ var msgConfig *messaging.MessengerConfig = &messaging.MessengerConfig{Domain: do
 func TestNewPublisher(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
 
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, testMessenger)
+	pub1 := publisher.NewPublisher(domain, publisher1ID, configFolder, false, testMessenger)
 	require.NotNil(t, pub1, "Failed creating publisher")
 
 	assert.NotNil(t, pub1.GetIdentity, "Missing publisher identity")
 	assert.NotEmpty(t, pub1.Address(), "Missing publisher address")
 }
 
+type s struct{ Item1 string }
+
+func TestNewAppPublisher(t *testing.T) {
+	appID := "testapp"
+	var appConfig struct{ Item1 string }
+	appPub, err := publisher.NewAppPublisher(appID, configFolder, cacheFolder, &appConfig, false)
+	assert.NotNil(t, appPub)
+	assert.Error(t, err) // no messenger config
+}
+
 func TestStartStop(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
 	var pollHandlerCalled = false
 
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, testMessenger)
+	pub1 := publisher.NewPublisher(domain, publisher1ID, configFolder, false, testMessenger)
 	pub1.SetPollInterval(1, func(pub *publisher.Publisher) {
 		pollHandlerCalled = true
 	})
@@ -82,7 +92,7 @@ func TestStartStop(t *testing.T) {
 func TestSetLogging(t *testing.T) {
 	var logFile = "/tmp/iotdomain-go.log"
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, testMessenger)
+	pub1 := publisher.NewPublisher(domain, publisher1ID, configFolder, false, testMessenger)
 	pub1.SetLogging("debug", "")
 	logrus.Debug("Hello from logger")
 
@@ -91,18 +101,22 @@ func TestSetLogging(t *testing.T) {
 
 }
 
-func TestLoadConfig(t *testing.T) {
-	var configFolder = "../test"
+func TestLoadNodes(t *testing.T) {
+	const device1ID = "device1"
+	const device1Type = types.NodeTypeAVReceiver
+
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, testMessenger)
-	err := pub1.LoadConfig(configFolder, false)
-	assert.Errorf(t, err, "Unable to load config from folder %s", configFolder)
+	pub1 := publisher.NewPublisher(domain, publisher1ID, configFolder, false, testMessenger)
+	pub1.CreateNode(device1ID, device1Type)
+
+	err := pub1.LoadRegisteredNodes()
+	assert.NoErrorf(t, err, "Unable to load config from folder %s: %s", configFolder, err)
 }
 
 // TestAlias tests the use of alias in the inout discovery publication
 func TestDiscoveryWithAlias(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, testMessenger)
+	pub1 := publisher.NewPublisher(domain, publisher1ID, configFolder, false, testMessenger)
 
 	// update the node alias and test if node, input and outputs are published using their alias as nodeID
 	pub1.Start()
@@ -130,7 +144,7 @@ func TestReceiveInput(t *testing.T) {
 	var node2InputSetAddr = fmt.Sprintf("%s/%s/0/%s", node2Base, node1InputType, types.MessageTypeSet)
 
 	// signMessages = false
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, domain, publisher1ID, testMessenger)
+	pub1 := publisher.NewPublisher(domain, publisher1ID, configFolder, false, testMessenger)
 
 	pub1.Start()
 	// update the node alias and see if its output is published with alias' as node id
@@ -168,10 +182,18 @@ func TestReceiveInput(t *testing.T) {
 	pub1.Stop()
 }
 
+// TODO
+// func TestPublishEvent(t *testing.T) {
+// 	// setup
+// 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
+// 	pub1 := publisher.NewPublisher(domain, publisher1ID, configFolder, false, testMessenger)
+// 	publisher.PublishOutputEvent(node, pub1.reg)
+// }
+
 // run a bunch of facade commands with invalid arguments
 func TestErrors(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
-	pub1 := publisher.NewPublisher(identityFolder, cacheFolder, "", publisher1ID, testMessenger)
+	pub1 := publisher.NewPublisher("", publisher1ID, configFolder, false, testMessenger)
 	pub1.Address()
 	pub1.CreateInput("fakeid", "faketype", types.DefaultInputInstance, nil)
 	pub1.CreateInputFromFile("fakeid", "faketype", types.DefaultInputInstance, "fakepath", nil)
@@ -205,8 +227,7 @@ func TestErrors(t *testing.T) {
 	pub1.GetOutputs()
 	pub1.GetOutputValue("fakeid", "faketype", "")
 	pub1.MakeNodeDiscoveryAddress("fakeid")
-	pub1.PublishConfigureNode("fakeaddr", types.NodeAttrMap{})
-
+	pub1.PublishNodeConfigure("fakeaddr", types.NodeAttrMap{})
 	pub1.PublishRaw(out1, true, "value")
 	pub1.SetSigningOnOff(true)
 	pub1.UpdateNodeErrorStatus("fakeid", types.NodeRunStateError, "fake status")

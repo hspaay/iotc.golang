@@ -282,9 +282,13 @@ func TestSigner(t *testing.T) {
 	assert.True(t, isSigned, "Message not signed")
 	assert.False(t, isEncrypted, "Message is encrypted")
 
-	// publish with error
+	// error case - publish with error
 	err = signer.PublishObject("test/bob/james", false, nil, &privKey.PublicKey)
-	assert.Error(t, err, "No error publishing string as object")
+	assert.Error(t, err, "No error publishing nil object")
+
+	// // error case - publish with string message - todo: needs update of handler
+	// err = signer.PublishEncrypted("test/bob/james", false, "aaa", &privKey.PublicKey)
+	// assert.Error(t, err, "No error publishing empty string as object")
 
 	signer.Unsubscribe("test/+/#", nil)
 }

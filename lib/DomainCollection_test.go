@@ -11,6 +11,7 @@ import (
 )
 
 type ItemType struct {
+	Address     string
 	PublisherID string
 	Name        string
 }
@@ -65,17 +66,17 @@ func TestCreateCollection(t *testing.T) {
 	require.Nil(t, item1b, "Item still there after remove")
 }
 func TestDiscovery(t *testing.T) {
-	const itemAddr = "domain/pub1/node1/type/instance"
+	const itemAddr = "test/pub1/node1/type/instance"
 	errCount := 0
 	privKey := messaging.CreateAsymKeys()
-	item1 := ItemType{PublisherID: "Hello", Name: "World"}
+	item1 := ItemType{Address: itemAddr, PublisherID: "Hello", Name: "World"}
 	config := messaging.MessengerConfig{}
 	msg := messaging.NewDummyMessenger(&config)
 	signer := messaging.NewMessageSigner(msg, privKey, nil)
 
 	c := lib.NewDomainCollection(reflect.TypeOf(&ItemType{}), signer.GetPublicKey)
 	require.NotNil(t, c)
-	signer.Subscribe("domain/+/#", func(addr string, msg string) error {
+	signer.Subscribe("test/+/#", func(addr string, msg string) error {
 		err := c.HandleDiscovery(addr, msg, &ItemType{})
 		if err != nil {
 			errCount++

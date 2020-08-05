@@ -3,8 +3,8 @@ package publisher
 import (
 	"reflect"
 
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
-	"github.com/iotdomain/iotdomain-go/persist"
 )
 
 // NewAppPublisher function for all the boilerplate. This:
@@ -22,28 +22,31 @@ import (
 // persistNodes flags whether to save discovered nodes and their configuration changes.
 //
 // This returns publisher instance or error if messenger fails to load
-func NewAppPublisher(appID string, configFolder string, cacheFolder string, appConfig interface{}, persistNodes bool) (*Publisher, error) {
-	var messengerConfig = messaging.MessengerConfig{}
+func NewAppPublisher(appID string, configFolder string, cacheFolder string,
+	appConfig interface{}, persistNodes bool) (*Publisher, error) {
 
-	err := persist.LoadMessengerConfig(configFolder, &messengerConfig)
+	var messengerConfig = messaging.MessengerConfig{}
+	err := lib.LoadMessengerConfig(configFolder, &messengerConfig)
 	messenger := messaging.NewMessenger(&messengerConfig)
 
 	// appconfig is optional
 	// The publisherID can be overridden from the appConfig yaml file
 	if appConfig != nil {
-		persist.LoadAppConfig(configFolder, appID, appConfig)
+		lib.LoadAppConfig(configFolder, appID, appConfig)
 	}
 	ac := reflect.ValueOf(appConfig)
 	field := reflect.Indirect(ac).FieldByName("PublisherID")
 	pubID := field.String()
-	if pubID == "" {
+	if !field.IsValid() || pubID == "" {
 		pubID = appID
 	}
 	// identity lives in the config folder
-	pub := NewPublisher(configFolder, cacheFolder, messengerConfig.Domain, pubID, messenger)
+	pub := NewPublisher(messengerConfig.Domain, pubID, configFolder, false, messenger)
 
-	// cache holds previously discovered nodes and external publisher
-	// Should node name and alias configuration updates be stored in config or cache?
-	pub.LoadConfig(configFolder, persistNodes)
+	// Load configuration of previously registered nodes from config
+	pub.LoadRegisteredNodes()
+
+	// Load discovered domain publishers from cache
+	pub.LoadDomainIdentities()
 	return pub, err
 }

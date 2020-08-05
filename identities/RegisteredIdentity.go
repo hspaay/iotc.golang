@@ -2,13 +2,15 @@ package identities
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
-	"github.com/iotdomain/iotdomain-go/persist"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
 )
@@ -16,13 +18,18 @@ import (
 // valid for 1 year
 const validDuration = time.Hour * 24 * 365
 
+// IdentityFileSuffix to append to name of the file containing saved identity
+const IdentityFileSuffix = "-identity.json"
+
 // RegisteredIdentity for managing the publisher's full identity
 type RegisteredIdentity struct {
+	filename     string // identity filename under which it is saved
 	domain       string // domain of the publisher creating this identity
 	publisherID  string
 	fullIdentity *types.PublisherFullIdentity
 	dssPubKey    *ecdsa.PublicKey  // DSS pub key for verification (secure zones only)
 	privateKey   *ecdsa.PrivateKey // private key from the new identity
+	updated      bool              // flag, this identity has been updated and needs to be published/saved
 }
 
 // GetAddress returns the identity's publication address
@@ -30,12 +37,62 @@ func (regIdentity *RegisteredIdentity) GetAddress() string {
 	return regIdentity.fullIdentity.Address
 }
 
-// GetIdentity returns the full identity with private key
-func (regIdentity *RegisteredIdentity) GetIdentity() (fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey) {
+// GetPublicKey returns the identity's public key
+// func (regIdentity *RegisteredIdentity) GetPublicKey() *ecdsa.PublicKey {
+// 	return &regIdentity.privateKey.PublicKey
+// }
+
+// GetPrivateKey returns the identity's private key
+func (regIdentity *RegisteredIdentity) GetPrivateKey() *ecdsa.PrivateKey {
+	return regIdentity.privateKey
+}
+
+// GetFullIdentity returns the full identity with private key
+func (regIdentity *RegisteredIdentity) GetFullIdentity() (fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey) {
 	return regIdentity.fullIdentity, regIdentity.privateKey
 }
 
-// UpdateIdentity verifies and sets a new registered identity
+// LoadIdentity loads the publisher identity and private key from json file and
+// verifies its content. See also VerifyIdentity for the criteria.
+//
+// Returns the identity with corresponding ECDSA private key, or nil if no identity is found
+// If anything goes wrong, err will contain the error and nil identity is returned
+// Use SaveIdentity to save updates to the identity
+func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
+	fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey, err error) {
+
+	// load the identity
+	identityJSON, err := ioutil.ReadFile(jsonFilename)
+	if err != nil {
+		return nil, nil, err
+	}
+	fullIdentity = &types.PublisherFullIdentity{}
+	err = json.Unmarshal(identityJSON, fullIdentity)
+	if err == nil {
+		privKey = messaging.PrivateKeyFromPem(fullIdentity.PrivateKey)
+	}
+	if err == nil {
+		// must match domain and publisher
+		// We don't know the DSS signing key at this point
+		err = VerifyFullIdentity(fullIdentity, regIdentity.domain, regIdentity.publisherID, nil)
+	}
+	// finaly, replace the identity with the loaded identity
+	if err == nil {
+		regIdentity.fullIdentity = fullIdentity
+		regIdentity.privateKey = privKey
+	}
+	return fullIdentity, privKey, err
+}
+
+// SetDssKey sets the DSS public key. This is needed to allow the DSS to update the
+// registered identity. Without it, any updates are refused. Intended to be set by
+// the publisher when a verified DSS identity is received.
+func (regIdentity *RegisteredIdentity) SetDssKey(dssSigningKey *ecdsa.PublicKey) {
+	regIdentity.dssPubKey = dssSigningKey
+}
+
+// UpdateIdentity verifies and sets a new registered identity and saves it to the
+// identity file.
 func (regIdentity *RegisteredIdentity) UpdateIdentity(fullIdentity *types.PublisherFullIdentity) {
 
 	err := VerifyFullIdentity(fullIdentity, regIdentity.domain, regIdentity.publisherID, regIdentity.dssPubKey)
@@ -46,6 +103,7 @@ func (regIdentity *RegisteredIdentity) UpdateIdentity(fullIdentity *types.Publis
 	privKey := messaging.PrivateKeyFromPem(fullIdentity.PrivateKey)
 	regIdentity.privateKey = privKey
 	regIdentity.fullIdentity = fullIdentity
+	regIdentity.updated = true
 }
 
 // CreateIdentity creates and self-sign a new identity for the publisher
@@ -107,26 +165,32 @@ func MakePublisherIdentityAddress(domain string, publisherID string) string {
 	return address
 }
 
-// PublishIdentity signs and publishes the public part of this identity using
-// the given message signer.
-func (regIdentity *RegisteredIdentity) PublishIdentity(signer *messaging.MessageSigner) {
-	publicIdentity := &regIdentity.fullIdentity.PublisherIdentityMessage
-	logrus.Infof("PublishIdentity: publish identity: %s", publicIdentity.Address)
-
-	signer.PublishObject(publicIdentity.Address, true, publicIdentity, nil)
+// SaveIdentity save the full identity of the publisher to the given json filename.
+// The identity is saved as a json file.
+// see also https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
+func SaveIdentity(jsonFilename string, identity *types.PublisherFullIdentity) error {
+	// save the identity as JSON. Remove the existing file first as they are read-only
+	identityJSON, _ := json.MarshalIndent(identity, " ", " ")
+	os.Remove(jsonFilename)
+	err := ioutil.WriteFile(jsonFilename, identityJSON, 0400)
+	if err != nil {
+		return lib.MakeErrorf("SaveIdentity: Unable to save the publisher's identity at %s: %s", jsonFilename, err)
+	}
+	return err
 }
 
-// SetDssKey sets the DSS public key. This is needed to allow the DSS to update the
-// registered identity. Without it, any updates are refused. Intended to be set by
-// the publisher when a verified DSS identity is received.
-func (regIdentity *RegisteredIdentity) SetDssKey(dssSigningKey *ecdsa.PublicKey) {
-	regIdentity.dssPubKey = dssSigningKey
-}
-
-// VerifyFullIdentity verifies the given full identity is correctly signed,
-// matches the given domain and publisher, and is not expired.
+// VerifyFullIdentity verifies the given full identity
 // If the publisher joined with the DSS domain then a dssSigningKey is known and
-// the identity MUST be signed by the DSS.
+// the identity MUST be signed by thep rovided DSS.
+//
+// verification  criteria:
+//  - identity and keys were found, and
+//  - the loaded identity is matches the domain/publisher of the publisher, and
+//  - the loaded identity has valid keys, and
+//  - the identity is not expired
+//  - the identity signature matches the public identity
+// If any of these conditions are not met then a new self-signed identity is created. When in a
+// secured domain, the publisher must be re-added to the domain as the issuer is not the DSS.
 func VerifyFullIdentity(ident *types.PublisherFullIdentity, domain string,
 	publisherID string, dssSigningKey *ecdsa.PublicKey) error {
 
@@ -146,52 +210,18 @@ func VerifyFullIdentity(ident *types.PublisherFullIdentity, domain string,
 	return nil
 }
 
-// SetupPublisherIdentity loads the publisher identity and keys from file in the identityFolder.
-// It returns the full identity with its private/public keypair.
-//
-// The identity is discarded and a new identity is created on any of the following conditions:
-//  - no identity and keys are found, or
-//  - the loaded identity is invalid due to a domain/publisher/address mismatch, or
-//  - the loaded identity is missing its keys, or
-//  - the identity is expired
-//  - the identity DSS signature verification fails
-// If any of these conditions are met in a secured domain then the publisher must
-// be re-added to the domain.
-func SetupPublisherIdentity(
-	identityFolder string, domain string, publisherID string,
-	dssSigningKey *ecdsa.PublicKey) (
-	fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey) {
+// NewRegisteredIdentity creates a new registered identity
+// Use LoadIdentity to load a previously saved identity
+func NewRegisteredIdentity(domain string, publisherID string) (regIdent *RegisteredIdentity) {
 
-	// If an identity is saved, load it
-	fullIdentity, privKey, err := persist.LoadIdentity(identityFolder, publisherID)
-	// must match domain and publisher
-	if err == nil {
-		err = VerifyFullIdentity(fullIdentity, domain, publisherID, dssSigningKey)
-	}
-	// Recreate identity if invalid
-	if err != nil { // invalid identity or none exists, create a new one
-		fullIdentity, privKey = CreateIdentity(domain, publisherID)
-		persist.SaveIdentity(identityFolder, publisherID, fullIdentity)
-	}
-
-	return fullIdentity, privKey
-}
-
-// NewRegisteredIdentity creates a new instance of the registered identity management,
-// including handling of updates from the DSS.
-// This first loads a previously saved identity if available and generates a new
-// identity when no valid identity is known.
-func NewRegisteredIdentity(identityFolder string, domain string, publisherID string,
-) (regIdent *RegisteredIdentity, privKey *ecdsa.PrivateKey) {
-
-	fullIdentity, privKey := SetupPublisherIdentity(
-		identityFolder, domain, publisherID, nil)
+	fullIdentity, privKey := CreateIdentity(domain, publisherID)
 
 	regIdent = &RegisteredIdentity{
 		domain:       domain,
 		fullIdentity: fullIdentity,
 		privateKey:   privKey,
 		publisherID:  publisherID,
+		updated:      true,
 	}
-	return regIdent, privKey
+	return regIdent
 }

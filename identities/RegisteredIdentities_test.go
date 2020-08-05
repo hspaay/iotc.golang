@@ -4,12 +4,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/iotdomain/iotdomain-go/identities"
 	"github.com/iotdomain/iotdomain-go/messaging"
-	"github.com/iotdomain/iotdomain-go/persist"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,36 +20,44 @@ const configFolder = "../test"
 // TestSave identity, saves and reloads the publisher identity with its private/public key
 func TestPersistIdentity(t *testing.T) {
 	const domain = "test"
+	const domain3 = "test3"
 	const publisherID = "publisher1"
-	// regIdent := identities.NewRegisteredIdentity(nil)
+	const publisherID3 = "publisher3"
+	identityFile := configFolder + "/testpersistidentity.json"
+
+	// setup - create and save an identity
 	ident, privKey := identities.CreateIdentity(domain, publisherID)
-	assert.NotEmpty(t, ident, "Identity not created")
-	assert.Equal(t, domain, ident.Domain)
-	assert.Equal(t, publisherID, ident.PublisherID)
+	require.NotEmpty(t, ident, "Identity not created")
+	require.Equal(t, domain, ident.Domain)
+	require.Equal(t, publisherID, ident.PublisherID)
+	err := identities.SaveIdentity(identityFile, ident)
+	require.NoError(t, err, "Failed saving identity")
 
-	err := persist.SaveIdentity(configFolder, publisherID, ident)
-	assert.NoError(t, err, "Failed saving identity")
-
-	// load and compare results
-	ident2, privKey2, err := persist.LoadIdentity(configFolder, publisherID)
-	assert.NoError(t, err, "Failed loading identity")
-	assert.NotNil(t, privKey2, "Unable to read private key")
+	// load and compare identity
+	regIdent2 := identities.NewRegisteredIdentity(domain, publisherID)
+	ident2, privKey2, err := regIdent2.LoadIdentity(identityFile)
+	require.NoError(t, err, "Failed loading identity")
 	require.NotNil(t, ident2, "Unable to read identity")
-	assert.Equal(t, publisherID, ident2.PublisherID)
+	assert.Equal(t, domain, ident2.Domain, "Loaded identity doesn't match saved identity")
+	assert.Equal(t, publisherID, ident2.PublisherID, "Loaded identity doesn't match saved identity")
 	pe1, _ := x509.MarshalECPrivateKey(privKey)
 	pe2, _ := x509.MarshalECPrivateKey(privKey2)
 	assert.Equal(t, pe1, pe2, "public key not identical")
 
-	// now lets load it all using SetupPublisherIdentity
-	ident3, privKey3 := identities.SetupPublisherIdentity(configFolder, domain, publisherID, nil)
-	require.NotNil(t, ident3, "Unable to read identity")
-	require.NotNil(t, privKey3, "Unable to get identity keys")
-
 	// error case using default identity folder and a not yet existing identity
-	ident4, privKey4 := identities.SetupPublisherIdentity("", domain, publisherID, nil)
-	require.NotNil(t, ident4, "Unable to create identity")
-	require.NotNil(t, privKey4, "Unable to create identity keys")
+	regIdent3 := identities.NewRegisteredIdentity(domain3, publisherID3)
+	ident3, privKey3, err := regIdent3.LoadIdentity("")
+	require.NotNil(t, err, "Expected error loading non existing identity")
+	require.Nil(t, ident3, "Unable to create identity")
+	require.Nil(t, privKey3, "Unable to create identity keys")
+	assert.Equal(t, domain, ident2.Domain, "Domain should be unchanged")
+	assert.Equal(t, publisherID, ident2.PublisherID, "Publisher should be unchanged")
 
+	// error case - invalid file
+	err = identities.SaveIdentity("/root/nofileaccess", ident3)
+	assert.Error(t, err, "shoulf fail saving to root")
+	// cleanup
+	os.Remove(identityFile)
 }
 
 func TestUpdateIdentity(t *testing.T) {
@@ -57,8 +65,10 @@ func TestUpdateIdentity(t *testing.T) {
 	const publisher1ID = "pub1"
 	const dssID = types.DSSPublisherID
 	var pubKeys = make(map[string]*ecdsa.PublicKey)
+	// identityFile := configFolder + "/testpersistidentity.json"
 
-	regIdentity, privKey := identities.NewRegisteredIdentity(configFolder, domain, publisher1ID)
+	regIdentity := identities.NewRegisteredIdentity(domain, publisher1ID)
+	privKey := regIdentity.GetPrivateKey()
 	pubKeys[regIdentity.GetAddress()] = &privKey.PublicKey
 
 	// privKey := messaging.CreateAsymKeys()
@@ -66,19 +76,14 @@ func TestUpdateIdentity(t *testing.T) {
 	getPubKey := func(address string) *ecdsa.PublicKey {
 		return pubKeys[address]
 	}
-
+	// setup the receiver for identity updates
 	var msgConfig *messaging.MessengerConfig = &messaging.MessengerConfig{Domain: domain}
 	messenger := messaging.NewDummyMessenger(msgConfig)
-	signer := messaging.NewMessageSigner(messenger, privKey, getPubKey)
+	signer := messaging.NewMessageSigner(messenger, regIdentity.GetPrivateKey(), getPubKey)
 	rxIdent := identities.NewReceiveRegisteredIdentityUpdate(regIdentity, signer)
 	rxIdent.Start()
 
 	// The DSS is the only one that can update an identity
-	// dssPub := identities.NewPublisher(configFolder, cacheFolder, domain, types.DSSPublisherID, false, messenger)
-	// dssPub.Start()
-	// dssKeys := dssPub.GetIdentityKeys()
-	// time.Sleep(time.Second)
-
 	// Create the self-signed DSS identity who will publish the new identity
 	dssIdent, dssKeys := identities.CreateIdentity(domain, dssID)
 	pubKeys[dssIdent.Address] = &dssKeys.PublicKey
@@ -88,7 +93,7 @@ func TestUpdateIdentity(t *testing.T) {
 	messaging.SignIdentity(&dssIdent.PublisherIdentityMessage, dssKeys)
 	regIdentity.SetDssKey(&dssKeys.PublicKey)
 
-	// next, create a new identity to publish
+	// next, create a new identity to publish by the DSS
 	newFullIdent, _ := identities.CreateIdentity(domain, publisher1ID)
 	newFullIdent.IssuerID = dssIdent.PublisherID
 	newFullIdent.Organization = "tester1"
@@ -98,7 +103,7 @@ func TestUpdateIdentity(t *testing.T) {
 
 	// test update the identity directly, if that doesn't work then the rest will fail too
 	regIdentity.UpdateIdentity(newFullIdent)
-	ident2, _ := regIdentity.GetIdentity()
+	ident2, _ := regIdentity.GetFullIdentity()
 	require.Equal(t, "tester1", ident2.Organization, "Identity not updated")
 
 	// test through publishing
@@ -110,7 +115,7 @@ func TestUpdateIdentity(t *testing.T) {
 
 	// publish and receive the identity
 	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, encryptedMessage)
-	ident2, _ = regIdentity.GetIdentity()
+	ident2, _ = regIdentity.GetFullIdentity()
 	assert.Equal(t, "tester2", ident2.Organization, "Identity not updated")
 
 	// error case - unsigned but encrypted
@@ -127,7 +132,7 @@ func TestUpdateIdentity(t *testing.T) {
 	signedMessage, _ = messaging.CreateJWSSignature(string(payload), dssKeys)
 	encryptedMessage, _ = messaging.EncryptMessage(signedMessage, &privKey.PublicKey)
 	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, encryptedMessage)
-	ident3, _ := regIdentity.GetIdentity()
+	ident3, _ := regIdentity.GetFullIdentity()
 	assert.Equal(t, dssIdent.Sender, ident3.Sender, "Identity with invalid sender should not be accepted")
 
 	// error case - domain doesn't match
@@ -137,12 +142,12 @@ func TestUpdateIdentity(t *testing.T) {
 	signedMessage, _ = messaging.CreateJWSSignature(string(payload), dssKeys)
 	encryptedMessage, _ = messaging.EncryptMessage(signedMessage, &privKey.PublicKey)
 	rxIdent.ReceiveIdentityUpdate(newFullIdent.Address, encryptedMessage)
-	ident4, _ := regIdentity.GetIdentity()
+	ident4, _ := regIdentity.GetFullIdentity()
 	assert.Equal(t, domain, ident4.Domain, "Identity with invalid domain should not be accepted")
 
 	// update and re-publish, verification should fail as the signature no longer matches
 	ident3.Location = "here"
-	regIdentity.PublishIdentity(signer)
+	identities.PublishIdentity(&ident3.PublisherIdentityMessage, signer)
 
 	rxIdent.Stop()
 

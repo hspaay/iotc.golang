@@ -1,5 +1,5 @@
-// Package persist with configuration for publishers and/or subscribers
-package persist
+// Package lib with configuration for publishers and/or subscribers
+package lib
 
 import (
 	"io/ioutil"

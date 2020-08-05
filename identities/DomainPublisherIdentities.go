@@ -3,12 +3,15 @@ package identities
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
+	"io/ioutil"
 	"reflect"
 	"strings"
 
 	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
+	"github.com/sirupsen/logrus"
 )
 
 // const DSSAddress = ""
@@ -79,6 +82,42 @@ func (pubIdentities *DomainPublisherIdentities) GetPublisherKey(publisherAddress
 	return pubKey
 }
 
+// LoadIdentities loads previously save identities from file
+// Existing identities are retained but replaced if contained in the file
+func (pubIdentities *DomainPublisherIdentities) LoadIdentities(filename string) error {
+	identList := make([]*types.PublisherIdentityMessage, 0)
+
+	jsonNodes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return lib.MakeErrorf("LoadIdentities: Unable to open file %s: %s", filename, err)
+	}
+	err = json.Unmarshal(jsonNodes, &identList)
+	if err != nil {
+		return lib.MakeErrorf("LoadIdentities: Error parsing JSON node file %s: %v", filename, err)
+	}
+	logrus.Infof("LoadIdentities: Identities loaded successfully from %s", filename)
+	for _, ident := range identList {
+		pubIdentities.AddIdentity(ident)
+	}
+	return nil
+
+}
+
+// SaveIdentities saves previously added identities to file
+func (pubIdentities *DomainPublisherIdentities) SaveIdentities(filename string) error {
+	collection := pubIdentities.GetAllPublishers()
+	jsonText, err := json.MarshalIndent(collection, "", "  ")
+	if err != nil {
+		return lib.MakeErrorf("SaveIdentities: Error Marshalling JSON collection '%s': %v", filename, err)
+	}
+	err = ioutil.WriteFile(filename, jsonText, 0664)
+	if err != nil {
+		return lib.MakeErrorf("SaveIdentities: Error saving collection to JSON file %s: %v", filename, err)
+	}
+	logrus.Infof("SaveIdentities: Collection saved successfully to JSON file %s", filename)
+	return nil
+}
+
 // VerifyPublisherIdentity verifies the integrity of the given identity record
 // Verification fails when:
 //  - domain/publisherID doesn't match the received address
@@ -89,12 +128,14 @@ func (pubIdentities *DomainPublisherIdentities) GetPublisherKey(publisherAddress
 //  - the identity signature doesn't verify against the signing key (if provided)
 //
 // The signing key is only available if the identity of the issuer is known;
-//  When a secured domain is joined, the issuer is the DSS whose identity must be received first
+//  When a secured domain is joined, the issuer is the DSS whose identity must be received first.
 //  When no secured domain is joined, the identity is self signed. Protection is
-//   based on message bus ACLs. Only publishers can publisher on their address.
+//   based on message bus ACLs. Only publishers can self sign their own identity.
 //  When the issuer is a CA, the CA public key must be known
 func VerifyPublisherIdentity(rxAddress string, ident *types.PublisherIdentityMessage,
-	signingKey *ecdsa.PublicKey) error {
+	dssSigningKey *ecdsa.PublicKey) error {
+
+	var signingKey *ecdsa.PublicKey
 
 	// identity must contain public key, issuer and signature
 	if ident.PublicKey == "" ||
@@ -130,9 +171,13 @@ func VerifyPublisherIdentity(rxAddress string, ident *types.PublisherIdentityMes
 		err := lib.MakeErrorf("VerifyIdentity: Identity '%s' is expired", rxAddress)
 		return err
 	}
+	if ident.IssuerID == types.DSSPublisherID {
+		signingKey = dssSigningKey
+	} else {
+		signingKey = messaging.PublicKeyFromPem(ident.PublicKey)
+	}
 
-	// Self signed identity. Assume the message bus secures the publishing address
-	// public key in identity must be the PEM key that belongs to the private key
+	// Self signed or DSS signed identity
 	err := messaging.VerifyIdentitySignature(ident, signingKey)
 	if err != nil {
 		return lib.MakeErrorf("VerifyIdentity: Verification of %s message failed. "+

@@ -2,6 +2,8 @@ package identities_test
 
 import (
 	"crypto/ecdsa"
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/iotdomain/iotdomain-go/identities"
@@ -31,12 +33,57 @@ func TestNewDomainIdentities(t *testing.T) {
 	require.NotNil(t, collection, "Failed creating registered publisher collection")
 }
 
+func TestLoadDomainIdentities(t *testing.T) {
+	// const Source1ID = "source1"
+	const domain = "test"
+	const publisher1ID = "pub1"
+	const publisher2ID = "pub2"
+	// const TestConfigID = "test"
+	// const TestConfigDefault = "testDefault"
+	const filename = "../test/testidentities.json"
+
+	// setup test
+	collection := identities.NewDomainPublisherIdentities()
+	require.NotNil(t, collection, "Failed creating registered publisher collection")
+
+	// Add self-signed identities
+	pubIdent1, _ := identities.CreateIdentity(domain, publisher1ID)
+	pubIdent2, _ := identities.CreateIdentity(domain, publisher2ID)
+	collection.AddIdentity(&pubIdent1.PublisherIdentityMessage)
+	collection.AddIdentity(&pubIdent2.PublisherIdentityMessage)
+
+	err := collection.SaveIdentities(filename)
+	assert.NoError(t, err)
+
+	// reload
+	collection2 := identities.NewDomainPublisherIdentities()
+	err = collection2.LoadIdentities(filename)
+	assert.NoError(t, err)
+	pubList2 := collection2.GetAllPublishers()
+	assert.Equal(t, 2, len(pubList2), "Identities not reloaded")
+
+	// error case -  unknown file
+	err = collection2.LoadIdentities("nonexistingfile.json")
+	assert.Error(t, err)
+	err = collection2.SaveIdentities("/root/noaccessfile.json")
+	assert.Error(t, err)
+
+	// error case - not a proper list
+	ioutil.WriteFile(filename, []byte("Hello world"), 0664)
+	err = collection2.LoadIdentities(filename)
+	assert.Error(t, err, "Not json")
+
+	// cleanup
+	os.Remove(filename)
+}
+
 func TestDiscoverDomainPublishers(t *testing.T) {
 	const Source1ID = "source1"
 	const domain = "test"
 	const publisher2ID = "pub2"
 	var err error
 
+	// setup test
 	collection := identities.NewDomainPublisherIdentities()
 	privKey := messaging.CreateAsymKeys()
 	messenger := messaging.NewDummyMessenger(dummyConfig)

@@ -1,14 +1,14 @@
 {
-  "address": "local/publisher1/$identity",
-  "domain": "local",
+  "address": "test/publisher1/$identity",
+  "domain": "test",
   "issuerId": "publisher1",
   "location": "local",
   "organization": "",
-  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJxL7B7lCbsjzOIODO3KlG/VcMAey\nngNXV8psDetLpwDQIeBl7ASbjD0UuQipVftSMDXHv3v2nqENYkc/q4ukIA==\n-----END PUBLIC KEY-----\n",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESmnRaO2kLJwjMuZrdnZB81uKkVMY\ndCoAbwJBq3vxn2aVxjlgyk95V4DrwGv5Mrdd38N1HaYO9gZfqpy2vQjo5w==\n-----END PUBLIC KEY-----\n",
   "publisherId": "publisher1",
-  "validUntil": "2021-08-03T22:40:03.804-0700",
-  "signature": "MEMCH3hEbC4FOuAD7S9b3svuGv5Yn26pTZoqF-7Pav02yAsCIDvTuFZoCOc93SByU1ykmIqurQKq1edTV82LS4cwFEyi",
-  "timestamp": "2020-08-03T22:40:03.804-0700",
-  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEINBezMqQf1a7xwxGEQPENOiS5cpFmKuUtBBULHVt3I7+oAoGCCqGSM49\nAwEHoUQDQgAEJxL7B7lCbsjzOIODO3KlG/VcMAeyngNXV8psDetLpwDQIeBl7ASb\njD0UuQipVftSMDXHv3v2nqENYkc/q4ukIA==\n-----END PRIVATE KEY-----\n",
+  "validUntil": "2021-08-04T08:09:36.548-0700",
+  "signature": "MEYCIQD5nHHXwefoqYz08ib64Lz_DHf1j6HI9yfFSIou0a7-mgIhAMvyJU3rUFWyorWYombupvy8Q4r5mCgyQ0uJtXjPr1i5",
+  "timestamp": "2020-08-04T08:09:36.548-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEICYhHAatshU64tkwioImEInFK6bLHNRJ7e/rNYgtoBOMoAoGCCqGSM49\nAwEHoUQDQgAESmnRaO2kLJwjMuZrdnZB81uKkVMYdCoAbwJBq3vxn2aVxjlgyk95\nV4DrwGv5Mrdd38N1HaYO9gZfqpy2vQjo5w==\n-----END PRIVATE KEY-----\n",
   "sender": ""
  }

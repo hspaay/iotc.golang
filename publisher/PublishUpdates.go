@@ -17,6 +17,9 @@ func (publisher *Publisher) PublishUpdates() {
 
 	updatedNodes := publisher.registeredNodes.GetUpdatedNodes(true)
 	nodes.PublishRegisteredNodes(updatedNodes, publisher.messageSigner)
+	if len(updatedNodes) > 0 && publisher.configFolder != "" {
+		publisher.SaveRegisteredNodes()
+	}
 
 	updatedInputs := publisher.registeredInputs.GetUpdatedInputs(true)
 	inputs.PublishRegisteredInputs(updatedInputs, publisher.messageSigner)

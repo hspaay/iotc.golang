@@ -32,32 +32,6 @@ func (rxIdentity *ReceiveDomainPublisherIdentities) Stop() {
 
 }
 
-// ReceiveDSSIdentity discoveres the identity of the DSS, domain security service.
-// This only applies to secured domains where the DSS issues a signed identity to
-// each publisher. The identity is signed by the DSS and can be verified with DSS public key.
-// Without a DSS, all publishers are unverified.
-// func (rxIdentity *ReceiveDomainPublisherIdentities) ReceiveDSSIdentity(address string, rawMessage string) error {
-// 	var newIdentity types.PublisherIdentityMessage
-
-// 	logrus.Infof("ReceiveDSSIdentity: %s", address)
-
-// 	// DSS identities aren't encrypted and their verification is based on either
-// 	// message bus ACL's or a signed certificate from lets encrypt.
-// 	_, err := messaging.VerifySenderJWSSignature(rawMessage, &newIdentity, nil)
-
-// 	if err != nil {
-// 		return lib.MakeErrorf("ReceiveDSSIdentity: Identity message from %s. Error %s'. Message discarded.", address, err)
-// 	}
-
-// 	// TODO: CA support. For now assume address protection is used so this is trusted.
-
-// 	// dssSigningPem := dssIdentity.Identity.PublicKeySigning
-// 	// dssSigningKey := messaging.PublicKeyFromPem(dssSigningPem)
-// 	// publisher.dssSigningKey = dssSigningKey
-// 	rxIdentity.domainIdentities.AddIdentity(&newIdentity)
-// 	return nil
-// }
-
 // ReceiveDomainIdentity handles receiving published identities of the domain.
 // This:
 // - verifies if the sender signature is valid

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,21 +22,30 @@ import (
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/nodes"
 	"github.com/iotdomain/iotdomain-go/outputs"
-	"github.com/iotdomain/iotdomain-go/persist"
 	"github.com/iotdomain/iotdomain-go/types"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
-// reserved keywords
 const (
 	// DefaultPollInterval in which the registered nodes, inputs and outputs are queried for
 	// polling based sources
 	DefaultPollInterval = 600
+
+	// NodesFileSuffix to append to name of the file containing saved nodes
+	NodesFileSuffix = "-nodes.json"
+	// IdentityFileSuffix to append to the name of the file containing publisher saved identity
+	IdentityFileSuffix = "-identity.json"
+	// DomainPublishersFileSuffix to append to the name of the file containing domain publisher identities
+	DomainPublishersFileSuffix = "-publishers.json"
 )
 
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
+	autosaveConfig bool   // automatically save updates to nodes and identity
+	cacheFolder    string // folder to save discovered publishers
+	configFolder   string // folder to save node and identity configuration
+
 	domainIdentities   *identities.DomainPublisherIdentities // discovered publisher identities
 	domainInputs       *inputs.DomainInputs                  // discovered inputs from the domain
 	domainNodes        *nodes.DomainNodes                    // discovered nodes from the domain
@@ -59,9 +69,6 @@ type Publisher struct {
 	registeredOutputs        *outputs.RegisteredOutputs        // registered/published outputs from this publisher
 	registeredOutputValues   *outputs.RegisteredOutputValues   // registered/published output values from this publisher
 
-	configFolder string // folder to save publisher, node, inputs and outputs configuration
-	// domainPublishers *publishers.PublisherList // publishers on the network by discovery address
-
 	// fullIdentity        *types.PublisherFullIdentity                         // this publishers identity
 	// identityPrivateKey  *ecdsa.PrivateKey                                    // key for signing and encryption
 	isRunning           bool                                                 // publisher was started and is running
@@ -78,33 +85,32 @@ type Publisher struct {
 	updateMutex      *sync.Mutex // mutex for async updating and publishing
 }
 
-// // FullIdentity return a copy of this publisher's full identity
-// func (pub *Publisher) FullIdentity() types.PublisherFullIdentity {
-// 	ident, _ := pub.registeredIdentity.GetIdentity()
-// 	return *ident
-// }
+// LoadDomainIdentities loads the identities of domain publishers
+// Intended to cache the public signing keys to verify messages from these publishers
+func (pub *Publisher) LoadDomainIdentities() error {
+	filename := path.Join(pub.configFolder, pub.PublisherID()+DomainPublishersFileSuffix)
+	err := pub.domainIdentities.LoadIdentities(filename)
+	return err
+}
 
-// LoadConfig loads previously saved configuration
-// If a node file exists in the given folder the nodes will be added/updated. Existing nodes will be replaced.
-// If autosave is set then save this publisher's nodes and configs when updated.
-// folder with the configuration files. Use "" for default, which is persist.DefaultConfigFolder
-//   autosave indicates to save updates to node configuration
-// returns error if folder doesn't exist
-func (pub *Publisher) LoadConfig(folder string, autosave bool) error {
-	var err error = nil
-	if folder == "" {
-		folder = persist.DefaultConfigFolder
-	}
-	if autosave {
-		pub.configFolder = folder
-	}
-	if folder != "" {
-		nodeList := make([]*types.NodeDiscoveryMessage, 0)
-		err = persist.LoadNodes(folder, pub.PublisherID(), &nodeList)
-		if err == nil {
-			pub.registeredNodes.UpdateNodes(nodeList)
-		}
-	}
+// LoadRegisteredNodes loads current registered nodes
+func (pub *Publisher) LoadRegisteredNodes() error {
+	filename := path.Join(pub.configFolder, pub.PublisherID()+NodesFileSuffix)
+	err := pub.registeredNodes.LoadNodes(filename)
+	return err
+}
+
+// SaveDomainPublishers saves known publisher identities
+func (pub *Publisher) SaveDomainPublishers() error {
+	filename := path.Join(pub.configFolder, pub.PublisherID()+DomainPublishersFileSuffix)
+	err := pub.domainIdentities.SaveIdentities(filename)
+	return err
+}
+
+// SaveRegisteredNodes saves current registered nodes
+func (pub *Publisher) SaveRegisteredNodes() error {
+	filename := path.Join(pub.configFolder, pub.PublisherID()+NodesFileSuffix)
+	err := pub.registeredNodes.SaveNodes(filename)
 	return err
 }
 
@@ -178,10 +184,8 @@ func (pub *Publisher) SetPollInterval(seconds int, handler func(pub *Publisher))
 	pub.pollHandler = handler
 }
 
-// Start publishing and listen for configuration and input messages
-// This will create the publisher node and load previously saved nodes
+// Start starts publishing registered nodes, inputs and outputs, and listens for command messages.
 // Start will fail if no messenger has been provided.
-// persistNodes will load previously saved nodes at startup and save them on configuration change
 func (pub *Publisher) Start() {
 	logrus.Warningf("Publisher.Start: Starting publisher %s/%s", pub.Domain(), pub.PublisherID())
 
@@ -200,10 +204,9 @@ func (pub *Publisher) Start() {
 		<-pub.heartbeatChannel
 
 		// our own identity is first
-		myIdent, _ := pub.registeredIdentity.GetIdentity()
+		myIdent, _ := pub.registeredIdentity.GetFullIdentity()
 		pub.domainIdentities.AddIdentity(&myIdent.PublisherIdentityMessage)
 
-		// TODO: support LWT
 		// receive domain entities, eg identities, nodes, inputs and outputs
 		pub.receiveDomainIdentities.Start()
 		pub.domainNodes.Start()
@@ -214,8 +217,10 @@ func (pub *Publisher) Start() {
 		pub.receiveNodeConfigure.Start()
 		pub.receiveMyIdentityUpdate.Start()
 		//  listening
+		// TODO: support LWT
 		pub.messenger.Connect("", "")
-		pub.registeredIdentity.PublishIdentity(pub.messageSigner)
+
+		identities.PublishIdentity(&myIdent.PublisherIdentityMessage, pub.messageSigner)
 	}
 }
 
@@ -288,17 +293,12 @@ func (pub *Publisher) heartbeatLoop() {
 	logrus.Infof("Publisher.heartbeatLoop: Ending loop of publisher %s", pub.PublisherID())
 }
 
-// NewPublisher creates a publisher instance. This is used for all publications.
+// NewPublisher creates a new publisher instance. This is used for all publications.
 //
-// The identityFolder contains the publisher identity file <publisherID>-identity.json. "" for default config folder.
-// The identity is written here when it is first created or is renewed by the domain security service.
-// This file only needs to be accessible during publisher startup.
-//
-// The cacheFolder contains stored discovered nodes, inputs, outputs, and external publishers. It also
-// contains node configuration so deleting these files will remove custom node configuration, for example
-// configuration of alias and name.
-//
-// domain and publisherID identity this pub. If the identity file does not match these, it
+// The configFolder contains the publisher saved identity and node configuration <publisherID>-nodes.json.
+// which is loaded during Start(). Use "" for default config folder. When autosave is set then the configuration
+// files are written when identity or registered nodes update.
+//  domain and publisherID identify this publisher. If the identity file does not match these, it
 // is discarded and a new identity is created. If the publisher has joined the domain and the DSS has issued
 // the identity then changing domain or publisherID invalidates the publisher and it has to rejoin
 // the domain. If no domain is provided, the default 'local' is used.
@@ -306,11 +306,7 @@ func (pub *Publisher) heartbeatLoop() {
 // signingMethod indicates if and how publications must be signed. The default is jws. For testing 'none' can be used.
 //
 // messenger for publishing onto the message bus
-func NewPublisher(
-	identityFolder string,
-	cacheFolder string,
-	domain string,
-	publisherID string,
+func NewPublisher(domain string, publisherID string, configFolder string, autosave bool,
 	messenger messaging.IMessenger,
 ) *Publisher {
 
@@ -318,13 +314,18 @@ func NewPublisher(
 	if domain == "" {
 		domain = types.LocalDomainID
 	}
-	// ours and domain identities
-	registeredIdentity, privateKey := identities.NewRegisteredIdentity(
-		identityFolder, domain, publisherID)
+	// load this publisher and domain identities
+	if configFolder == "" {
+		configFolder = lib.DefaultConfigFolder
+	}
+	identityFile := path.Join(configFolder, publisherID+IdentityFileSuffix)
+	registeredIdentity := identities.NewRegisteredIdentity(domain, publisherID)
+	registeredIdentity.LoadIdentity(identityFile)
+	privKey := registeredIdentity.GetPrivateKey()
 	domainIdentities := identities.NewDomainPublisherIdentities()
 
 	// These are the basis for signing and identifying publishers
-	messageSigner := messaging.NewMessageSigner(messenger, privateKey, domainIdentities.GetPublisherKey)
+	messageSigner := messaging.NewMessageSigner(messenger, privKey, domainIdentities.GetPublisherKey)
 
 	// application services
 	domainInputs := inputs.NewDomainInputs(messageSigner)
@@ -342,11 +343,13 @@ func NewPublisher(
 	receiveDomainIdentities := identities.NewReceivePublisherIdentities(domain,
 		domainIdentities, messageSigner)
 	receiveNodeConfigure := nodes.NewReceiveNodeConfigure(
-		domain, publisherID, nil, messageSigner, registeredNodes, privateKey)
+		domain, publisherID, nil, messageSigner, registeredNodes, privKey)
 	receiveNodeSetAlias := nodes.NewReceiveNodeAlias(
-		domain, publisherID, nil, messageSigner, privateKey)
+		domain, publisherID, nil, messageSigner, privKey)
 
 	var publisher = &Publisher{
+		autosaveConfig:     autosave,
+		configFolder:       configFolder,
 		domainIdentities:   domainIdentities,
 		domainInputs:       domainInputs,
 		domainNodes:        domainNodes,

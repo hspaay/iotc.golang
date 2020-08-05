@@ -1,0 +1,35 @@
+[
+  {
+    "address": "test/publisher1/device1/$node",
+    "config": {
+      "name": {
+        "datatype": "string",
+        "description": "Human friendly node name"
+      },
+      "publishEvent": {
+        "datatype": "string",
+        "default": "false",
+        "description": "Enable publishing outputs as event"
+      },
+      "publishHistory": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing output history"
+      },
+      "publishLatest": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing latest output"
+      },
+      "publishRaw": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing raw outputs"
+      }
+    },
+    "deviceid": "device1",
+    "nodeid": "device1",
+    "nodeType": "unknown",
+    "timestamp": "2020-08-04T16:42:24.933-0700"
+  }
+]

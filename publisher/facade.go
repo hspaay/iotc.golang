@@ -73,7 +73,7 @@ func (pub *Publisher) CreateOutput(deviceID string, outputType types.OutputType,
 
 // Domain returns the publication domain
 func (pub *Publisher) Domain() string {
-	ident, _ := pub.registeredIdentity.GetIdentity()
+	ident, _ := pub.registeredIdentity.GetFullIdentity()
 	return ident.Domain
 }
 
@@ -135,13 +135,13 @@ func (pub *Publisher) GetInputs() []*types.InputDiscoveryMessage {
 
 // GetIdentity returns the publisher public identity including public signing key
 func (pub *Publisher) GetIdentity() *types.PublisherIdentityMessage {
-	ident, _ := pub.registeredIdentity.GetIdentity()
+	ident, _ := pub.registeredIdentity.GetFullIdentity()
 	return &ident.PublisherIdentityMessage
 }
 
 // GetIdentityKeys returns the private/public key pair of this publisher
 func (pub *Publisher) GetIdentityKeys() *ecdsa.PrivateKey {
-	_, privKey := pub.registeredIdentity.GetIdentity()
+	_, privKey := pub.registeredIdentity.GetFullIdentity()
 	return privKey
 }
 
@@ -239,14 +239,14 @@ func (pub *Publisher) MakeNodeDiscoveryAddress(nodeID string) string {
 
 // PublisherID returns the publisher's ID
 func (pub *Publisher) PublisherID() string {
-	ident, _ := pub.registeredIdentity.GetIdentity()
+	ident, _ := pub.registeredIdentity.GetFullIdentity()
 	return ident.PublisherID
 }
 
-// PublishConfigureNode publishes a $configure command to a domain node
+// PublishNodeConfigure publishes a $configure command to a domain node
 // Returns true if successful, false if the domain node publisher cannot be found or has no public key
 // and the message is not sent.
-func (pub *Publisher) PublishConfigureNode(domainNodeAddr string, attr types.NodeAttrMap) bool {
+func (pub *Publisher) PublishNodeConfigure(domainNodeAddr string, attr types.NodeAttrMap) bool {
 	destPubKey := pub.GetPublisherKey(domainNodeAddr)
 	if destPubKey == nil {
 		logrus.Warnf("PublishConfigureNode: no public key found to encrypt command for node %s. Message not sent.", domainNodeAddr)

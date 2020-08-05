@@ -240,6 +240,22 @@ func TestReceiveConfig(t *testing.T) {
 	assert.Equal(t, "bob", name)
 }
 
+func TestLoadSave(t *testing.T) {
+	const domain = "test"
+	const publisher1ID = "publisher1"
+	const device1ID = "device1"
+	const filename = "../test/testsavenodes.json"
+
+	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
+	collection.CreateNode(device1ID, types.NodeTypeUnknown)
+	err := collection.SaveNodes(filename)
+	assert.NoError(t, err)
+
+	collection2 := nodes.NewRegisteredNodes(domain, publisher1ID)
+	err = collection2.LoadNodes(filename)
+	assert.NoError(t, err)
+}
+
 func TestAlias(t *testing.T) {
 	const node1AliasID = "alias1"
 

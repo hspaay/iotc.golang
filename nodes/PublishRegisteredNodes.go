@@ -24,9 +24,4 @@ func PublishRegisteredNodes(
 			// TODO: remove node from the message bus
 		}
 	}
-	// todo: move to appropriate spot
-	// if len(updatedNodes) > 0 && configFolder != "" {
-	// 	allNodes := regNodes.GetAllNodes()
-	// 	persist.SaveNodes(regNodes.configFolder, regNodes.publisherID, allNodes)
-	// }
 }

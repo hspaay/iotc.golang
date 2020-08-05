@@ -19,7 +19,8 @@ import (
 
 // MessageSigner for signing and verifying of signed and encrypted messages
 type MessageSigner struct {
-	getPublicKey func(address string) *ecdsa.PublicKey
+	// GetPublicKey when available is used in mess to verify signature
+	GetPublicKey func(address string) *ecdsa.PublicKey // must be a variable
 	messenger    IMessenger
 	signMessages bool              // flag, sign outgoing messages. Default is true. Disable for testing
 	privateKey   *ecdsa.PrivateKey // private key for signing and decryption
@@ -31,14 +32,8 @@ type MessageSigner struct {
 // object must hold the expected message type to decode the json message containging the sender info
 func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}) (isEncrypted bool, isSigned bool, err error) {
 	dmessage, isEncrypted, err := DecryptMessage(rawMessage, signer.privateKey)
-	isSigned, err = VerifySenderJWSSignature(dmessage, object, signer.getPublicKey)
+	isSigned, err = VerifySenderJWSSignature(dmessage, object, signer.GetPublicKey)
 	return isEncrypted, isSigned, err
-}
-
-// GetPublicKey is a convenience function for getting the public key of the given
-// publisher address. Intended for verification of signatures or encryption.
-func (signer *MessageSigner) GetPublicKey(addr string) *ecdsa.PublicKey {
-	return signer.getPublicKey(addr)
 }
 
 // VerifySignedMessage parses and verifies the message signature
@@ -46,7 +41,7 @@ func (signer *MessageSigner) GetPublicKey(addr string) *ecdsa.PublicKey {
 // Sender field is missing then the 'address' field contains the publisher.
 //  or 'address' field
 func (signer *MessageSigner) VerifySignedMessage(rawMessage string, object interface{}) (isSigned bool, err error) {
-	isSigned, err = VerifySenderJWSSignature(rawMessage, object, signer.getPublicKey)
+	isSigned, err = VerifySenderJWSSignature(rawMessage, object, signer.GetPublicKey)
 	return isSigned, err
 }
 
@@ -95,7 +90,7 @@ func (signer *MessageSigner) PublishEncrypted(
 	message := payload
 	// first sign, then encrypt as per RFC
 	if signer.signMessages {
-		message, err = CreateJWSSignature(string(payload), signer.privateKey)
+		message, _ = CreateJWSSignature(string(payload), signer.privateKey)
 	}
 	emessage, err := EncryptMessage(message, publicKey)
 	err = signer.messenger.Publish(address, retained, emessage)
@@ -122,14 +117,13 @@ func (signer *MessageSigner) PublishSigned(
 }
 
 // NewMessageSigner creates a new instance for signing and verifying published messages
-func NewMessageSigner(
-	messenger IMessenger,
-	signingKey *ecdsa.PrivateKey,
+// If getPublicKey is not provided, verification of signature is skipped
+func NewMessageSigner(messenger IMessenger, signingKey *ecdsa.PrivateKey,
 	getPublicKey func(address string) *ecdsa.PublicKey,
 ) *MessageSigner {
 
 	signer := &MessageSigner{
-		getPublicKey: getPublicKey,
+		GetPublicKey: getPublicKey,
 		messenger:    messenger,
 		signMessages: true,
 		privateKey:   signingKey, // private key for signing
@@ -192,16 +186,15 @@ func DecryptMessage(serialized string, privateKey *ecdsa.PrivateKey) (message st
 
 // EncryptMessage encrypts and serializes the message using JWE
 func EncryptMessage(message string, publicKey *ecdsa.PublicKey) (serialized string, err error) {
+	var jwe *jose.JSONWebEncryption
 
 	recpnt := jose.Recipient{Algorithm: jose.ECDH_ES, Key: publicKey}
 
 	encrypter, err := jose.NewEncrypter(jose.A128CBC_HS256, recpnt, nil)
 
-	if err != nil {
-		return message, err
+	if encrypter != nil {
+		jwe, err = encrypter.Encrypt([]byte(message))
 	}
-
-	jwe, err := encrypter.Encrypt([]byte(message))
 	if err != nil {
 		return message, err
 	}
