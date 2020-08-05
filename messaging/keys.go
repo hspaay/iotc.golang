@@ -28,6 +28,9 @@ func CreateAsymKeys() *ecdsa.PrivateKey {
 // See also PrivateKeyToPem for the opposite.
 // Returns nil if the encoded pem source isn't a pem format
 func PrivateKeyFromPem(pemEncodedPriv string) *ecdsa.PrivateKey {
+	if pemEncodedPriv == "" {
+		return nil
+	}
 	block, _ := pem.Decode([]byte(pemEncodedPriv))
 	x509Encoded := block.Bytes
 	privateKey, _ := x509.ParseECPrivateKey(x509Encoded)
@@ -46,6 +49,9 @@ func PrivateKeyToPem(privateKey *ecdsa.PrivateKey) string {
 
 // PublicKeyFromPem converts a ascii encoded public key into a ECDSA public key
 func PublicKeyFromPem(pemEncodedPub string) *ecdsa.PublicKey {
+	if pemEncodedPub == "" {
+		return nil
+	}
 	blockPub, _ := pem.Decode([]byte(pemEncodedPub))
 	x509EncodedPub := blockPub.Bytes
 	genericPublicKey, _ := x509.ParsePKIXPublicKey(x509EncodedPub)

@@ -112,6 +112,7 @@ func (dc *DomainCollection) HandleDiscovery(
 	address string, rawMessage string, newItem interface{}) error {
 
 	// verify the message signature and get the payload
+	// FIXME: this is a lib func, should not depend on messaging!
 	_, err := messaging.VerifySenderJWSSignature(rawMessage, newItem,
 		dc.GetPublicKey)
 

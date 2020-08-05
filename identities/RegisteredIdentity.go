@@ -56,7 +56,7 @@ func (regIdentity *RegisteredIdentity) GetFullIdentity() (fullIdentity *types.Pu
 // verifies its content. See also VerifyIdentity for the criteria.
 //
 // Returns the identity with corresponding ECDSA private key, or nil if no identity is found
-// If anything goes wrong, err will contain the error and nil identity is returned
+// If anything goes wrong, err will contain the error and the existing identity is returned.
 // Use SaveIdentity to save updates to the identity
 func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
 	fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey, err error) {
@@ -81,7 +81,7 @@ func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
 		regIdentity.fullIdentity = fullIdentity
 		regIdentity.privateKey = privKey
 	}
-	return fullIdentity, privKey, err
+	return regIdentity.fullIdentity, regIdentity.privateKey, err
 }
 
 // SetDssKey sets the DSS public key. This is needed to allow the DSS to update the

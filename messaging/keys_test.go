@@ -19,6 +19,13 @@ func TestKeysFromPem(t *testing.T) {
 	privKey2 := messaging.PrivateKeyFromPem(privPem)
 	assert.Equal(t, privKey, privKey2, "Private keys should be equal")
 
+	// error cases
+	privKey3 := messaging.PrivateKeyFromPem("")
+	assert.Nil(t, privKey3)
+
+	pubKey3 := messaging.PublicKeyFromPem("")
+	assert.Nil(t, pubKey3)
+
 	// create public key for verification of publisher
 	// used each time a publisher message is received
 	pubPem := messaging.PublicKeyToPem(&privKey.PublicKey)

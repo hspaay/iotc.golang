@@ -52,23 +52,15 @@ func (rxIdentity *ReceiveDomainPublisherIdentities) ReceiveDomainIdentity(addres
 		return lib.MakeErrorf("ReceiveDomainIdentity: Invalid identity message on '%s': %s", address, err)
 	}
 
-	// Publishers self sign their JWS. Verify now we know the publisher.
-	pubKey := messaging.PublicKeyFromPem(newIdentity.PublicKey)
-	_, err = messaging.VerifyJWSMessage(rawMessage, pubKey)
-	if err != nil {
-		return lib.MakeErrorf("ReceiveDomainIdentity: Publisher message not self-signed '%s'. Identity ignored", address)
-	}
-
 	// Determine the key to verify the identity with
-	issuerKey := pubKey
 	if newIdentity.IssuerID == newIdentity.PublisherID {
 		// self signed identity
-		issuerKey = messaging.PublicKeyFromPem(newIdentity.PublicKey)
+		issuerKey := messaging.PublicKeyFromPem(newIdentity.PublicKey)
 		err = VerifyPublisherIdentity(address, &newIdentity, issuerKey)
 	} else if newIdentity.IssuerID == types.DSSPublisherID {
 		// DSS signed identity. DSS Must be known.
 		issuerAddress := newIdentity.Domain + "/" + newIdentity.IssuerID
-		issuerKey = rxIdentity.domainIdentities.GetPublisherKey(issuerAddress)
+		issuerKey := rxIdentity.domainIdentities.GetPublisherKey(issuerAddress)
 		err = VerifyPublisherIdentity(address, &newIdentity, issuerKey)
 	} else {
 		// TODO: assume a CA signed identity. Not yet supported

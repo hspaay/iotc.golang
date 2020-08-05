@@ -310,7 +310,7 @@ func NewPublisher(domain string, publisherID string, configFolder string, autosa
 	messenger messaging.IMessenger,
 ) *Publisher {
 
-	logrus.SetLevel(log.DebugLevel)
+	logrus.SetLevel(log.WarnLevel)
 	if domain == "" {
 		domain = types.LocalDomainID
 	}

@@ -149,10 +149,6 @@ func TestSigningPerformance(t *testing.T) {
 	}
 	duration = time.Since(start).Seconds()
 	log.Printf("10K VerifyJWSMessage signatures verified in %.2f seconds", duration)
-
-	// verify invalid jws mess
-	messaging.VerifyJWSMessage("bad sig", &privKey.PublicKey)
-
 }
 
 // Test the sender verification
@@ -229,6 +225,13 @@ func TestVerifySender(t *testing.T) {
 		return &newKeys.PublicKey
 	})
 	assert.Errorf(t, err, "Verification with wrong publickey should not succeed")
+
+	// error case - verify invalid jws mess
+	_, err = messaging.VerifyJWSMessage("bad sig", &privKey.PublicKey)
+	assert.Error(t, err, "Invalid sign should result in error")
+
+	_, err = messaging.VerifyJWSMessage(sig1, nil)
+	assert.Error(t, err, "nil public key should result in error")
 }
 
 func TestSigner(t *testing.T) {

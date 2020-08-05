@@ -254,6 +254,10 @@ func VerifyEcdsaSignature(payload []byte, signatureB64urlEncoded string, publicK
 // needed to verify the message.
 //  Intended for testing, as the application uses VerifySenderJWSSignature instead.
 func VerifyJWSMessage(message string, publicKey *ecdsa.PublicKey) (payload string, err error) {
+	if publicKey == nil {
+		err := errors.New("VerifyJWSMessage: public key is nil")
+		return "", err
+	}
 	jwsSignature, err := jose.ParseSigned(message)
 	if err != nil {
 		return "", err

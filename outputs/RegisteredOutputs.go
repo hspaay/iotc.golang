@@ -121,6 +121,13 @@ func (regOutputs *RegisteredOutputs) SetAlias(deviceID string, alias string) {
 }
 
 // UpdateOutput replaces the output and updates its timestamp.
+func (regOutputs *RegisteredOutputs) UpdateOutput(output *types.OutputDiscoveryMessage) {
+	regOutputs.updateMutex.Lock()
+	defer regOutputs.updateMutex.Unlock()
+	regOutputs.updateOutput(output)
+}
+
+// updateOutput replaces the output and updates its timestamp.
 // For internal use only. Use within locked section.
 func (regOutputs *RegisteredOutputs) updateOutput(output *types.OutputDiscoveryMessage) {
 

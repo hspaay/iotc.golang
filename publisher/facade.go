@@ -66,7 +66,8 @@ func (pub *Publisher) CreateNode(deviceID string, nodeType types.NodeType) *type
 
 // CreateOutput creates a new node output adds it to this publisher outputs list
 // returns the output object to allow for easy updates
-func (pub *Publisher) CreateOutput(deviceID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
+func (pub *Publisher) CreateOutput(deviceID string, outputType types.OutputType,
+	instance string) *types.OutputDiscoveryMessage {
 	output := pub.registeredOutputs.CreateOutput(deviceID, outputType, instance)
 	return output
 }
@@ -334,11 +335,11 @@ func (pub *Publisher) UpdateNodeStatus(deviceID string, status map[types.NodeSta
 // 	pub.registeredNodes.UpdateNode(node)
 // }
 
-// // UpdateOutput replaces a registered output with a new instance. Intended to update an
-// // output attribute. If the output does not exist, this is ignored.
-// func (pub *Publisher) UpdateOutput(output *types.OutputDiscoveryMessage) {
-// 	pub.registeredOutputs.UpdateOutput(output)
-// }
+// UpdateOutput replaces a registered output with a new instance. Intended to update an
+// output attribute. If the output does not exist, this is ignored.
+func (pub *Publisher) UpdateOutput(output *types.OutputDiscoveryMessage) {
+	pub.registeredOutputs.UpdateOutput(output)
+}
 
 // UpdateOutputForecast replaces a forecast
 func (pub *Publisher) UpdateOutputForecast(outputID string, forecast outputs.OutputForecast) {
