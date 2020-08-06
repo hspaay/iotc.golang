@@ -56,17 +56,16 @@ func (domainInputs *DomainInputs) RemoveInput(inputAddress string) {
 	domainInputs.c.Remove(inputAddress)
 }
 
-// Start subscribing to input discovery
-func (domainInputs *DomainInputs) Start() {
+// Subscribe to inputs from a domain publisher
+func (domainInputs *DomainInputs) Subscribe(domain string, publisherID string) {
 	// subscription address for all inputs domain/publisher/node/type/instance/$input
-	// TODO: Only subscribe to selected publishers
-	addr := MakeInputDiscoveryAddress("+", "+", "+", "+", "+")
+	addr := MakeInputDiscoveryAddress(domain, publisherID, "+", "+", "+")
 	domainInputs.messageSigner.Subscribe(addr, domainInputs.handleDiscoverInput)
 }
 
-// Stop polling for inputs
-func (domainInputs *DomainInputs) Stop() {
-	addr := MakeInputDiscoveryAddress("+", "+", "+", "+", "+")
+// Unsubscribe from publisher inputs
+func (domainInputs *DomainInputs) Unsubscribe(domain string, publisherID string) {
+	addr := MakeInputDiscoveryAddress(domain, publisherID, "+", "+", "+")
 	domainInputs.messageSigner.Unsubscribe(addr, domainInputs.handleDiscoverInput)
 }
 

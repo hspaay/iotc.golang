@@ -66,18 +66,17 @@ func (domainOutputs *DomainOutputs) RemoveOutput(address string) {
 	domainOutputs.c.Remove(address)
 }
 
-// Start subscribing to output discovery
-func (domainOutputs *DomainOutputs) Start() {
+// Subscribe to outputs from a domain publisher
+func (domainOutputs *DomainOutputs) Subscribe(domain string, publisherID string) {
 	// subscription address for all outputs domain/publisher/node/type/instance/$output
-	// TODO: Only subscribe to selected publishers
-	address := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainOutputs.messageSigner.Subscribe(address, domainOutputs.handleDiscoverOutput)
+	addr := MakeOutputDiscoveryAddress(domain, publisherID, "+", "+", "+")
+	domainOutputs.messageSigner.Subscribe(addr, domainOutputs.handleDiscoverOutput)
 }
 
-// Stop polling for outputs
-func (domainOutputs *DomainOutputs) Stop() {
-	address := MakeOutputDiscoveryAddress("+", "+", "+", "+", "+")
-	domainOutputs.messageSigner.Unsubscribe(address, domainOutputs.handleDiscoverOutput)
+// Unsubscribe from publisher outputs
+func (domainOutputs *DomainOutputs) Unsubscribe(domain string, publisherID string) {
+	addr := MakeOutputDiscoveryAddress(domain, publisherID, "+", "+", "+")
+	domainOutputs.messageSigner.Unsubscribe(addr, domainOutputs.handleDiscoverOutput)
 }
 
 // handleDiscoverOutput updates the domain output list with discovered outputs

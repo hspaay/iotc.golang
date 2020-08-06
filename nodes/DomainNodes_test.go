@@ -77,6 +77,7 @@ func TestNewDomainNodes(t *testing.T) {
 func TestDiscoverDomainNodes(t *testing.T) {
 	const Source1ID = "source1"
 	const domain = "test"
+	const domain2 = "domain2"
 	const publisherID = "pub2"
 	const nodeID = "node1"
 	const node1Addr = domain + "/" + publisherID + "/" + nodeID
@@ -90,14 +91,14 @@ func TestDiscoverDomainNodes(t *testing.T) {
 
 	collection := nodes.NewDomainNodes(signer)
 	require.NotNil(t, collection, "Failed creating registered node collection")
-	collection.Start()
+	collection.Subscribe(domain2, "+")
 
-	node := nodes.NewNode("domain2", "publisher2", "node55", types.NodeTypeAVControl)
+	node := nodes.NewNode(domain2, "publisher2", "node55", types.NodeTypeAVControl)
 	nodeAsBytes, err := json.Marshal(node)
 	require.NoErrorf(t, err, "Failed serializing node discovery message")
 	messenger.Publish(node.Address, false, string(nodeAsBytes))
 
 	inList := collection.GetAllNodes()
 	assert.Equal(t, 1, len(inList), "Expected 1 discovered node. Got %d", len(inList))
-	collection.Stop()
+	collection.Unsubscribe(domain2, "+")
 }

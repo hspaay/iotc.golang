@@ -44,9 +44,11 @@ func NewAppPublisher(appID string, configFolder string, cacheFolder string,
 	pubConfig.Domain = messengerConfig.Domain
 	lib.LoadAppConfig(configFolder, appID, &pubConfig)
 
+	// 3: load application configuration itself
 	if appConfig != nil {
 		lib.LoadAppConfig(configFolder, appID, appConfig)
 	}
+	// 4: create the publisher. Reload its identity if available.
 	pub := NewPublisher(pubConfig.Domain, pubConfig.PublisherID, configFolder, false, messenger)
 	pub.SetLogging(pubConfig.Loglevel, pubConfig.Logfile)
 

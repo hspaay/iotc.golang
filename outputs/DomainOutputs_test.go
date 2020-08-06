@@ -66,7 +66,9 @@ func TestDiscoverDomainOutputs(t *testing.T) {
 	var dummyConfig = &messaging.MessengerConfig{}
 	const Source1ID = "source1"
 	const domain = "test"
+	const domain2 = "domain2"
 	const publisherID = "pub2"
+	const publisherID2 = "pub2"
 	const nodeID = "node1"
 	const node1Addr = domain + "/" + publisherID + "/" + nodeID
 	const outputType = types.OutputTypeSwitch
@@ -79,14 +81,14 @@ func TestDiscoverDomainOutputs(t *testing.T) {
 
 	collection := outputs.NewDomainOutputs(signer)
 	require.NotNil(t, collection, "Failed creating registered output collection")
-	collection.Start()
+	collection.Subscribe(domain2, publisherID2)
 
-	output := outputs.NewOutput("domain2", "publisher2", "node55", types.OutputTypeSwitch, types.DefaultOutputInstance)
+	output := outputs.NewOutput(domain2, publisherID2, "node55", types.OutputTypeSwitch, types.DefaultOutputInstance)
 	outputAsBytes, err := json.Marshal(output)
 	require.NoErrorf(t, err, "Failed serializing output discovery message")
 	messenger.Publish(output.Address, false, string(outputAsBytes))
 
 	inList := collection.GetAllOutputs()
 	assert.Equal(t, 1, len(inList), "Expected 1 discovered output. Got %d", len(inList))
-	collection.Stop()
+	collection.Unsubscribe(domain, publisherID2)
 }

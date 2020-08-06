@@ -54,10 +54,11 @@ func (regIdentity *RegisteredIdentity) GetFullIdentity() (fullIdentity *types.Pu
 
 // LoadIdentity loads the publisher identity and private key from json file and
 // verifies its content. See also VerifyIdentity for the criteria.
-//
-// Returns the identity with corresponding ECDSA private key, or nil if no identity is found
-// If anything goes wrong, err will contain the error and the existing identity is returned.
-// Use SaveIdentity to save updates to the identity
+//  Returns the identity with corresponding ECDSA private key.
+//  If anything goes wrong, the identity doesn' exist or is invalid then an error will be returned
+// and the existing identity remains unchanged.
+// Use SaveIdentity to save updates to the identity, for example when an error is returned
+// write a new identity file.
 func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
 	fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey, err error) {
 

@@ -48,8 +48,10 @@ func (rxIdentity *ReceiveDomainPublisherIdentities) ReceiveDomainIdentity(addres
 
 	// decode the message and determine the sender.
 	isSigned, err := messaging.VerifySenderJWSSignature(rawMessage, &newIdentity, nil)
-	if !isSigned || err != nil {
+	if err != nil {
 		return lib.MakeErrorf("ReceiveDomainIdentity: Invalid identity message on '%s': %s", address, err)
+	} else if !isSigned && rxIdentity.messageSigner.SignMessages() {
+		return lib.MakeErrorf("ReceiveDomainIdentity: Identity message on '%s' isn't signed but must be. Message discarded.", address)
 	}
 
 	// Determine the key to verify the identity with

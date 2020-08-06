@@ -58,7 +58,9 @@ func TestNewDomainInput(t *testing.T) {
 func TestDiscoverDomainInputs(t *testing.T) {
 	const Source1ID = "source1"
 	const domain = "test"
-	const publisherID = "pub2"
+	const domain2 = "domain2"
+	const publisherID = "pub"
+	const publisher2ID = "pub2"
 	const nodeID = "node1"
 	const node1Addr = domain + "/" + publisherID + "/" + nodeID
 	const inputType = types.InputTypeSwitch
@@ -71,14 +73,14 @@ func TestDiscoverDomainInputs(t *testing.T) {
 
 	collection := inputs.NewDomainInputs(signer)
 	require.NotNil(t, collection, "Failed creating registered input collection")
-	collection.Start()
+	collection.Subscribe(domain2, publisher2ID)
 
-	input := inputs.NewInput("domain2", "publisher2", "node55", types.InputTypeSwitch, types.DefaultInputInstance)
+	input := inputs.NewInput(domain2, publisher2ID, "node55", types.InputTypeSwitch, types.DefaultInputInstance)
 	inputAsBytes, err := json.Marshal(input)
 	require.NoErrorf(t, err, "Failed serializing input discovery message")
 	messenger.Publish(input.Address, false, string(inputAsBytes))
 
 	inList := collection.GetAllInputs()
 	assert.Equal(t, 1, len(inList), "Expected 1 discovered input. Got %d", len(inList))
-	collection.Stop()
+	collection.Unsubscribe(domain2, publisher2ID)
 }

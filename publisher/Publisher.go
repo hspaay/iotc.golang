@@ -209,9 +209,6 @@ func (pub *Publisher) Start() {
 
 		// receive domain entities, eg identities, nodes, inputs and outputs
 		pub.receiveDomainIdentities.Start()
-		pub.domainNodes.Start()
-		pub.domainInputs.Start()
-		pub.domainOutputs.Start()
 		// receive commands
 		pub.receiveNodeSetAlias.Start()
 		pub.receiveNodeConfigure.Start()
@@ -236,9 +233,6 @@ func (pub *Publisher) Stop() {
 		pub.receiveDomainIdentities.Stop()
 		pub.receiveNodeConfigure.Stop()
 		pub.receiveNodeSetAlias.Stop()
-		pub.domainOutputs.Stop()
-		pub.domainInputs.Stop()
-		pub.domainNodes.Stop()
 
 		pub.updateMutex.Unlock()
 		// wait for heartbeat to end
@@ -320,8 +314,11 @@ func NewPublisher(domain string, publisherID string, configFolder string, autosa
 	}
 	identityFile := path.Join(configFolder, publisherID+IdentityFileSuffix)
 	registeredIdentity := identities.NewRegisteredIdentity(domain, publisherID)
-	registeredIdentity.LoadIdentity(identityFile)
-	privKey := registeredIdentity.GetPrivateKey()
+	ident, privKey, err := registeredIdentity.LoadIdentity(identityFile)
+	if err != nil {
+		// save the identity as the loaded one isnt' valid
+		identities.SaveIdentity(identityFile, ident)
+	}
 	domainIdentities := identities.NewDomainPublisherIdentities()
 
 	// These are the basis for signing and identifying publishers

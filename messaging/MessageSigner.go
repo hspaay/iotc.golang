@@ -36,6 +36,11 @@ func (signer *MessageSigner) DecodeMessage(rawMessage string, object interface{}
 	return isEncrypted, isSigned, err
 }
 
+// SignMessages returns whether messages MUST be signed on sending or receiving
+func (signer *MessageSigner) SignMessages() bool {
+	return signer.signMessages
+}
+
 // VerifySignedMessage parses and verifies the message signature
 // as per standard, the sender and signer of the message is in the message 'Sender' field. If the
 // Sender field is missing then the 'address' field contains the publisher.
@@ -162,6 +167,9 @@ func SignIdentity(publicIdent *types.PublisherIdentityMessage, privKey *ecdsa.Pr
 // CreateJWSSignature signs the payload using JSE ES256 and return the JSE compact serialized message
 func CreateJWSSignature(payload string, privateKey *ecdsa.PrivateKey) (string, error) {
 	joseSigner, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: privateKey}, nil)
+	if err != nil {
+		return "", err
+	}
 	signedObject, err := joseSigner.Sign([]byte(payload))
 	if err != nil {
 		return "", err

@@ -290,6 +290,36 @@ func (pub *Publisher) SetSigningOnOff(onOff bool) {
 	pub.messageSigner.SetSignMessages(onOff)
 }
 
+// Subscribe to receive nodes, inputs and outputs from the selected domain and/or publisher
+// To subscribe to all domains or all publishers use "" as the domain or publisherID
+func (pub *Publisher) Subscribe(domain string, publisherID string) {
+	// subscription address for all outputs domain/publisher/node/type/instance/$output
+	if domain == "" {
+		domain = "+"
+	}
+	if publisherID == "" {
+		publisherID = "+"
+	}
+	pub.domainNodes.Subscribe(domain, publisherID)
+	pub.domainInputs.Subscribe(domain, publisherID)
+	pub.domainOutputs.Subscribe(domain, publisherID)
+}
+
+// Unsubscribe from receiving nodes, inputs and outputs from the selected domain and/or publisher
+// Use the same domain and publisherID as used in Subscribe
+func (pub *Publisher) Unsubscribe(domain string, publisherID string) {
+	// subscription address for all outputs domain/publisher/node/type/instance/$output
+	if domain == "" {
+		domain = "+"
+	}
+	if publisherID == "" {
+		publisherID = "+"
+	}
+	pub.domainNodes.Unsubscribe(domain, publisherID)
+	pub.domainInputs.Unsubscribe(domain, publisherID)
+	pub.domainOutputs.Unsubscribe(domain, publisherID)
+}
+
 // UpdateNodeErrorStatus sets a registered node RunState to the given status with a lasterror message
 // Use NodeRunStateError for errors and NodeRunStateReady to clear error
 // This only updates the node if the status or lastError message changes

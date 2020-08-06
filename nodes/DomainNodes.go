@@ -93,31 +93,18 @@ func (domainNodes *DomainNodes) RemoveNode(address string) {
 	domainNodes.c.Remove(address)
 }
 
-// Start subscribing to node discovery
-func (domainNodes *DomainNodes) Start() {
-	// subscription address for all inputs domain/publisher/node/$node
-	// TODO: Only subscribe to selected publishers
-	address := MakeNodeDiscoveryAddress("+", "+", "+")
+// Subscribe to nodes discovery of the given domain publisher.
+func (domainNodes *DomainNodes) Subscribe(domain string, publisherID string) {
+	// subscription address  domain/publisher/+/$node
+	address := MakeNodeDiscoveryAddress(domain, publisherID, "+")
 	domainNodes.messageSigner.Subscribe(address, domainNodes.handleDiscoverNode)
 }
 
-// Stop polling for nodes
-func (domainNodes *DomainNodes) Stop() {
-	address := MakeNodeDiscoveryAddress("+", "+", "+")
+// Unsubscribe from publisher
+func (domainNodes *DomainNodes) Unsubscribe(domain string, publisherID string) {
+	address := MakeNodeDiscoveryAddress(domain, publisherID, "+")
 	domainNodes.messageSigner.Unsubscribe(address, domainNodes.handleDiscoverNode)
 }
-
-// getNode returns a node by its discovery address
-// address must contain the domain, publisher and nodeID. Any other fields are ignored.
-// Returns nil if address has no known node
-// func (domainNodes *DomainNodes) getNode(address string) *types.NodeDiscoveryMessage {
-
-// 	var node = domainNodes.c.Get(address, "", "")
-// 	if node == nil {
-// 		return nil
-// 	}
-// 	return node.(*types.NodeDiscoveryMessage)
-// }
 
 // handleDiscoverNode adds discovered domain nodes to the collection
 func (domainNodes *DomainNodes) handleDiscoverNode(address string, message string) error {
@@ -126,13 +113,6 @@ func (domainNodes *DomainNodes) handleDiscoverNode(address string, message strin
 	err := domainNodes.c.HandleDiscovery(address, message, &discoMsg)
 	return err
 }
-
-// MakeNodeDiscoveryAddress generates the address of a node: domain/publisherID/nodeID/$node.
-// Intended for lookup of nodes in the node list.
-// func (domainNodes *DomainNodes) MakeNodeDiscoveryAddress(domain string, publisherID string, nodeID string) string {
-// 	address := fmt.Sprintf("%s/%s/%s/%s", domain, publisherID, nodeID, types.MessageTypeNodeDiscovery)
-// 	return address
-// }
 
 // NewDomainNodes creates a new instance for domain node management.
 //  messageSigner is used to receive signed node discovery messages

@@ -142,7 +142,7 @@ func VerifyPublisherIdentity(rxAddress string, ident *types.PublisherIdentityMes
 		ident.Domain == "" ||
 		ident.IssuerID == "" ||
 		ident.IdentitySignature == "" {
-		err := lib.MakeErrorf("VerifyIdentity: missing identity information for '%s'", rxAddress)
+		err := lib.MakeErrorf("VerifyIdentity: identity is incomplete for '%s'", rxAddress)
 		return err
 	}
 	// domain/publisherID must match the address
