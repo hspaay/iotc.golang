@@ -348,8 +348,8 @@ func (pub *Publisher) UpdateNodeConfig(deviceID string, attrName types.NodeAttr,
 // UpdateNodeConfigValues updates the configuration values for the given registered node. This takes a map of
 // key-value pairs with the configuration attribute name and new value. Intended for updating the
 // node configuration based on what the registered node reports.
-func (pub *Publisher) UpdateNodeConfigValues(deviceID string, params types.NodeAttrMap) {
-	pub.registeredNodes.UpdateNodeConfigValues(deviceID, params)
+func (pub *Publisher) UpdateNodeConfigValues(deviceID string, params types.NodeAttrMap) (changed bool) {
+	return pub.registeredNodes.UpdateNodeConfigValues(deviceID, params)
 }
 
 // UpdateNodeStatus updates one or more status attributes of a registered node
