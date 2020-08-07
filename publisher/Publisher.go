@@ -40,11 +40,23 @@ const (
 	DomainPublishersFileSuffix = "-publishers.json"
 )
 
+// PublisherConfig defined configuration fields read from the application configuration
+type PublisherConfig struct {
+	Autosave          bool   `yaml:"autosave"`          // automatically save updates to identities, nodes, inputs, outputs
+	ConfigFolder      string `yaml:"configFolder"`      // configuration files location
+	Domain            string `yaml:"domain"`            // optional override per publisher
+	PublisherID       string `yaml:"publisherId"`       // this publisher's ID
+	Loglevel          string `yaml:"loglevel"`          // error, warning, info, debug
+	Logfile           string `yaml:"logfile"`           //
+	DisableConfig     bool   `yaml:"disableConfig"`     // disable configuration over the bus, default is enabled
+	DisableInput      bool   `yaml:"disableInput"`      // disable inputs over the bus, default is enabled
+	DisablePublishers bool   `yaml:"disablePublishers"` // disable listening for available publishers (enabled for signature verification)
+	SecuredDomain     bool   `yaml:"securedDomain"`     // require secured domain and signed messages
+}
+
 // Publisher carries the operating state of 'this' publisher
 type Publisher struct {
-	autosaveConfig bool   // automatically save updates to nodes and identity
-	cacheFolder    string // folder to save discovered publishers
-	configFolder   string // folder to save node and identity configuration
+	config PublisherConfig // determines publisher behavior
 
 	domainIdentities   *identities.DomainPublisherIdentities // discovered publisher identities
 	domainInputs       *inputs.DomainInputs                  // discovered inputs from the domain
@@ -85,81 +97,32 @@ type Publisher struct {
 	updateMutex      *sync.Mutex // mutex for async updating and publishing
 }
 
-// LoadDomainIdentities loads the identities of domain publishers
+// LoadDomainIdentities loads cached identities of the domain publishers from file
 // Intended to cache the public signing keys to verify messages from these publishers
 func (pub *Publisher) LoadDomainIdentities() error {
-	filename := path.Join(pub.configFolder, pub.PublisherID()+DomainPublishersFileSuffix)
+	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+DomainPublishersFileSuffix)
 	err := pub.domainIdentities.LoadIdentities(filename)
 	return err
 }
 
-// LoadRegisteredNodes loads current registered nodes
+// LoadRegisteredNodes loads cached registered nodes
 func (pub *Publisher) LoadRegisteredNodes() error {
-	filename := path.Join(pub.configFolder, pub.PublisherID()+NodesFileSuffix)
+	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+NodesFileSuffix)
 	err := pub.registeredNodes.LoadNodes(filename)
 	return err
 }
 
 // SaveDomainPublishers saves known publisher identities
 func (pub *Publisher) SaveDomainPublishers() error {
-	filename := path.Join(pub.configFolder, pub.PublisherID()+DomainPublishersFileSuffix)
+	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+DomainPublishersFileSuffix)
 	err := pub.domainIdentities.SaveIdentities(filename)
 	return err
 }
 
 // SaveRegisteredNodes saves current registered nodes
 func (pub *Publisher) SaveRegisteredNodes() error {
-	filename := path.Join(pub.configFolder, pub.PublisherID()+NodesFileSuffix)
+	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+NodesFileSuffix)
 	err := pub.registeredNodes.SaveNodes(filename)
-	return err
-}
-
-// SetLogging sets the logging level and output file for this publisher
-// Intended for setting logging from configuration
-//  levelName is the requested logging level: error, warning, info, debug
-//  filename is the output log file full name including path, use "" for stderr
-func (pub *Publisher) SetLogging(levelName string, filename string) error {
-	loggingLevel := log.DebugLevel
-	var err error
-
-	if levelName != "" {
-		switch strings.ToLower(levelName) {
-		case "error":
-			loggingLevel = log.ErrorLevel
-		case "warn":
-		case "warning":
-			loggingLevel = log.WarnLevel
-		case "info":
-			loggingLevel = log.InfoLevel
-		case "debug":
-			loggingLevel = log.DebugLevel
-		}
-	}
-	logOut := os.Stderr
-	if filename != "" {
-		logFileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
-		if err != nil {
-			err = lib.MakeErrorf("Publisher.SetLogging: Unable to open logfile: %s", err)
-		} else {
-			logrus.Warnf("Publisher.SetLogging: Send logging output to %s", filename)
-			logOut = logFileHandle
-		}
-	}
-
-	logrus.SetFormatter(
-		&log.TextFormatter{
-			// LogFormat: "",
-			// DisableColors:   true,
-			// DisableLevelTruncation: true,
-			// PadLevelText:    true,
-			TimestampFormat: "2006-01-02 15:04:05.000",
-			FullTimestamp:   true,
-			// ForceFormatting: true,
-		})
-	logrus.SetOutput(logOut)
-	logrus.SetLevel(loggingLevel)
-
-	logrus.SetReportCaller(false) // publisher logging includes caller and file:line#
 	return err
 }
 
@@ -189,11 +152,6 @@ func (pub *Publisher) SetPollInterval(seconds int, handler func(pub *Publisher))
 func (pub *Publisher) Start() {
 	logrus.Warningf("Publisher.Start: Starting publisher %s/%s", pub.Domain(), pub.PublisherID())
 
-	if pub.messenger == nil {
-		logrus.Errorf("Publisher.Start: Can't start publisher %s/%s without a messenger. See SetMessenger()",
-			pub.Domain(), pub.PublisherID())
-		return
-	}
 	if !pub.isRunning {
 		pub.updateMutex.Lock()
 		pub.isRunning = true
@@ -210,9 +168,18 @@ func (pub *Publisher) Start() {
 		// receive domain entities, eg identities, nodes, inputs and outputs
 		pub.receiveDomainIdentities.Start()
 		// receive commands
-		pub.receiveNodeSetAlias.Start()
-		pub.receiveNodeConfigure.Start()
-		pub.receiveMyIdentityUpdate.Start()
+		// If inputs are not disabled, subscribe to set input commands
+		if !pub.config.DisableInput {
+			pub.receiveNodeSetAlias.Start()
+		}
+		// If configuration is not disabled, subscribe to configuration commands
+		if !pub.config.DisableConfig {
+			pub.receiveNodeConfigure.Start()
+		}
+		// in secured domains the DSS can update the identity
+		if pub.config.SecuredDomain {
+			pub.receiveMyIdentityUpdate.Start()
+		}
 		//  listening
 		// TODO: support LWT
 		pub.messenger.Connect("", "")
@@ -287,6 +254,55 @@ func (pub *Publisher) heartbeatLoop() {
 	logrus.Infof("Publisher.heartbeatLoop: Ending loop of publisher %s", pub.PublisherID())
 }
 
+// SetLogging sets the logging level and output file for this publisher
+// Intended for setting logging from configuration
+//  levelName is the requested logging level: error, warning, info, debug
+//  filename is the output log file full name including path, use "" for stderr
+func SetLogging(levelName string, filename string) error {
+	loggingLevel := log.DebugLevel
+	var err error
+
+	if levelName != "" {
+		switch strings.ToLower(levelName) {
+		case "error":
+			loggingLevel = log.ErrorLevel
+		case "warn":
+		case "warning":
+			loggingLevel = log.WarnLevel
+		case "info":
+			loggingLevel = log.InfoLevel
+		case "debug":
+			loggingLevel = log.DebugLevel
+		}
+	}
+	logOut := os.Stderr
+	if filename != "" {
+		logFileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+		if err != nil {
+			err = lib.MakeErrorf("Publisher.SetLogging: Unable to open logfile: %s", err)
+		} else {
+			logrus.Warnf("Publisher.SetLogging: Send logging output to %s", filename)
+			logOut = logFileHandle
+		}
+	}
+
+	logrus.SetFormatter(
+		&log.TextFormatter{
+			// LogFormat: "",
+			// DisableColors:   true,
+			// DisableLevelTruncation: true,
+			// PadLevelText:    true,
+			TimestampFormat: "2006-01-02 15:04:05.000",
+			FullTimestamp:   true,
+			// ForceFormatting: true,
+		})
+	logrus.SetOutput(logOut)
+	logrus.SetLevel(loggingLevel)
+
+	logrus.SetReportCaller(false) // publisher logging includes caller and file:line#
+	return err
+}
+
 // NewPublisher creates a new publisher instance. This is used for all publications.
 //
 // The configFolder contains the publisher saved identity and node configuration <publisherID>-nodes.json.
@@ -299,21 +315,26 @@ func (pub *Publisher) heartbeatLoop() {
 //
 // signingMethod indicates if and how publications must be signed. The default is jws. For testing 'none' can be used.
 //
-// messenger for publishing onto the message bus
-func NewPublisher(domain string, publisherID string, configFolder string, autosave bool,
-	messenger messaging.IMessenger,
+// messenger for publishing onto the message bus is required
+func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 ) *Publisher {
 
-	logrus.SetLevel(log.WarnLevel)
-	if domain == "" {
-		domain = types.LocalDomainID
+	if messenger == nil {
+		return nil
 	}
-	// load this publisher and domain identities
-	if configFolder == "" {
-		configFolder = lib.DefaultConfigFolder
+	if config == nil {
+		config = &PublisherConfig{}
 	}
-	identityFile := path.Join(configFolder, publisherID+IdentityFileSuffix)
-	registeredIdentity := identities.NewRegisteredIdentity(domain, publisherID)
+	if config.Domain == "" {
+		config.Domain = types.LocalDomainID
+	}
+	if config.ConfigFolder == "" {
+		config.ConfigFolder = lib.DefaultConfigFolder
+	}
+	SetLogging(config.Loglevel, config.Logfile)
+
+	identityFile := path.Join(config.ConfigFolder, config.PublisherID+IdentityFileSuffix)
+	registeredIdentity := identities.NewRegisteredIdentity(config.Domain, config.PublisherID)
 	ident, privKey, err := registeredIdentity.LoadIdentity(identityFile)
 	if err != nil {
 		// save the identity as the loaded one isnt' valid
@@ -329,24 +350,23 @@ func NewPublisher(domain string, publisherID string, configFolder string, autosa
 	domainNodes := nodes.NewDomainNodes(messageSigner)
 	domainOutputs := outputs.NewDomainOutputs(messageSigner)
 	domainOutputValues := outputs.NewDomainOutputValues(messageSigner)
-	registeredInputs := inputs.NewRegisteredInputs(domain, publisherID)
-	registeredNodes := nodes.NewRegisteredNodes(domain, publisherID)
-	registeredOutputs := outputs.NewRegisteredOutputs(domain, publisherID)
-	registeredOutputValues := outputs.NewRegisteredOutputValues(domain, publisherID)
-	registeredForecastValues := outputs.NewRegisteredForecastValues(domain, publisherID)
+	registeredInputs := inputs.NewRegisteredInputs(config.Domain, config.PublisherID)
+	registeredNodes := nodes.NewRegisteredNodes(config.Domain, config.PublisherID)
+	registeredOutputs := outputs.NewRegisteredOutputs(config.Domain, config.PublisherID)
+	registeredOutputValues := outputs.NewRegisteredOutputValues(config.Domain, config.PublisherID)
+	registeredForecastValues := outputs.NewRegisteredForecastValues(config.Domain, config.PublisherID)
 
 	receiveMyIdentityUpdate := identities.NewReceiveRegisteredIdentityUpdate(
 		registeredIdentity, messageSigner)
-	receiveDomainIdentities := identities.NewReceivePublisherIdentities(domain,
+	receiveDomainIdentities := identities.NewReceivePublisherIdentities(config.Domain,
 		domainIdentities, messageSigner)
 	receiveNodeConfigure := nodes.NewReceiveNodeConfigure(
-		domain, publisherID, nil, messageSigner, registeredNodes, privKey)
+		config.Domain, config.PublisherID, nil, messageSigner, registeredNodes, privKey)
 	receiveNodeSetAlias := nodes.NewReceiveNodeAlias(
-		domain, publisherID, nil, messageSigner, privKey)
+		config.Domain, config.PublisherID, nil, messageSigner, privKey)
 
 	var publisher = &Publisher{
-		autosaveConfig:     autosave,
-		configFolder:       configFolder,
+		config:             *config,
 		domainIdentities:   domainIdentities,
 		domainInputs:       domainInputs,
 		domainNodes:        domainNodes,
@@ -354,7 +374,7 @@ func NewPublisher(domain string, publisherID string, configFolder string, autosa
 		domainOutputValues: domainOutputValues,
 
 		inputFromSetCommands: inputs.NewReceiveFromSetCommands(
-			domain, publisherID, messageSigner, registeredInputs),
+			config.Domain, config.PublisherID, messageSigner, registeredInputs),
 		inputFromHTTP:    inputs.NewReceiveFromHTTP(registeredInputs),
 		inputFromFiles:   inputs.NewReceiveFromFiles(registeredInputs),
 		inputFromOutputs: inputs.NewReceiveFromOutputs(messageSigner, registeredInputs),

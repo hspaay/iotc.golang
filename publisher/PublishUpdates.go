@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/iotdomain/iotdomain-go/inputs"
+	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/nodes"
 	"github.com/iotdomain/iotdomain-go/outputs"
@@ -17,7 +18,7 @@ func (publisher *Publisher) PublishUpdates() {
 
 	updatedNodes := publisher.registeredNodes.GetUpdatedNodes(true)
 	nodes.PublishRegisteredNodes(updatedNodes, publisher.messageSigner)
-	if len(updatedNodes) > 0 && publisher.configFolder != "" {
+	if len(updatedNodes) > 0 && publisher.config.ConfigFolder != "" {
 		publisher.SaveRegisteredNodes()
 	}
 
@@ -75,23 +76,31 @@ func PublishOutputEvent(
 	registeredOutputs *outputs.RegisteredOutputs,
 	outputValues *outputs.RegisteredOutputValues,
 	messageSigner *messaging.MessageSigner,
-) {
+) error {
 	// output values are published using their alias address, if any
 	aliasAddress := outputs.ReplaceMessageType(node.Address, types.MessageTypeEvent)
 	logrus.Infof("Publisher.publishEvent: %s", aliasAddress)
 
-	nodeOutputs := registeredOutputs.GetOutputsByDeviceID(node.Address)
+	nodeOutputs := registeredOutputs.GetOutputsByDeviceID(node.DeviceID)
 	event := make(map[string]string)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
+	if len(nodeOutputs) == 0 {
+		return lib.MakeErrorf("PublishOutputEvent: Node %s doesn't have any outputs", node.Address)
+	}
 	for _, output := range nodeOutputs {
+		var value = ""
 		latest := outputValues.GetOutputValueByAddress(output.Address)
 		attrID := string(output.OutputType) + "/" + output.Instance
-		event[attrID] = latest.Value
+		if latest != nil {
+			value = latest.Value
+		}
+		event[attrID] = value
 	}
 	eventMessage := &types.OutputEventMessage{
 		Address:   aliasAddress,
 		Event:     event,
 		Timestamp: timeStampStr,
 	}
-	messageSigner.PublishObject(aliasAddress, true, eventMessage, nil)
+	err := messageSigner.PublishObject(aliasAddress, true, eventMessage, nil)
+	return err
 }

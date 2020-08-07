@@ -130,7 +130,9 @@ func (regOutputs *RegisteredOutputs) UpdateOutput(output *types.OutputDiscoveryM
 // updateOutput replaces the output and updates its timestamp.
 // For internal use only. Use within locked section.
 func (regOutputs *RegisteredOutputs) updateOutput(output *types.OutputDiscoveryMessage) {
-
+	if output == nil {
+		return
+	}
 	regOutputs.outputsByID[output.OutputID] = output
 	regOutputs.addressMap[output.Address] = output.OutputID
 

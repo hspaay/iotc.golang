@@ -271,6 +271,11 @@ func (pub *Publisher) PublishRaw(output *types.OutputDiscoveryMessage, sign bool
 	outputs.PublishOutputRaw(output, value, pub.messageSigner)
 }
 
+// PublishOutputEvent publishes all outputs of the node in a single event
+func (pub *Publisher) PublishOutputEvent(node *types.NodeDiscoveryMessage) error {
+	return PublishOutputEvent(node, pub.registeredOutputs, pub.registeredOutputValues, pub.messageSigner)
+}
+
 // PublishSetInput publishes a $set input command to the given input address
 //  This requires that the publisher identity of the receiving input is known so the
 // command can be encrypted.
