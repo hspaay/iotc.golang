@@ -39,7 +39,7 @@ func (nodeConfigure *ReceiveNodeConfigure) Start() {
 	nodeConfigure.updateMutex.Lock()
 	defer nodeConfigure.updateMutex.Unlock()
 	// subscribe to all configure commands for this publisher's nodes
-	addr := MakeNodeAddress(nodeConfigure.domain, nodeConfigure.publisherID, "+", types.MessageTypeConfigure)
+	addr := MakeNodeConfigureAddress(nodeConfigure.domain, nodeConfigure.publisherID, "+")
 	nodeConfigure.messageSigner.Subscribe(addr, nodeConfigure.receiveConfigureCommand)
 }
 
@@ -47,7 +47,7 @@ func (nodeConfigure *ReceiveNodeConfigure) Start() {
 func (nodeConfigure *ReceiveNodeConfigure) Stop() {
 	nodeConfigure.updateMutex.Lock()
 	defer nodeConfigure.updateMutex.Unlock()
-	addr := MakeNodeAddress(nodeConfigure.domain, nodeConfigure.publisherID, "+", types.MessageTypeConfigure)
+	addr := MakeNodeConfigureAddress(nodeConfigure.domain, nodeConfigure.publisherID, "+")
 	nodeConfigure.messageSigner.Unsubscribe(addr, nodeConfigure.receiveConfigureCommand)
 }
 

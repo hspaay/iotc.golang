@@ -1,0 +1,14 @@
+{
+  "address": "local/testapp/$identity",
+  "domain": "local",
+  "issuerId": "testapp",
+  "location": "local",
+  "organization": "",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2UkRFeugsQ6qRb7vfC8DEdcnCM8J\n2pvjo4RVPQqFrNRjsjGELxe9vhgK+AFZC5HcgS6CUHQFGh6Xb/rLoDX1YA==\n-----END PUBLIC KEY-----\n",
+  "publisherId": "testapp",
+  "validUntil": "2021-08-06T20:25:50.056-0700",
+  "signature": "MEUCIQC4VL2-jvCeVjkZ2mE0yOaPgCwuYLBonq-btXESLz_szAIgSWDo87x-wsJWq2nr6aYL76Zifrre3OgQmEbe7ovx6IE=",
+  "timestamp": "2020-08-06T20:25:50.056-0700",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMHcCAQEEILKVotCIOKQLvAhuDNnCZ0aQsFBR4/0X/0XDGWjlxihCoAoGCCqGSM49\nAwEHoUQDQgAE2UkRFeugsQ6qRb7vfC8DEdcnCM8J2pvjo4RVPQqFrNRjsjGELxe9\nvhgK+AFZC5HcgS6CUHQFGh6Xb/rLoDX1YA==\n-----END PRIVATE KEY-----\n",
+  "sender": ""
+ }

@@ -2,13 +2,16 @@
 package nodes
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 
 	"github.com/iotdomain/iotdomain-go/lib"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/types"
+	"github.com/sirupsen/logrus"
 )
 
 // DomainNodes manages nodes discovered on the domain
@@ -87,10 +90,46 @@ func (domainNodes *DomainNodes) GetNodeConfigValue(
 	return attrValue, nil
 }
 
+// LoadNodes loads saved discovered nodes from file
+// Existing nodes are retained but replaced if contained in the file
+func (domainNodes *DomainNodes) LoadNodes(filename string) error {
+	nodeList := make([]*types.NodeDiscoveryMessage, 0)
+
+	jsonNodes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return lib.MakeErrorf("LoadNodes: Unable to open file %s: %s", filename, err)
+	}
+	err = json.Unmarshal(jsonNodes, &nodeList)
+	if err != nil {
+		return lib.MakeErrorf("LoadNodes: Error parsing JSON node file %s: %v", filename, err)
+	}
+	logrus.Infof("LoadIdentities: Identities loaded successfully from %s", filename)
+	for _, node := range nodeList {
+		domainNodes.AddNode(node)
+	}
+	return nil
+
+}
+
 // RemoveNode removes a node using its address.
 // If the node doesn't exist, this is ignored.
 func (domainNodes *DomainNodes) RemoveNode(address string) {
 	domainNodes.c.Remove(address)
+}
+
+// SaveNodes saves previously discovered nodes to file
+func (domainNodes *DomainNodes) SaveNodes(filename string) error {
+	collection := domainNodes.GetAllNodes()
+	jsonText, err := json.MarshalIndent(collection, "", "  ")
+	if err != nil {
+		return lib.MakeErrorf("SaveNodes: Error Marshalling JSON collection '%s': %v", filename, err)
+	}
+	err = ioutil.WriteFile(filename, jsonText, 0664)
+	if err != nil {
+		return lib.MakeErrorf("SaveNodes: Error saving collection to JSON file %s: %v", filename, err)
+	}
+	logrus.Infof("SaveNodes: Collection saved successfully to JSON file %s", filename)
+	return nil
 }
 
 // Subscribe to nodes discovery of the given domain publisher.

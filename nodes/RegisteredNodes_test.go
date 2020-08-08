@@ -21,17 +21,17 @@ const publisher2ID = "publisher2"
 var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
 var node1Addr = node1Base + "/$node"
 
-var node1ConfigureAddr = node1Base + "/$configure"
-var node1InputAddr = node1Base + "/switch/0/$input"
-var node1InputSetAddr = node1Base + "/switch/0/$set"
+// var node1ConfigureAddr = node1Base + "/$configure"
+// var node1InputAddr = node1Base + "/switch/0/$input"
+// var node1InputSetAddr = node1Base + "/switch/0/$set"
 
-var node1Output1Addr = node1Base + "/switch/0/$output"
-var node1Output1Type = "switch"
-var node1Output1Instance = "0"
+// var node1Output1Addr = node1Base + "/switch/0/$output"
+// var node1Output1Type = "switch"
+// var node1Output1Instance = "0"
 
-var node1valueAddr = node1Base + "/switch/0/$value"
-var node1latestAddr = node1Base + "/switch/0/$latest"
-var node1historyAddr = node1Base + "/switch/0/$history"
+// var node1valueAddr = node1Base + "/switch/0/$value"
+// var node1latestAddr = node1Base + "/switch/0/$latest"
+// var node1historyAddr = node1Base + "/switch/0/$history"
 
 // const node2 = new node.Node{}
 

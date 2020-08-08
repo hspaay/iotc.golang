@@ -23,7 +23,7 @@ const IdentityFileSuffix = "-identity.json"
 
 // RegisteredIdentity for managing the publisher's full identity
 type RegisteredIdentity struct {
-	filename     string // identity filename under which it is saved
+	filename     string // identity filename under which it is saved. Set in LoadIdentity
 	domain       string // domain of the publisher creating this identity
 	publisherID  string
 	fullIdentity *types.PublisherFullIdentity
@@ -55,14 +55,14 @@ func (regIdentity *RegisteredIdentity) GetFullIdentity() (fullIdentity *types.Pu
 // LoadIdentity loads the publisher identity and private key from json file and
 // verifies its content. See also VerifyIdentity for the criteria.
 //  Returns the identity with corresponding ECDSA private key.
-//  If anything goes wrong, the identity doesn' exist or is invalid then an error will be returned
-// and the existing identity remains unchanged.
-// Use SaveIdentity to save updates to the identity, for example when an error is returned
-// write a new identity file.
+//  If the identity doesn't exist, has a different domain/publisherId, or is invalid
+// then an error will be returned and the existing identity remains unchanged.
+// Use SaveIdentity to save updates to the given filename
 func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
 	fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey, err error) {
 
 	// load the identity
+	regIdentity.filename = jsonFilename
 	identityJSON, err := ioutil.ReadFile(jsonFilename)
 	if err != nil {
 		return nil, nil, err
@@ -83,6 +83,25 @@ func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
 		regIdentity.privateKey = privKey
 	}
 	return regIdentity.fullIdentity, regIdentity.privateKey, err
+}
+
+// SaveIdentity save the full identity of the publisher to the json filename provided
+// in LoadIdentity.
+// see also https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
+func (regIdentity *RegisteredIdentity) SaveIdentity() error {
+	if regIdentity.filename == "" {
+		return lib.MakeErrorf("No filename to save under. LoadIdentity must be called first.")
+	}
+	// save the identity as JSON. Remove the existing file first as they are read-only
+	identityJSON, _ := json.MarshalIndent(regIdentity.fullIdentity, " ", " ")
+	// move the identity before deleting
+	os.Rename(regIdentity.filename, regIdentity.filename+".old")
+	err := ioutil.WriteFile(regIdentity.filename, identityJSON, 0400)
+	if err != nil {
+		return lib.MakeErrorf("SaveIdentity: Unable to save the publisher's identity at %s: %s", regIdentity.filename, err)
+	}
+	os.Remove(regIdentity.filename + ".old")
+	return err
 }
 
 // SetDssKey sets the DSS public key. This is needed to allow the DSS to update the
@@ -166,20 +185,6 @@ func MakePublisherIdentityAddress(domain string, publisherID string) string {
 	return address
 }
 
-// SaveIdentity save the full identity of the publisher to the given json filename.
-// The identity is saved as a json file.
-// see also https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
-func SaveIdentity(jsonFilename string, identity *types.PublisherFullIdentity) error {
-	// save the identity as JSON. Remove the existing file first as they are read-only
-	identityJSON, _ := json.MarshalIndent(identity, " ", " ")
-	os.Remove(jsonFilename)
-	err := ioutil.WriteFile(jsonFilename, identityJSON, 0400)
-	if err != nil {
-		return lib.MakeErrorf("SaveIdentity: Unable to save the publisher's identity at %s: %s", jsonFilename, err)
-	}
-	return err
-}
-
 // VerifyFullIdentity verifies the given full identity
 // If the publisher joined with the DSS domain then a dssSigningKey is known and
 // the identity MUST be signed by thep rovided DSS.
@@ -195,7 +200,12 @@ func SaveIdentity(jsonFilename string, identity *types.PublisherFullIdentity) er
 func VerifyFullIdentity(ident *types.PublisherFullIdentity, domain string,
 	publisherID string, dssSigningKey *ecdsa.PublicKey) error {
 
-	// the public identity must verify first
+	// must be of the same publisher
+	if domain != ident.Domain || publisherID != ident.PublisherID {
+		return lib.MakeErrorf("Identity publisher %s/%s doesn't match the given publisher %s/%s",
+			ident.Domain, ident.PublisherID, domain, publisherID)
+	}
+	// the public identity must verify
 	err := VerifyPublisherIdentity(ident.Address, &ident.PublisherIdentityMessage, dssSigningKey)
 	if err != nil {
 		return err
@@ -212,7 +222,6 @@ func VerifyFullIdentity(ident *types.PublisherFullIdentity, domain string,
 }
 
 // NewRegisteredIdentity creates a new registered identity
-// Use LoadIdentity to load a previously saved identity
 func NewRegisteredIdentity(domain string, publisherID string) (regIdent *RegisteredIdentity) {
 
 	fullIdentity, privKey := CreateIdentity(domain, publisherID)

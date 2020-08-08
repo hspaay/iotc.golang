@@ -42,15 +42,17 @@ const (
 
 // PublisherConfig defined configuration fields read from the application configuration
 type PublisherConfig struct {
-	Autosave          bool   `yaml:"autosave"`          // automatically save updates to identities, nodes, inputs, outputs
-	ConfigFolder      string `yaml:"configFolder"`      // configuration files location
+	CachePublishers   bool   `yaml:"cachePublishers"`   // load/save discovered publisher identities
+	CacheNodes        bool   `yaml:"cacheNodes"`        // load/save discovered nodes
+	CacheFolder       string `yaml:"cacheFolder"`       // location of discovered nodes and identities
+	ConfigFolder      string `yaml:"configFolder"`      // location of yaml configuration files and configuration changes
 	Domain            string `yaml:"domain"`            // optional override per publisher
 	PublisherID       string `yaml:"publisherId"`       // this publisher's ID
 	Loglevel          string `yaml:"loglevel"`          // error, warning, info, debug
 	Logfile           string `yaml:"logfile"`           //
 	DisableConfig     bool   `yaml:"disableConfig"`     // disable configuration over the bus, default is enabled
 	DisableInput      bool   `yaml:"disableInput"`      // disable inputs over the bus, default is enabled
-	DisablePublishers bool   `yaml:"disablePublishers"` // disable listening for available publishers (enabled for signature verification)
+	DisablePublishers bool   `yaml:"disablePublishers"` // disable listening for available publishers (enable for signature verification)
 	SecuredDomain     bool   `yaml:"securedDomain"`     // require secured domain and signed messages
 }
 
@@ -97,15 +99,17 @@ type Publisher struct {
 	updateMutex      *sync.Mutex // mutex for async updating and publishing
 }
 
-// LoadDomainIdentities loads cached identities of the domain publishers from file
+// LoadCachedDiscoveries loads cached discovered publisher identities and nodes from
+// the cache folder.
 // Intended to cache the public signing keys to verify messages from these publishers
-func (pub *Publisher) LoadDomainIdentities() error {
-	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+DomainPublishersFileSuffix)
+func (pub *Publisher) LoadCachedDiscoveries() error {
+	filename := path.Join(pub.config.CacheFolder, pub.PublisherID()+DomainPublishersFileSuffix)
 	err := pub.domainIdentities.LoadIdentities(filename)
 	return err
 }
 
-// LoadRegisteredNodes loads cached registered nodes
+// LoadRegisteredNodes loads saved registered nodes from the config folder.
+// Intended to restore node configuration.
 func (pub *Publisher) LoadRegisteredNodes() error {
 	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+NodesFileSuffix)
 	err := pub.registeredNodes.LoadNodes(filename)
@@ -165,14 +169,24 @@ func (pub *Publisher) Start() {
 		myIdent, _ := pub.registeredIdentity.GetFullIdentity()
 		pub.domainIdentities.AddIdentity(&myIdent.PublisherIdentityMessage)
 
-		// receive domain entities, eg identities, nodes, inputs and outputs
-		pub.receiveDomainIdentities.Start()
-		// receive commands
-		// If inputs are not disabled, subscribe to set input commands
+		// reload previously discovered publishers
+		if pub.config.CachePublishers {
+			pub.domainIdentities.LoadIdentities(pub.config.CacheFolder)
+		}
+		// reload previously discovered nodes
+		if pub.config.CacheNodes {
+			pub.domainNodes.LoadNodes(pub.config.CacheFolder)
+		}
+
+		// discover domain entities, eg identities, nodes, inputs and outputs
+		if !pub.config.DisablePublishers {
+			pub.receiveDomainIdentities.Start()
+		}
+		// receive registered input set commands
 		if !pub.config.DisableInput {
 			pub.receiveNodeSetAlias.Start()
 		}
-		// If configuration is not disabled, subscribe to configuration commands
+		// Receive registered node configuration commands
 		if !pub.config.DisableConfig {
 			pub.receiveNodeConfigure.Start()
 		}
@@ -335,10 +349,10 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 
 	identityFile := path.Join(config.ConfigFolder, config.PublisherID+IdentityFileSuffix)
 	registeredIdentity := identities.NewRegisteredIdentity(config.Domain, config.PublisherID)
-	ident, privKey, err := registeredIdentity.LoadIdentity(identityFile)
+	_, privKey, err := registeredIdentity.LoadIdentity(identityFile)
 	if err != nil {
 		// save the identity as the loaded one isnt' valid
-		identities.SaveIdentity(identityFile, ident)
+		registeredIdentity.SaveIdentity()
 	}
 	domainIdentities := identities.NewDomainPublisherIdentities()
 
@@ -365,7 +379,7 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 	receiveNodeSetAlias := nodes.NewReceiveNodeAlias(
 		config.Domain, config.PublisherID, nil, messageSigner, privKey)
 
-	var publisher = &Publisher{
+	var pub = &Publisher{
 		config:             *config,
 		domainIdentities:   domainIdentities,
 		domainInputs:       domainInputs,
@@ -401,7 +415,10 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 
 		updateMutex: &sync.Mutex{},
 	}
-	receiveNodeSetAlias.SetAliasHandler(publisher.HandleAliasCommand)
+	receiveNodeSetAlias.SetAliasHandler(pub.HandleAliasCommand)
 
-	return publisher
+	// Load configuration of previously registered nodes from config
+	pub.LoadRegisteredNodes()
+
+	return pub
 }

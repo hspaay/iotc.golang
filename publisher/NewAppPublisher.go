@@ -17,10 +17,10 @@ import (
 //  configFolder location contains saved publisher, nodes, inputs and outputs, use "" for default
 // location (.config/iotdomain).
 //  appConfig optional application object to load <appID>.yaml configuration into
-//  autosave automatically saves discovered identities and node configuration.
+//  cacheDiscovery loads and saves discovered publisher identities and nodes from cache
 // This returns publisher instance or error if messenger fails to load
 func NewAppPublisher(appID string, configFolder string,
-	appConfig interface{}, autosave bool) (*Publisher, error) {
+	appConfig interface{}, cacheDiscovery bool) (*Publisher, error) {
 
 	// 1: load messenger config shared with other publishers
 	var messengerConfig = messaging.MessengerConfig{}
@@ -29,11 +29,13 @@ func NewAppPublisher(appID string, configFolder string,
 
 	// 2: load Publisher config fields from appconfig
 	pubConfig := &PublisherConfig{
-		Autosave:     autosave,
-		ConfigFolder: configFolder,
-		Loglevel:     "warning",
-		Domain:       messengerConfig.Domain,
-		PublisherID:  appID,
+		CacheNodes:      cacheDiscovery,
+		CachePublishers: cacheDiscovery,
+		ConfigFolder:    configFolder,
+		CacheFolder:     lib.DefaultCacheFolder,
+		Loglevel:        "warning",
+		Domain:          messengerConfig.Domain,
+		PublisherID:     appID,
 	}
 	lib.LoadAppConfig(configFolder, appID, &pubConfig)
 
@@ -44,10 +46,5 @@ func NewAppPublisher(appID string, configFolder string,
 	// 4: create the publisher. Reload its identity if available.
 	pub := NewPublisher(pubConfig, messenger)
 
-	// Load configuration of previously registered nodes from config
-	pub.LoadRegisteredNodes()
-
-	// Load discovered domain publishers from cache
-	pub.LoadDomainIdentities()
 	return pub, err
 }

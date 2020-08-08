@@ -564,6 +564,11 @@ func MakeNodeAddress(domain string, publisherID string, nodeID string, messageTy
 	return address
 }
 
+// MakeNodeConfigureAddress generates the address to configure a node
+func MakeNodeConfigureAddress(domain string, publisherID string, nodeID string) string {
+	return MakeNodeAddress(domain, publisherID, nodeID, types.MessageTypeConfigure)
+}
+
 // MakeNodeDiscoveryAddress generates the address of a node: domain/publisherID/nodeID/$node.
 func MakeNodeDiscoveryAddress(domain string, publisherID string, nodeID string) string {
 	return MakeNodeAddress(domain, publisherID, nodeID, types.MessageTypeNodeDiscovery)

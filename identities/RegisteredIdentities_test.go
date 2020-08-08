@@ -26,15 +26,16 @@ func TestPersistIdentity(t *testing.T) {
 	identityFile := configFolder + "/testpersistidentity.json"
 
 	// setup - create and save an identity
-	ident, privKey := identities.CreateIdentity(domain, publisherID)
+	regIdent2 := identities.NewRegisteredIdentity(domain, publisherID)
+	regIdent2.LoadIdentity(identityFile)
+	ident, privKey := regIdent2.GetFullIdentity()
 	require.NotEmpty(t, ident, "Identity not created")
 	require.Equal(t, domain, ident.Domain)
 	require.Equal(t, publisherID, ident.PublisherID)
-	err := identities.SaveIdentity(identityFile, ident)
+	err := regIdent2.SaveIdentity()
 	require.NoError(t, err, "Failed saving identity")
 
 	// load and compare identity
-	regIdent2 := identities.NewRegisteredIdentity(domain, publisherID)
 	ident2, privKey2, err := regIdent2.LoadIdentity(identityFile)
 	require.NoError(t, err, "Failed loading identity")
 	require.NotNil(t, ident2, "Unable to read identity")
@@ -46,7 +47,7 @@ func TestPersistIdentity(t *testing.T) {
 
 	// error case using default identity folder and a not yet existing identity
 	regIdent3 := identities.NewRegisteredIdentity(domain3, publisherID3)
-	ident3, privKey3, err := regIdent3.LoadIdentity("")
+	ident3, privKey3, err := regIdent3.LoadIdentity("/root/nofileaccess")
 	require.NotNil(t, err, "Expected error loading non existing identity")
 	require.Nil(t, ident3, "Unable to create identity")
 	require.Nil(t, privKey3, "Unable to create identity keys")
@@ -54,7 +55,7 @@ func TestPersistIdentity(t *testing.T) {
 	assert.Equal(t, publisherID, ident2.PublisherID, "Publisher should be unchanged")
 
 	// error case - invalid file
-	err = identities.SaveIdentity("/root/nofileaccess", ident3)
+	err = regIdent3.SaveIdentity()
 	assert.Error(t, err, "shoulf fail saving to root")
 	// cleanup
 	os.Remove(identityFile)

@@ -57,6 +57,7 @@ func (rxIdentity *ReceiveRegisteredIdentityUpdate) ReceiveIdentityUpdate(address
 	}
 	if rxIdentity.registeredIdentity != nil {
 		rxIdentity.registeredIdentity.UpdateIdentity(&newIdentity)
+		rxIdentity.registeredIdentity.SaveIdentity()
 	}
 	return err
 }
