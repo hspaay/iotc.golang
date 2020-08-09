@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iotdomain/iotdomain-go/inputs"
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/publisher"
 	"github.com/iotdomain/iotdomain-go/types"
@@ -111,7 +112,10 @@ func TestLoadNodes(t *testing.T) {
 	pub1 := publisher.NewPublisher(test1Config, testMessenger)
 	pub1.CreateNode(device1ID, device1Type)
 
-	err := pub1.LoadRegisteredNodes()
+	err := pub1.LoadCachedIdentities()
+	assert.Errorf(t, err, "Unexpectedly loaded cached identities")
+
+	err = pub1.LoadRegisteredNodes()
 	assert.NoErrorf(t, err, "Unable to load config from folder: %s", err)
 
 	err = pub1.SaveDomainPublishers()
@@ -174,8 +178,11 @@ func TestReceiveInput(t *testing.T) {
 
 	in1 := pub1.GetInputByAddress(node1InputAddr)
 	assert.NotNilf(t, in1, "Input 1 not found on address %s", node1InputAddr)
+	node1InputID := inputs.MakeInputID(node1ID, node1InputType, types.DefaultInputInstance)
+	in1 = pub1.GetInputByID(node1InputID)
+	assert.NotNilf(t, in1, "Input 1 not found on ID %s", node1InputID)
 
-	val := pub1.GetOutputValue(node1ID, node1Output1Type, types.DefaultOutputInstance)
+	val := pub1.GetOutputValueByDevice(node1ID, node1Output1Type, types.DefaultOutputInstance)
 	if !assert.NotNilf(t, val, "Unable to find output value for output %s", node1Output1Addr) {
 		return
 	}
@@ -207,7 +214,7 @@ func TestErrors(t *testing.T) {
 	pub1.Address()
 	pub1.CreateInput("fakeid", "faketype", types.DefaultInputInstance, nil)
 	pub1.CreateInputFromFile("fakeid", "faketype", types.DefaultInputInstance, "fakepath", nil)
-	pub1.CreateInputFromHTTP("fakeid", "faketype", types.DefaultInputInstance, "fakeurl", 0, nil)
+	pub1.CreateInputFromHTTP("fakeid", "faketype", types.DefaultInputInstance, "fakeurl", "", "", 0, nil)
 	pub1.CreateInputFromOutput("fakeid", "faketype", types.DefaultInputInstance, "fakeaddr", nil)
 	pub1.CreateNode("fakeid", types.NodeTypeAlarm)
 	out1 := pub1.CreateOutput("fakeid", types.OutputTypeAlarm, types.DefaultOutputInstance)
@@ -234,9 +241,11 @@ func TestErrors(t *testing.T) {
 	pub1.GetNodes()
 	pub1.GetNodeStatus("fakeid", "fakeattr")
 	pub1.GetNodeStatus("doesntexist", "")
-	pub1.GetOutput("fakenode", "", "")
+	pub1.GetOutputByDevice("fakenode", "", "")
+	pub1.GetOutputByID("fakeid")
 	pub1.GetOutputs()
-	pub1.GetOutputValue("fakeid", "faketype", "")
+	pub1.GetOutputValueByDevice("fakedevice", "faketype", "")
+	pub1.GetOutputValueByID("fakeid")
 	pub1.MakeNodeDiscoveryAddress("fakeid")
 	pub1.PublishNodeConfigure("fakeaddr", types.NodeAttrMap{})
 	pub1.PublishRaw(out1, true, "value")

@@ -16,29 +16,29 @@ type OutputHistory []types.OutputValue
 type RegisteredOutputValues struct {
 	domain         string                   // the domain of this publisher
 	publisherID    string                   // the registered publisher for the inputs
-	historyMap     map[string]OutputHistory // history lists by output address
+	historyMap     map[string]OutputHistory // history lists by output ID
 	updateMutex    *sync.Mutex              // mutex for async updating of outputs
-	updatedOutputs map[string]string        // addresses of updated outputs
+	updatedOutputs map[string]string        // IDs of updated outputs
 }
 
 // GetHistory returns the history list
 // Returns nil if the type or instance is unknown
-func (outputValues *RegisteredOutputValues) GetHistory(address string) OutputHistory {
+func (outputValues *RegisteredOutputValues) GetHistory(outputID string) OutputHistory {
 	outputValues.updateMutex.Lock()
-	var historyList = outputValues.historyMap[address]
+	var historyList = outputValues.historyMap[outputID]
 	outputValues.updateMutex.Unlock()
 	return historyList
 }
 
-// GetOutputValueByAddress returns the most recent output value by output discovery address
+// GetOutputValueByID returns the most recent output value by output ID
 // This returns a HistoryValue object with the latest value and timestamp it was updated
-func (outputValues *RegisteredOutputValues) GetOutputValueByAddress(address string) *types.OutputValue {
+func (outputValues *RegisteredOutputValues) GetOutputValueByID(outputID string) *types.OutputValue {
 	var latest *types.OutputValue
 
 	outputValues.updateMutex.Lock()
 	defer outputValues.updateMutex.Unlock()
 
-	history := outputValues.historyMap[address]
+	history := outputValues.historyMap[outputID]
 
 	if history == nil || len(history) == 0 {
 		return nil
@@ -47,48 +47,48 @@ func (outputValues *RegisteredOutputValues) GetOutputValueByAddress(address stri
 	return latest
 }
 
-// GetOutputValueByType returns the current output value by output type and instance
+// GetOutputValueByType returns the current output value by deviceID, output type and instance
 func (outputValues *RegisteredOutputValues) GetOutputValueByType(
-	nodeID string, outputType types.OutputType, instance string) *types.OutputValue {
-	addr := MakeOutputDiscoveryAddress(outputValues.domain, outputValues.publisherID, nodeID, outputType, instance)
-	return outputValues.GetOutputValueByAddress(addr)
+	deviceID string, outputType types.OutputType, instance string) *types.OutputValue {
+	outputID := MakeOutputID(deviceID, outputType, instance)
+	return outputValues.GetOutputValueByID(outputID)
 }
 
-// GetUpdatedOutputValues returns a list of addresses of outputs that have updated values
-// clear the update outputs list on return
+// GetUpdatedOutputValues returns a list of output IDs that have updated values
+//  clearUpdates clears the list upon return
 func (outputValues *RegisteredOutputValues) GetUpdatedOutputValues(clearUpdates bool) []string {
-	var addrList []string = make([]string, 0)
+	var idList []string = make([]string, 0)
 
 	outputValues.updateMutex.Lock()
 	defer outputValues.updateMutex.Unlock()
 
 	if outputValues.updatedOutputs != nil {
-		for _, addr := range outputValues.updatedOutputs {
-			addrList = append(addrList, addr)
+		for _, outputID := range outputValues.updatedOutputs {
+			idList = append(idList, outputID)
 		}
 		if clearUpdates {
 			outputValues.updatedOutputs = nil
 		}
 	}
-	return addrList
+	return idList
 }
 
 // UpdateOutputFloatList adds a list of floats as the output value in the format: "[value1, value2, ...]"
-func (outputValues *RegisteredOutputValues) UpdateOutputFloatList(address string, values []float32) bool {
+func (outputValues *RegisteredOutputValues) UpdateOutputFloatList(outputID string, values []float32) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(address, string(valuesAsString))
+	return outputValues.UpdateOutputValue(outputID, string(valuesAsString))
 }
 
 // UpdateOutputIntList adds a list of integers as the output value in the format: "[value1, value2, ...]"
-func (outputValues *RegisteredOutputValues) UpdateOutputIntList(address string, values []int) bool {
+func (outputValues *RegisteredOutputValues) UpdateOutputIntList(outputID string, values []int) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(address, string(valuesAsString))
+	return outputValues.UpdateOutputValue(outputID, string(valuesAsString))
 }
 
 // UpdateOutputStringList adds a list of strings as the output value in the format: "[value1, value2, ...]"
-func (outputValues *RegisteredOutputValues) UpdateOutputStringList(address string, values []string) bool {
+func (outputValues *RegisteredOutputValues) UpdateOutputStringList(outputID string, values []string) bool {
 	valuesAsString, _ := json.Marshal(values)
-	return outputValues.UpdateOutputValue(address, string(valuesAsString))
+	return outputValues.UpdateOutputValue(outputID, string(valuesAsString))
 }
 
 // UpdateOutputValue adds the new node output value to the front of the history
@@ -96,7 +96,7 @@ func (outputValues *RegisteredOutputValues) UpdateOutputStringList(address strin
 //  it has changed, or if the previous update was older than the repeatDelay.
 // The history retains a max of 24 hours
 // returns true if history is updated, false if history has not been updated
-func (outputValues *RegisteredOutputValues) UpdateOutputValue(address string, newValue string) bool {
+func (outputValues *RegisteredOutputValues) UpdateOutputValue(outputID string, newValue string) bool {
 	var previous *types.OutputValue
 	var repeatDelay = 3600 // default repeat delay is 1 hour
 	var ageSeconds = -1
@@ -107,7 +107,7 @@ func (outputValues *RegisteredOutputValues) UpdateOutputValue(address string, ne
 
 	// auto create the output if it hasn't been discovered yet
 	// output := outputvalue.Outputs.GetOutputByAddress(addr)
-	history := outputValues.historyMap[address]
+	history := outputValues.historyMap[outputID]
 
 	// only update output if value changes or delay has passed
 	// for now use 1 hour repeat delay. Need to get the config from somewhere
@@ -125,13 +125,13 @@ func (outputValues *RegisteredOutputValues) UpdateOutputValue(address string, ne
 		// 24 hour history
 		newHistory := updateHistory(history, newValue, 0)
 
-		outputValues.historyMap[address] = newHistory
+		outputValues.historyMap[outputID] = newHistory
 		hasUpdated = true
 
 		if outputValues.updatedOutputs == nil {
 			outputValues.updatedOutputs = make(map[string]string)
 		}
-		outputValues.updatedOutputs[address] = address
+		outputValues.updatedOutputs[outputID] = outputID
 
 	}
 	return hasUpdated

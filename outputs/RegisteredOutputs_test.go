@@ -63,11 +63,11 @@ func TestUpdateOutputs(t *testing.T) {
 		return
 	}
 	// update
-	// collection.UpdateOutput(output1)
-	// updated = collection.GetUpdatedOutputs(false)
-	// if !(assert.Equal(t, 1, len(updated), "Expected 1 updated output")) {
-	// 	return
-	// }
+	collection.UpdateOutput(output1)
+	updated = collection.GetUpdatedOutputs(false)
+	if !(assert.Equal(t, 1, len(updated), "Expected 1 updated output")) {
+		return
+	}
 }
 
 func TestAlias(t *testing.T) {

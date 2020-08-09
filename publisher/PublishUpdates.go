@@ -28,24 +28,31 @@ func (publisher *Publisher) PublishUpdates() {
 	updatedOutputs := publisher.registeredOutputs.GetUpdatedOutputs(true)
 	outputs.PublishRegisteredOutputs(updatedOutputs, publisher.messageSigner)
 
-	updatedValues := publisher.registeredOutputValues.GetUpdatedOutputValues(true)
-	publisher.PublishUpdatedOutputValues(updatedValues, publisher.messageSigner)
+	updatedOutputIDs := publisher.registeredOutputValues.GetUpdatedOutputValues(true)
+	publisher.PublishUpdatedOutputValues(updatedOutputIDs, publisher.messageSigner)
 }
 
 // PublishUpdatedOutputValues publishes updated outputs discovery and values of registered outputs
 // This uses the node config to determine which output publications to use: eg raw, latest, history
 func (publisher *Publisher) PublishUpdatedOutputValues(
-	updatedOutputValueAddresses []string,
+	updatedOutputIDs []string,
 	messageSigner *messaging.MessageSigner) {
 	regOutputValues := publisher.registeredOutputValues
 
-	for _, outputAddress := range updatedOutputValueAddresses {
-		output := publisher.registeredOutputs.GetOutputByAddress(outputAddress)
-		node := publisher.registeredNodes.GetNodeByAddress(outputAddress)
+	for _, outputID := range updatedOutputIDs {
+		var node *types.NodeDiscoveryMessage
+		latestValue := regOutputValues.GetOutputValueByID(outputID)
+		output := publisher.registeredOutputs.GetOutputByID(outputID)
 
-		latestValue := regOutputValues.GetOutputValueByAddress(outputAddress)
-		if latestValue == nil {
-			logrus.Warningf("PublishOutputValues: no latest value for %s. This is unexpected", output.Address)
+		if output == nil {
+			logrus.Warningf("PublishOutputValues: output with ID %s. This is unexpected", outputID)
+		} else {
+			node = publisher.registeredNodes.GetNodeByDeviceID(output.DeviceID)
+		}
+		if node == nil {
+			logrus.Warningf("PublishOutputValues: no node for output %s. This is unexpected", outputID)
+		} else if latestValue == nil {
+			logrus.Warningf("PublishOutputValues: no latest value for %s. This is unexpected", outputID)
 		} else {
 			pubRaw, _ := publisher.registeredNodes.GetNodeConfigBool(node.Address, types.NodeAttrPublishRaw, true)
 			if pubRaw {
@@ -57,7 +64,7 @@ func (publisher *Publisher) PublishUpdatedOutputValues(
 			}
 			pubHistory, _ := publisher.registeredNodes.GetNodeConfigBool(node.Address, types.NodeAttrPublishHistory, true)
 			if pubHistory {
-				history := regOutputValues.GetHistory(outputAddress)
+				history := regOutputValues.GetHistory(outputID)
 				outputs.PublishOutputHistory(output, history, messageSigner)
 			}
 			pubEvent, _ := publisher.registeredNodes.GetNodeConfigBool(node.Address, types.NodeAttrPublishEvent, false)
@@ -89,7 +96,7 @@ func PublishOutputEvent(
 	}
 	for _, output := range nodeOutputs {
 		var value = ""
-		latest := outputValues.GetOutputValueByAddress(output.Address)
+		latest := outputValues.GetOutputValueByID(output.OutputID)
 		attrID := string(output.OutputType) + "/" + output.Instance
 		if latest != nil {
 			value = latest.Value

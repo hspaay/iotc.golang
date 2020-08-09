@@ -99,10 +99,9 @@ type Publisher struct {
 	updateMutex      *sync.Mutex // mutex for async updating and publishing
 }
 
-// LoadCachedDiscoveries loads cached discovered publisher identities and nodes from
-// the cache folder.
+// LoadCachedIdentities loads discovered publisher identities from the cache folder.
 // Intended to cache the public signing keys to verify messages from these publishers
-func (pub *Publisher) LoadCachedDiscoveries() error {
+func (pub *Publisher) LoadCachedIdentities() error {
 	filename := path.Join(pub.config.CacheFolder, pub.PublisherID()+DomainPublishersFileSuffix)
 	err := pub.domainIdentities.LoadIdentities(filename)
 	return err

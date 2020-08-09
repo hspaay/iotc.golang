@@ -41,10 +41,12 @@ func (pub *Publisher) CreateInputFromFile(deviceID string, inputType types.Input
 
 // CreateInputFromHTTP periodically polls an http address and sends the response to an input when it is modified
 func (pub *Publisher) CreateInputFromHTTP(deviceID string, inputType types.InputType, instance string,
-	url string, intervalSec int,
+	url string, login string, password string, intervalSec int,
 	handler func(input *types.InputDiscoveryMessage, sender string, value string)) {
 
-	input := pub.registeredInputs.CreateInput(deviceID, inputType, instance, handler)
+	input := pub.inputFromHTTP.CreateHttpInput(
+		deviceID, inputType, instance, url, login, password, intervalSec, handler)
+	// input := pub.registeredInputs.CreateInput(deviceID, inputType, instance, handler)
 	// pub.httpInputs.LinkToInput(path, path)
 	_ = input
 }
@@ -129,6 +131,11 @@ func (pub *Publisher) GetInputByAddress(address string) *types.InputDiscoveryMes
 	return pub.registeredInputs.GetInputByAddress(address)
 }
 
+// GetInputByID returns a registered input by its inputID
+func (pub *Publisher) GetInputByID(inputID string) *types.InputDiscoveryMessage {
+	return pub.registeredInputs.GetInputByID(inputID)
+}
+
 // GetInputs returns a list of all registered inputs
 func (pub *Publisher) GetInputs() []*types.InputDiscoveryMessage {
 	return pub.registeredInputs.GetAllInputs()
@@ -211,15 +218,14 @@ func (pub *Publisher) GetNodeStatus(deviceID string, attrName types.NodeStatus) 
 	return value, exists
 }
 
-// GetPublisherKey returns the public key of the publisher contained in the given address
-// The address must at least contain a domain and publisherId
-func (pub *Publisher) GetPublisherKey(address string) *ecdsa.PublicKey {
-	return pub.domainIdentities.GetPublisherKey(address)
+// GetOutputByDevice get a registered output by device ID
+func (pub *Publisher) GetOutputByDevice(deviceID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
+	return pub.registeredOutputs.GetOutputByDevice(deviceID, outputType, instance)
 }
 
-// GetOutput get a registered output
-func (pub *Publisher) GetOutput(deviceID string, outputType types.OutputType, instance string) *types.OutputDiscoveryMessage {
-	return pub.registeredOutputs.GetOutputByDevice(deviceID, outputType, instance)
+// GetOutputByID gets a registered output by its outputID
+func (pub *Publisher) GetOutputByID(outputID string) *types.OutputDiscoveryMessage {
+	return pub.registeredOutputs.GetOutputByID(outputID)
 }
 
 // GetOutputs returns a list of all registered outputs
@@ -227,9 +233,20 @@ func (pub *Publisher) GetOutputs() []*types.OutputDiscoveryMessage {
 	return pub.registeredOutputs.GetAllOutputs()
 }
 
-// GetOutputValue returns the registered output's value object including timestamp
-func (pub *Publisher) GetOutputValue(deviceID string, outputType types.OutputType, instance string) *types.OutputValue {
+// GetOutputValueByDevice returns the registered output's value object including timestamp
+func (pub *Publisher) GetOutputValueByDevice(deviceID string, outputType types.OutputType, instance string) *types.OutputValue {
 	return pub.registeredOutputValues.GetOutputValueByType(deviceID, outputType, instance)
+}
+
+// GetOutputValueByID returns the registered output's value object including timestamp
+func (pub *Publisher) GetOutputValueByID(outputID string) *types.OutputValue {
+	return pub.registeredOutputValues.GetOutputValueByID(outputID)
+}
+
+// GetPublisherKey returns the public key of the publisher contained in the given address
+// The address must at least contain a domain and publisherId
+func (pub *Publisher) GetPublisherKey(address string) *ecdsa.PublicKey {
+	return pub.domainIdentities.GetPublisherKey(address)
 }
 
 // MakeNodeDiscoveryAddress makes the node discovery address using the publisher domain and publisherID
@@ -383,6 +400,6 @@ func (pub *Publisher) UpdateOutputForecast(outputID string, forecast outputs.Out
 
 // UpdateOutputValue adds the registered node's output value to the front of the value history
 func (pub *Publisher) UpdateOutputValue(deviceID string, outputType types.OutputType, instance string, newValue string) bool {
-	outputAddr := outputs.MakeOutputDiscoveryAddress(pub.Domain(), pub.PublisherID(), deviceID, outputType, instance)
-	return pub.registeredOutputValues.UpdateOutputValue(outputAddr, newValue)
+	outputID := outputs.MakeOutputID(deviceID, outputType, instance)
+	return pub.registeredOutputValues.UpdateOutputValue(outputID, newValue)
 }

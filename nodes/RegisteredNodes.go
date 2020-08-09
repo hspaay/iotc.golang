@@ -51,7 +51,7 @@ func (regNodes *RegisteredNodes) Clone(node *types.NodeDiscoveryMessage) *types.
 }
 
 // CreateNode creates a node instance for a device or service and adds it to the list. If the node exists it will remain unchanged.
-// This returns the node instance
+// This returns the existing node instance or a newly created instance
 func (regNodes *RegisteredNodes) CreateNode(deviceID string, nodeType types.NodeType) *types.NodeDiscoveryMessage {
 	existingNode := regNodes.GetNodeByDeviceID(deviceID)
 	if existingNode != nil {
@@ -494,16 +494,18 @@ func (regNodes *RegisteredNodes) UpdateNodes(updates []*types.NodeDiscoveryMessa
 
 	for _, node := range updates {
 		// fill in missing fields
-		if node.Attr == nil {
-			node.Attr = map[types.NodeAttr]string{}
+		if node != nil {
+			if node.Attr == nil {
+				node.Attr = map[types.NodeAttr]string{}
+			}
+			if node.Config == nil {
+				node.Config = map[types.NodeAttr]types.ConfigAttr{}
+			}
+			if node.Status == nil {
+				node.Status = make(map[types.NodeStatus]string)
+			}
+			regNodes.updateNode(node)
 		}
-		if node.Config == nil {
-			node.Config = map[types.NodeAttr]types.ConfigAttr{}
-		}
-		if node.Status == nil {
-			node.Status = make(map[types.NodeStatus]string)
-		}
-		regNodes.updateNode(node)
 	}
 }
 

@@ -1,6 +1,6 @@
 [
   {
-    "address": "test/publisher1/node1/$node",
+    "address": "test/publisher1/alias1/$node",
     "config": {
       "name": {
         "datatype": "string",
@@ -28,8 +28,8 @@
       }
     },
     "deviceid": "node1",
-    "nodeid": "node1",
+    "nodeid": "alias1",
     "nodeType": "unknown",
-    "timestamp": "2020-08-06T22:12:56.313-0700"
+    "timestamp": "2020-08-08T22:48:01.781-0700"
   }
 ]
