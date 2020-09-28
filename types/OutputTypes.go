@@ -166,7 +166,7 @@ type OutputDiscoveryMessage struct {
 	Unit       Unit          `json:"unit,omitempty"`       // unit of output value
 	// For convenience, filled when registering or receiving
 	OutputID    string     `json:"-"`
-	DeviceID    string     `json:"-"`
+	NodeHWID    string     `json:"-"`
 	PublisherID string     `json:"-"`
 	OutputType  OutputType `json:"-"`
 	Instance    string     `json:"-"`

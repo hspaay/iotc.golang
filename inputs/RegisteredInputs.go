@@ -18,36 +18,36 @@ import (
 
 // RegisteredInputs manages registration of publisher inputs
 // Generics would be nice as this overlaps with outputs, nodes, publishers
-// The inputID used in the inputMap consist of deviceID.inputType.instance
+// The inputID used in the inputMap consist of nodeHWID.inputType.instance
 type RegisteredInputs struct {
-	domain          string                                  // the domain of this publisher
-	publisherID     string                                  // the registered publisher for the inputs
-	addressMap      map[string]string                       // lookup inputID by publication address
-	inputsByID      map[string]*types.InputDiscoveryMessage // lookup input by inputID
-	updatedInputIDs map[string]string                       // inputIDs of inputs that have been rediscovered/updated
-	updateMutex     *sync.Mutex                             // mutex for async handling of inputs
+	domain            string                                  // the domain of this publisher
+	publisherID       string                                  // the registered publisher for the inputs
+	addressMap        map[string]string                       // lookup inputID by publication address
+	inputsByHWID      map[string]*types.InputDiscoveryMessage // lookup input by inputHWID
+	updatedInputHWIDs map[string]string                       // inputHWIDs of inputs that have been rediscovered/updated
+	updateMutex       *sync.Mutex                             // mutex for async handling of inputs
 	// notification handlers by inputID
 	handlers map[string]func(input *types.InputDiscoveryMessage, sender string, value string)
 }
 
 // CreateInput creates and registers a new input with optional handler for input trigger
 func (regInputs *RegisteredInputs) CreateInput(
-	deviceID string, inputType types.InputType, instance string,
+	nodeHWID string, inputType types.InputType, instance string,
 	handler func(input *types.InputDiscoveryMessage, sender string, value string)) *types.InputDiscoveryMessage {
 
-	return regInputs.CreateInputWithSource(deviceID, inputType, instance, "", handler)
+	return regInputs.CreateInputWithSource(nodeHWID, inputType, instance, "", handler)
 }
 
 // CreateInputWithSource creates and registers a new input that takes its input value from a given source
 // Replaces the existing input if it already exist.
 func (regInputs *RegisteredInputs) CreateInputWithSource(
-	deviceID string, inputType types.InputType, instance string, source string,
+	nodeHWID string, inputType types.InputType, instance string, source string,
 	handler func(input *types.InputDiscoveryMessage, sender string, value string)) *types.InputDiscoveryMessage {
 
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
 
-	input := NewInput(regInputs.domain, regInputs.publisherID, deviceID, inputType, instance)
+	input := NewInput(regInputs.domain, regInputs.publisherID, nodeHWID, inputType, instance)
 	input.Source = source
 
 	regInputs.updateInput(input, handler)
@@ -55,19 +55,20 @@ func (regInputs *RegisteredInputs) CreateInputWithSource(
 }
 
 // DeleteInput unregisters the input
-func (regInputs *RegisteredInputs) DeleteInput(inputID string) {
+// inputHWID is the input's ID based on the node HWID
+func (regInputs *RegisteredInputs) DeleteInput(inputHWID string) {
 
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
 
 	// inputAddr := MakeInputDiscoveryAddress(regInputs.domain, regInputs.publisherID, nodeID, inputType, instance)
-	delete(regInputs.inputsByID, inputID)
-	delete(regInputs.handlers, inputID)
-	if regInputs.updatedInputIDs == nil {
-		regInputs.updatedInputIDs = make(map[string]string)
+	delete(regInputs.inputsByHWID, inputHWID)
+	delete(regInputs.handlers, inputHWID)
+	if regInputs.updatedInputHWIDs == nil {
+		regInputs.updatedInputHWIDs = make(map[string]string)
 	}
 	// "" updates mean that the input is deleted
-	regInputs.updatedInputIDs[inputID] = ""
+	regInputs.updatedInputHWIDs[inputHWID] = ""
 }
 
 // GetAllInputs returns the list of inputs
@@ -76,7 +77,7 @@ func (regInputs *RegisteredInputs) GetAllInputs() []*types.InputDiscoveryMessage
 	defer regInputs.updateMutex.Unlock()
 
 	var inputList = make([]*types.InputDiscoveryMessage, 0)
-	for _, output := range regInputs.inputsByID {
+	for _, output := range regInputs.inputsByHWID {
 		inputList = append(inputList, output)
 	}
 	return inputList
@@ -88,38 +89,38 @@ func (regInputs *RegisteredInputs) GetInputByAddress(inputAddr string) *types.In
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
 	inputID := regInputs.addressMap[inputAddr]
-	input := regInputs.inputsByID[inputID]
+	input := regInputs.inputsByHWID[inputID]
 	return input
 }
 
-// GetInputByDevice returns an input by deviceID, input type and instance
+// GetInputByNodeHWID returns an input by nodeHWID, input type and instance
 // Returns nil if the device has no such input
-func (regInputs *RegisteredInputs) GetInputByDevice(
-	deviceID string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
+func (regInputs *RegisteredInputs) GetInputByNodeHWID(
+	nodeHWID string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
 
-	inputID := MakeInputID(deviceID, inputType, instance)
+	inputID := MakeInputHWID(nodeHWID, inputType, instance)
 	return regInputs.GetInputByID(inputID)
 }
 
-// GetInputsByDeviceID returns a list of all inputs of a given deviceID
-func (regInputs *RegisteredInputs) GetInputsByDeviceID(deviceID string) []*types.InputDiscoveryMessage {
+// GetInputsByNodeHWID returns a list of all inputs that are part of the owning node
+func (regInputs *RegisteredInputs) GetInputsByNodeHWID(nodeHWID string) []*types.InputDiscoveryMessage {
 	inputList := make([]*types.InputDiscoveryMessage, 0)
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
-	for _, input := range regInputs.inputsByID {
-		if input.DeviceID == deviceID {
+	for _, input := range regInputs.inputsByHWID {
+		if input.NodeHWID == nodeHWID {
 			inputList = append(inputList, input)
 		}
 	}
 	return inputList
 }
 
-// GetInputByID returns an input by its input ID (device.type.instance)
+// GetInputByID returns an input by its input ID (nodeHWID.type.instance)
 // Returns nil if there is no known input
 func (regInputs *RegisteredInputs) GetInputByID(inputID string) *types.InputDiscoveryMessage {
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
-	var input = regInputs.inputsByID[inputID]
+	var input = regInputs.inputsByHWID[inputID]
 	return input
 }
 
@@ -128,7 +129,7 @@ func (regInputs *RegisteredInputs) GetInputByID(inputID string) *types.InputDisc
 // used with set input commands.
 func (regInputs *RegisteredInputs) GetInputsWithSource(source string) []*types.InputDiscoveryMessage {
 	inputList := make([]*types.InputDiscoveryMessage, 0)
-	for _, input := range regInputs.inputsByID {
+	for _, input := range regInputs.inputsByHWID {
 		if input.Source == source {
 			inputList = append(inputList, input)
 		}
@@ -143,15 +144,15 @@ func (regInputs *RegisteredInputs) GetUpdatedInputs(clearUpdates bool) []*types.
 
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
-	if regInputs.updatedInputIDs != nil {
-		for _, inputID := range regInputs.updatedInputIDs {
-			input := regInputs.inputsByID[inputID]
+	if regInputs.updatedInputHWIDs != nil {
+		for _, inputID := range regInputs.updatedInputHWIDs {
+			input := regInputs.inputsByHWID[inputID]
 			if input != nil {
 				updateList = append(updateList, input)
 			}
 		}
 		if clearUpdates {
-			regInputs.updatedInputIDs = nil
+			regInputs.updatedInputHWIDs = nil
 		}
 	}
 	return updateList
@@ -169,14 +170,14 @@ func (regInputs *RegisteredInputs) NotifyInputHandler(inputID string, sender str
 	}
 }
 
-// SetAlias updates the publication address of all inputs with the given deviceID
-func (regInputs *RegisteredInputs) SetAlias(deviceID string, alias string) {
-	inputList := regInputs.GetInputsByDeviceID(deviceID)
+// SetNodeID changes the publication address of all inputs that belong to the device hardware address
+func (regInputs *RegisteredInputs) SetNodeID(nodeHWID string, newNodeID string) {
+	inputList := regInputs.GetInputsByNodeHWID(nodeHWID)
 	for _, input := range inputList {
 		newAddress := MakeInputDiscoveryAddress(
-			regInputs.domain, regInputs.publisherID, alias, input.InputType, input.Instance)
+			regInputs.domain, regInputs.publisherID, newNodeID, input.InputType, input.Instance)
 		input.Address = newAddress
-		// input.NodeID = alias
+		// input.NodeID = newNodeID
 		regInputs.updateMutex.Lock()
 		regInputs.updateInput(input, nil)
 		regInputs.updateMutex.Unlock()
@@ -189,7 +190,7 @@ func (regInputs *RegisteredInputs) UpdateInput(input *types.InputDiscoveryMessag
 
 	regInputs.updateMutex.Lock()
 	defer regInputs.updateMutex.Unlock()
-	existingInput := regInputs.inputsByID[input.InputID]
+	existingInput := regInputs.inputsByHWID[input.InputID]
 	if existingInput == nil {
 		return lib.MakeErrorf("UpdateInput: input '%s' does not exist", input.InputID)
 	}
@@ -204,32 +205,32 @@ func (regInputs *RegisteredInputs) UpdateInput(input *types.InputDiscoveryMessag
 func (regInputs *RegisteredInputs) updateInput(input *types.InputDiscoveryMessage,
 	handler func(input *types.InputDiscoveryMessage, sender string, value string)) {
 
-	regInputs.inputsByID[input.InputID] = input
+	regInputs.inputsByHWID[input.InputID] = input
 	regInputs.addressMap[input.Address] = input.InputID
 	if handler != nil {
 		regInputs.handlers[input.InputID] = handler
 	}
 	// track which inputs are updated
-	if regInputs.updatedInputIDs == nil {
-		regInputs.updatedInputIDs = make(map[string]string)
+	if regInputs.updatedInputHWIDs == nil {
+		regInputs.updatedInputHWIDs = make(map[string]string)
 	}
 	input.Timestamp = time.Now().Format(types.TimeFormat)
-	regInputs.updatedInputIDs[input.InputID] = input.InputID
+	regInputs.updatedInputHWIDs[input.InputID] = input.InputID
 }
 
-// MakeInputID creates the internal ID to identify the input of the owning deviceID or serviceID.
-func MakeInputID(deviceID string, inputType types.InputType, instance string) string {
-	inputID := deviceID + "." + string(inputType) + "." + instance
+// MakeInputHWID creates the internal ID to identify the input of the owning node using its HWID
+func MakeInputHWID(nodeHWID string, inputType types.InputType, instance string) string {
+	inputID := nodeHWID + "." + string(inputType) + "." + instance
 	return inputID
 }
 
 // NewInput instance for creating an input object for later adding.
 // To add it to the inputlist use 'UpdateInput'
 func NewInput(
-	domain string, publisherID string, deviceID string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
+	domain string, publisherID string, nodeHWID string, inputType types.InputType, instance string) *types.InputDiscoveryMessage {
 
-	inputID := MakeInputID(deviceID, inputType, instance)
-	address := MakeInputDiscoveryAddress(domain, publisherID, deviceID, inputType, instance)
+	inputHWID := MakeInputHWID(nodeHWID, inputType, instance)
+	address := MakeInputDiscoveryAddress(domain, publisherID, nodeHWID, inputType, instance)
 	// segments := strings.Split(nodeAddress, "/")
 	input := &types.InputDiscoveryMessage{
 		Address:   address,
@@ -237,8 +238,8 @@ func NewInput(
 		Config:    make(types.ConfigAttrMap),
 		Timestamp: time.Now().Format(types.TimeFormat),
 		// internal use only
-		InputID:     inputID,
-		DeviceID:    deviceID,
+		InputID:     inputHWID,
+		NodeHWID:    nodeHWID,
 		Instance:    instance,
 		PublisherID: publisherID,
 		InputType:   inputType,
@@ -250,12 +251,12 @@ func NewInput(
 func NewRegisteredInputs(domain string, publisherID string) *RegisteredInputs {
 
 	regInputs := &RegisteredInputs{
-		domain:      domain,
-		publisherID: publisherID,
-		addressMap:  make(map[string]string),
-		inputsByID:  make(map[string]*types.InputDiscoveryMessage),
-		handlers:    make(map[string]func(input *types.InputDiscoveryMessage, sender string, newValue string)),
-		updateMutex: &sync.Mutex{},
+		domain:       domain,
+		publisherID:  publisherID,
+		addressMap:   make(map[string]string),
+		inputsByHWID: make(map[string]*types.InputDiscoveryMessage),
+		handlers:     make(map[string]func(input *types.InputDiscoveryMessage, sender string, newValue string)),
+		updateMutex:  &sync.Mutex{},
 	}
 	return regInputs
 }

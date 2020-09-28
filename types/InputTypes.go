@@ -58,11 +58,11 @@ type InputDiscoveryMessage struct {
 	Timestamp  string        `json:"timestamp"`            // Time the record is last updated
 	Unit       Unit          `json:"unit,omitempty"`       // unit of value
 	// For internal use. Filled when registering inputs
-	InputID     string    `json:"-"`
-	DeviceID    string    `json:"-"`
-	PublisherID string    `json:"-"`
-	InputType   InputType `json:"-"`
-	Instance    string    `json:"-"`
+	InputID     string    `json:"-"` // ID of input using NodeHWID
+	NodeHWID    string    `json:"-"` // Hardware address of the node the input belongs to
+	PublisherID string    `json:"-"` // publisher of the input
+	InputType   InputType `json:"-"` // type of input
+	Instance    string    `json:"-"` // instance of input
 }
 
 // SetInputMessage to control an input

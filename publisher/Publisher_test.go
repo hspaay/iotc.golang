@@ -123,8 +123,8 @@ func TestLoadNodes(t *testing.T) {
 
 }
 
-// TestAlias tests the use of alias in the inout discovery publication
-func TestDiscoveryWithAlias(t *testing.T) {
+// TestDiscoveryWithNewNodeID tests changing the nodeID in the inout discovery publication
+func TestDiscoveryWithNewNodeID(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
 	pub1 := publisher.NewPublisher(test1Config, testMessenger)
 
@@ -134,7 +134,7 @@ func TestDiscoveryWithAlias(t *testing.T) {
 	// pub1.CreateInput(node1ID, node1InputType, types.DefaultInputInstance, nil) // 4th [3]
 	// pub1.CreateOutput(node1ID, node1Output1Type, types.DefaultOutputInstance)  // 4th [3]
 	pub1.PublishUpdates()
-	pub1.PublishNodeAlias(node1Addr, node1AliasID)
+	pub1.PublishSetNodeID(node1Addr, node1AliasID)
 
 	// time.Sleep(1)
 	// nodes, inputs and outputs must have been published using their alias
@@ -150,8 +150,8 @@ func TestReceiveInput(t *testing.T) {
 	var testMessenger = messaging.NewDummyMessenger(msgConfig)
 	// var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
 	// var node2Base = fmt.Sprintf("%s/%s/%s", domain, publisher2ID, "node2")
-	var node1InputSetAddr = fmt.Sprintf("%s/%s/0/%s", node1Base, node1InputType, types.MessageTypeSet)
-	var node2InputSetAddr = fmt.Sprintf("%s/%s/0/%s", node2Base, node1InputType, types.MessageTypeSet)
+	var node1InputSetAddr = fmt.Sprintf("%s/%s/0/%s", node1Base, node1InputType, types.MessageTypeSetInput)
+	var node2InputSetAddr = fmt.Sprintf("%s/%s/0/%s", node2Base, node1InputType, types.MessageTypeSetInput)
 
 	// signMessages = false
 	pub1 := publisher.NewPublisher(test1Config, testMessenger)
@@ -178,11 +178,11 @@ func TestReceiveInput(t *testing.T) {
 
 	in1 := pub1.GetInputByAddress(node1InputAddr)
 	assert.NotNilf(t, in1, "Input 1 not found on address %s", node1InputAddr)
-	node1InputID := inputs.MakeInputID(node1ID, node1InputType, types.DefaultInputInstance)
+	node1InputID := inputs.MakeInputHWID(node1ID, node1InputType, types.DefaultInputInstance)
 	in1 = pub1.GetInputByID(node1InputID)
 	assert.NotNilf(t, in1, "Input 1 not found on ID %s", node1InputID)
 
-	val := pub1.GetOutputValueByDevice(node1ID, node1Output1Type, types.DefaultOutputInstance)
+	val := pub1.GetOutputValueByNodeHWID(node1ID, node1Output1Type, types.DefaultOutputInstance)
 	if !assert.NotNilf(t, val, "Unable to find output value for output %s", node1Output1Addr) {
 		return
 	}
@@ -228,11 +228,11 @@ func TestErrors(t *testing.T) {
 	pub1.GetDomainOutput("fakeaddr")
 	pub1.GetIdentity()
 	pub1.GetIdentityKeys()
-	pub1.GetInputByDevice("fakenode", "", "")
+	pub1.GetInputByNodeHWID("fakenode", "", "")
 	pub1.GetInputs()
 	pub1.GetNodeAttr("fakenode", "fakeattr")
 	pub1.GetNodeByAddress("fakeaddr")
-	pub1.GetNodeByDeviceID("fakenode")
+	pub1.GetNodeByHWID("fakenode")
 	pub1.GetNodeByNodeID("fakenode")
 	pub1.GetNodeConfigBool("fakeid", "fakeattr", false)
 	pub1.GetNodeConfigFloat("fakeid", "fakeattr", 42.0)
@@ -241,10 +241,10 @@ func TestErrors(t *testing.T) {
 	pub1.GetNodes()
 	pub1.GetNodeStatus("fakeid", "fakeattr")
 	pub1.GetNodeStatus("doesntexist", "")
-	pub1.GetOutputByDevice("fakenode", "", "")
+	pub1.GetOutputByNodeHWID("fakenode", "", "")
 	pub1.GetOutputByID("fakeid")
 	pub1.GetOutputs()
-	pub1.GetOutputValueByDevice("fakedevice", "faketype", "")
+	pub1.GetOutputValueByNodeHWID("fakedevice", "faketype", "")
 	pub1.GetOutputValueByID("fakeid")
 	pub1.MakeNodeDiscoveryAddress("fakeid")
 	pub1.PublishNodeConfigure("fakeaddr", types.NodeAttrMap{})
@@ -253,7 +253,7 @@ func TestErrors(t *testing.T) {
 	pub1.SetSigningOnOff(true)
 	pub1.Subscribe("", "")
 	pub1.Unsubscribe("", "")
-	pub1.UpdateNodeErrorStatus("fakeid", types.NodeRunStateError, "fake status")
+	pub1.UpdateNodeErrorStatus("fakeid", types.NodeStateError, "fake status")
 	pub1.UpdateNodeAttr("fakeid", types.NodeAttrMap{})
 	pub1.UpdateNodeConfig("fakeid", types.NodeAttrName, nil)
 	pub1.UpdateNodeConfigValues("fakeid", types.NodeAttrMap{})

@@ -25,18 +25,18 @@ type ReceiveFromHTTP struct {
 	updateMutex      *sync.Mutex       // mutex for async updating of inputs
 }
 
-// CreateHttpInput creates a new input that periodically polls a URL address. If a login and password
+// CreateHTTPInput creates a new input that periodically polls a URL address. If a login and password
 // is provided then it will be used for http basic authentication.
 // If an input of the given nodeID, type and instance already exists it will be replaced.
 // pollInterval is in seconds
-func (rxFromHttp *ReceiveFromHTTP) CreateHttpInput(
-	deviceID string, inputType types.InputType, instance string,
+func (rxFromHttp *ReceiveFromHTTP) CreateHTTPInput(
+	nodeHWID string, inputType types.InputType, instance string,
 	url string, login string, password string, pollInterval int,
 	handler func(input *types.InputDiscoveryMessage, sender string, path string)) *types.InputDiscoveryMessage {
 
-	inputID := MakeInputID(deviceID, inputType, instance)
+	inputID := MakeInputHWID(nodeHWID, inputType, instance)
 	// create the input then add it to the list of addresses to poll
-	input := rxFromHttp.registeredInputs.CreateInputWithSource(deviceID, inputType, instance, url, handler)
+	input := rxFromHttp.registeredInputs.CreateInputWithSource(nodeHWID, inputType, instance, url, handler)
 	input.Attr[types.NodeAttrURL] = url
 	input.Attr[types.NodeAttrPollInterval] = strconv.Itoa(pollInterval)
 	input.Attr[types.NodeAttrLoginName] = login
@@ -126,7 +126,7 @@ func (rxFromHttp *ReceiveFromHTTP) readInput(input *types.InputDiscoveryMessage)
 func (rxFromHttp *ReceiveFromHTTP) pollInputAndNotify(input *types.InputDiscoveryMessage) {
 	payload, err := rxFromHttp.readInput(input)
 	if err == nil && payload != "" {
-		inputID := MakeInputID(input.DeviceID, input.InputType, input.Instance)
+		inputID := MakeInputHWID(input.NodeHWID, input.InputType, input.Instance)
 		rxFromHttp.registeredInputs.NotifyInputHandler(inputID, "", string(payload))
 	}
 }

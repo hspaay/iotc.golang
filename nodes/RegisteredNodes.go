@@ -20,11 +20,13 @@ import (
 // Nodes are immutable. Any modifications made are applied to a new instance. The old node instance
 // is discarded and replaced with the new instance.
 // To make changes to a node directly, always Clone the node first and use UpdateNode to apply the change.
-// A registered node is identified by its deviceID. Its nodeID is used for publication and can change.
+// A registered node is identified by its hwID which is immutable and relates to the hardware the
+// node is attached to. Its nodeID is used for publication and can change.
 type RegisteredNodes struct {
-	domain       string                                 // domain these nodes belong to
-	publisherID  string                                 // ID of the publisher these nodes belong to
-	deviceMap    map[string]*types.NodeDiscoveryMessage // registered nodes by device ID
+	domain      string                                 // domain these nodes belong to
+	publisherID string                                 // ID of the publisher these nodes belong to
+	deviceMap   map[string]*types.NodeDiscoveryMessage // registered nodes by device ID
+	// onSetNodeID  func(node *types.NodeDiscoveryMessage, newID string) // notify of a change in node ID. Use this to update input and output addresses
 	nodeMap      map[string]*types.NodeDiscoveryMessage // registered nodes by node ID
 	updatedNodes map[string]*types.NodeDiscoveryMessage // updated nodes by device ID
 	updateMutex  *sync.Mutex                            // mutex for async updating of nodes
@@ -43,7 +45,7 @@ func (regNodes *RegisteredNodes) Clone(node *types.NodeDiscoveryMessage) *types.
 	// Shallow copy of the config list
 	newNode.Config = node.Config
 
-	newNode.Status = make(map[types.NodeStatus]string)
+	newNode.Status = make(map[types.NodeStatusAttr]string)
 	for key, value := range node.Status {
 		newNode.Status[key] = value
 	}
@@ -52,8 +54,8 @@ func (regNodes *RegisteredNodes) Clone(node *types.NodeDiscoveryMessage) *types.
 
 // CreateNode creates a node instance for a device or service and adds it to the list. If the node exists it will remain unchanged.
 // This returns the existing node instance or a newly created instance
-func (regNodes *RegisteredNodes) CreateNode(deviceID string, nodeType types.NodeType) *types.NodeDiscoveryMessage {
-	existingNode := regNodes.GetNodeByDeviceID(deviceID)
+func (regNodes *RegisteredNodes) CreateNode(hwID string, nodeType types.NodeType) *types.NodeDiscoveryMessage {
+	existingNode := regNodes.GetNodeByHWID(hwID)
 	if existingNode != nil {
 		return existingNode
 	}
@@ -61,7 +63,7 @@ func (regNodes *RegisteredNodes) CreateNode(deviceID string, nodeType types.Node
 	regNodes.updateMutex.Lock()
 	defer regNodes.updateMutex.Unlock()
 
-	newNode := NewNode(regNodes.domain, regNodes.publisherID, deviceID, nodeType)
+	newNode := NewNode(regNodes.domain, regNodes.publisherID, hwID, nodeType)
 	regNodes.updateNode(newNode)
 	return newNode
 }
@@ -74,10 +76,10 @@ func (regNodes *RegisteredNodes) CreateNode(deviceID string, nodeType types.Node
 //  defaultValue to use as default configuration value
 // returns a new Configuration Attribute instance.
 func (regNodes *RegisteredNodes) CreateNodeConfig(
-	deviceID string, attrName types.NodeAttr, dataType types.DataType,
+	hwID string, attrName types.NodeAttr, dataType types.DataType,
 	description string, defaultValue string) *types.ConfigAttr {
 
-	node := regNodes.GetNodeByDeviceID(deviceID)
+	node := regNodes.GetNodeByHWID(hwID)
 	if node == nil {
 		return nil
 	}
@@ -103,6 +105,11 @@ func (regNodes *RegisteredNodes) CreateNodeConfig(
 	return &config
 }
 
+// DeleteNode deletes a node from the collection of registered nodes
+func (regNodes *RegisteredNodes) DeleteNode(hwAddress string) {
+	// TODO
+}
+
 // GetAllNodes returns a list of nodes
 func (regNodes *RegisteredNodes) GetAllNodes() []*types.NodeDiscoveryMessage {
 	regNodes.updateMutex.Lock()
@@ -116,10 +123,10 @@ func (regNodes *RegisteredNodes) GetAllNodes() []*types.NodeDiscoveryMessage {
 }
 
 // GetNodeAttr returns a node attribute value
-func (regNodes *RegisteredNodes) GetNodeAttr(deviceID string, attrName types.NodeAttr) string {
+func (regNodes *RegisteredNodes) GetNodeAttr(nodeHWID string, attrName types.NodeAttr) string {
 	regNodes.updateMutex.Lock()
 	defer regNodes.updateMutex.Unlock()
-	var node = regNodes.deviceMap[deviceID]
+	var node = regNodes.deviceMap[nodeHWID]
 	if node == nil {
 		return ""
 	}
@@ -141,13 +148,13 @@ func (regNodes *RegisteredNodes) GetNodeByAddress(address string) *types.NodeDis
 	return node
 }
 
-// GetNodeByDeviceID returns a registered node by its device ID
-// Returns nil if deviceID does not exist
-func (regNodes *RegisteredNodes) GetNodeByDeviceID(deviceID string) *types.NodeDiscoveryMessage {
+// GetNodeByHWID returns a registered node by its device ID
+// Returns nil if hwID does not exist
+func (regNodes *RegisteredNodes) GetNodeByHWID(nodeHWID string) *types.NodeDiscoveryMessage {
 	regNodes.updateMutex.Lock()
 	defer regNodes.updateMutex.Unlock()
 
-	var node = regNodes.deviceMap[deviceID]
+	var node = regNodes.deviceMap[nodeHWID]
 	return node
 }
 
@@ -166,9 +173,9 @@ func (regNodes *RegisteredNodes) GetNodeByNodeID(nodeID string) *types.NodeDisco
 // This retuns the provided default value if no value is set or no default is configured, or the value is not an integer
 // An error is returned when the node or configuration doesn't exist
 func (regNodes *RegisteredNodes) GetNodeConfigBool(
-	deviceID string, attrName types.NodeAttr, defaultValue bool) (value bool, err error) {
+	nodeHWID string, attrName types.NodeAttr, defaultValue bool) (value bool, err error) {
 
-	valueStr, err := regNodes.GetNodeConfigString(deviceID, attrName, "")
+	valueStr, err := regNodes.GetNodeConfigString(nodeHWID, attrName, "")
 	if err != nil {
 		return defaultValue, err
 	}
@@ -178,7 +185,7 @@ func (regNodes *RegisteredNodes) GetNodeConfigBool(
 	value, err = strconv.ParseBool(valueStr)
 	if err != nil {
 		msg := fmt.Sprintf("NodeList.GetNodeConfigBool: Node '%s' configuration '%s' is not a boolean: %s",
-			deviceID, attrName, err)
+			nodeHWID, attrName, err)
 		return defaultValue, errors.New(msg)
 	}
 	return value, nil
@@ -189,9 +196,9 @@ func (regNodes *RegisteredNodes) GetNodeConfigBool(
 // This retuns the provided default value if no value is set or no default is configured, or the value is not an integer
 // An error is returned when the node or configuration doesn't exist or is not an integer
 func (regNodes *RegisteredNodes) GetNodeConfigFloat(
-	deviceID string, attrName types.NodeAttr, defaultValue float32) (value float32, err error) {
+	nodeHWID string, attrName types.NodeAttr, defaultValue float32) (value float32, err error) {
 
-	valueStr, err := regNodes.GetNodeConfigString(deviceID, attrName, "")
+	valueStr, err := regNodes.GetNodeConfigString(nodeHWID, attrName, "")
 	if err != nil {
 		return defaultValue, err
 	}
@@ -202,7 +209,7 @@ func (regNodes *RegisteredNodes) GetNodeConfigFloat(
 	value = float32(value64)
 	if err != nil {
 		msg := fmt.Sprintf("NodeList.GetNodeConfigFloat: Node '%s' configuration '%s' is not a float: %s",
-			deviceID, attrName, err)
+			nodeHWID, attrName, err)
 		return defaultValue, errors.New(msg)
 	}
 	return value, nil
@@ -212,9 +219,9 @@ func (regNodes *RegisteredNodes) GetNodeConfigFloat(
 // This retuns the provided default value if no value is set or no default is configured, or the value is not an integer
 // An error is returned when the node or configuration doesn't exist or is not an integer
 func (regNodes *RegisteredNodes) GetNodeConfigInt(
-	deviceID string, attrName types.NodeAttr, defaultValue int) (value int, err error) {
+	nodeHWID string, attrName types.NodeAttr, defaultValue int) (value int, err error) {
 
-	valueStr, err := regNodes.GetNodeConfigString(deviceID, attrName, "")
+	valueStr, err := regNodes.GetNodeConfigString(nodeHWID, attrName, "")
 	if err != nil {
 		return defaultValue, err
 	}
@@ -224,7 +231,7 @@ func (regNodes *RegisteredNodes) GetNodeConfigInt(
 	value, err = strconv.Atoi(valueStr)
 	if err != nil {
 		msg := fmt.Sprintf("NodeList.GetNodeConfigInt: Node '%s' configuration '%s' is not an integer: %s",
-			deviceID, attrName, err)
+			nodeHWID, attrName, err)
 		return defaultValue, errors.New(msg)
 	}
 	return value, nil
@@ -234,13 +241,13 @@ func (regNodes *RegisteredNodes) GetNodeConfigInt(
 // This retuns the provided default value if no value is set and no default is configured.
 // An error is returned when the node or configuration doesn't exist.
 func (regNodes *RegisteredNodes) GetNodeConfigString(
-	deviceID string, attrName types.NodeAttr, defaultValue string) (value string, err error) {
+	nodeHWID string, attrName types.NodeAttr, defaultValue string) (value string, err error) {
 	regNodes.updateMutex.Lock()
 	defer regNodes.updateMutex.Unlock()
 
-	var node = regNodes.deviceMap[deviceID]
+	var node = regNodes.deviceMap[nodeHWID]
 	if node == nil {
-		msg := fmt.Sprintf("NodeList.GetNodeConfigString: Device '%s' not found", deviceID)
+		msg := fmt.Sprintf("NodeList.GetNodeConfigString: Device '%s' not found", nodeHWID)
 		return defaultValue, errors.New(msg)
 	}
 
@@ -249,7 +256,7 @@ func (regNodes *RegisteredNodes) GetNodeConfigString(
 	config, configExists := node.Config[attrName]
 	if !configExists {
 		msg := fmt.Sprintf("NodeList.GetNodeConfigString: Device '%s' configuration '%s' does not exist",
-			deviceID, attrName)
+			nodeHWID, attrName)
 		return defaultValue, errors.New(msg)
 	}
 	// if no value is known, use the configuration default
@@ -283,13 +290,13 @@ func (regNodes *RegisteredNodes) GetUpdatedNodes(clearUpdates bool) []*types.Nod
 	return updateList
 }
 
-// HandleSetAliasMessage handles a message for setting the node alias using the node address
-func (regNodes *RegisteredNodes) HandleSetAliasMessage(nodeAddress string, msg *types.NodeAliasMessage) {
-	segments := strings.Split(nodeAddress, "/")
-	nodeID := segments[2]
-	node := regNodes.GetNodeByNodeID(nodeID)
-	regNodes.SetAlias(node, msg.Alias)
-}
+// // HandleSetAliasMessage handles a message for setting the node alias using the node address
+// func (regNodes *RegisteredNodes) HandleSetAliasMessage(nodeAddress string, msg *types.NodeAliasMessage) {
+// 	segments := strings.Split(nodeAddress, "/")
+// 	nodeID := segments[2]
+// 	node := regNodes.GetNodeByNodeID(nodeID)
+// 	regNodes.SetAlias(node, msg.Alias)
+// }
 
 // LoadNodes loads previously saved registered nodes.
 // Intended to persist changes to node configuration.
@@ -324,27 +331,27 @@ func (regNodes *RegisteredNodes) SaveNodes(filename string) error {
 	return nil
 }
 
-// SetAlias changes the nodeID and address of the node with the given deviceID.
-//  Use an empty alias to restore the nodeID and address to its deviceID.
-//  This creates a new node instance for the alias and marks it as updated for publication. The existing
+// SetNodeID changes the nodeID and address of the node
+//  Use an empty ID to restore the nodeID and address to the hwAddress.
+//  This creates a new node instance and marks it as updated for publication. The existing
 // node publication remains unchanged.
-//  Returns true if a new node is created using the alias, false if node not found or alias is already in use
-func (regNodes *RegisteredNodes) SetAlias(node *types.NodeDiscoveryMessage, aliasID string) bool {
+//  Returns true if a new node is created, false if node not found or the nodeID is already in use
+func (regNodes *RegisteredNodes) SetNodeID(node *types.NodeDiscoveryMessage, newNodeID string) bool {
 	if node == nil {
-		// deviceID not found
+		// ID not found
 		return false
 	}
-	aliasNode := regNodes.Clone(node)
+	newNode := regNodes.Clone(node)
 	// reset nodeID
-	if aliasID == "" {
-		aliasNode.NodeID = node.DeviceID
+	if newNodeID == "" {
+		newNode.NodeID = node.HWID
 	} else {
 		// The new alias must not be an existing node unless it is the device
-		existingNode := regNodes.GetNodeByDeviceID(aliasID)
-		if existingNode != nil && aliasID != node.DeviceID {
+		existingNode := regNodes.GetNodeByNodeID(newNodeID)
+		if existingNode != nil && newNodeID != node.HWID {
 			return false
 		}
-		aliasNode.NodeID = aliasID
+		newNode.NodeID = newNodeID
 	}
 	// Note: the old alias remains in existence on the domain with the last updated timestamp. should
 	// this be removed?
@@ -356,17 +363,26 @@ func (regNodes *RegisteredNodes) SetAlias(node *types.NodeDiscoveryMessage, alia
 	regNodes.updatedNodes[node.NodeID] = nil // inform the publisher this nodeID is no longer valid
 	regNodes.updateMutex.Unlock()
 
-	aliasNode.Address = MakeNodeDiscoveryAddress(regNodes.domain, regNodes.publisherID, aliasNode.NodeID)
-	regNodes.updateNode(aliasNode)
+	newNode.Address = MakeNodeDiscoveryAddress(regNodes.domain, regNodes.publisherID, newNode.NodeID)
+	regNodes.updateNode(newNode)
+	// if regNodes.onSetNodeID != nil {
+	// 	regNodes.onSetNodeID(node, newNodeID)
+	// }
 	// regNodes.updateNode(node) // last update of the alias
 	return true
 }
 
+// SetNodeIDHandler sets the handler that is notified if the nodeID is set
+// intended to update the input and output address to use the new node ID
+// func (regNodes *RegisteredNodes) SetNodeIDHandler(handler func(node *types.NodeDiscoveryMessage, newNodeID string)) {
+// 	regNodes.onSetNodeID = handler
+// }
+
 // UpdateErrorStatus sets the device RunState to the given status with a lasterror message
 // Use NodeRunStateError for errors and NodeRunStateReady to clear error
 // This only updates the node if the status or lastError message changes
-func (regNodes *RegisteredNodes) UpdateErrorStatus(deviceID string, runState string, errorMsg string) (changed bool) {
-	node := regNodes.GetNodeByDeviceID(deviceID)
+func (regNodes *RegisteredNodes) UpdateErrorStatus(nodeHWID string, runState string, errorMsg string) (changed bool) {
+	node := regNodes.GetNodeByHWID(nodeHWID)
 	if node == nil {
 		return false
 	}
@@ -376,14 +392,14 @@ func (regNodes *RegisteredNodes) UpdateErrorStatus(deviceID string, runState str
 
 	newNode := regNodes.Clone(node)
 	changed = false
-	if node.Status[types.NodeStatusLastError] != errorMsg {
-		newNode.Status[types.NodeStatusLastError] = errorMsg
+	if node.Status[types.NodeStatusAttrLastError] != errorMsg {
+		newNode.Status[types.NodeStatusAttrLastError] = errorMsg
 		changed = true
 	}
 
-	if node.Status[types.NodeStatusRunState] != runState {
+	if node.Status[types.NodeStatusAttrState] != runState {
 		changed = true
-		newNode.Status[types.NodeStatusRunState] = runState
+		newNode.Status[types.NodeStatusAttrState] = runState
 	}
 	// Don't unnecesarily republish the node if the status doesnt change
 	if changed {
@@ -396,8 +412,8 @@ func (regNodes *RegisteredNodes) UpdateErrorStatus(deviceID string, runState str
 // Node is marked as modified for publication only if one of the attrParams has changes
 // Use when additional node attributes has been discovered.
 // returns true when node has changed, false if node doesn't exist or attributes haven't changed
-func (regNodes *RegisteredNodes) UpdateNodeAttr(deviceID string, attrParams map[types.NodeAttr]string) (changed bool) {
-	node := regNodes.GetNodeByDeviceID(deviceID)
+func (regNodes *RegisteredNodes) UpdateNodeAttr(nodeHWID string, attrParams map[types.NodeAttr]string) (changed bool) {
+	node := regNodes.GetNodeByHWID(nodeHWID)
 	if node == nil {
 		return false
 	}
@@ -424,10 +440,10 @@ func (regNodes *RegisteredNodes) UpdateNodeAttr(deviceID string, attrParams map[
 // Nodes are immutable. If one or more configuration values have changed then a new node is created and
 // published and the old node instance is discarded.
 //  param is the map with key-value pairs of configuration values to update
-// returns true if configuration changes, false if configuration doesn't exist
-func (regNodes *RegisteredNodes) UpdateNodeConfigValues(deviceID string, params types.NodeAttrMap) (changed bool) {
+// returns true if configuration changes, false if configuration remains unchanged or doesn't exist
+func (regNodes *RegisteredNodes) UpdateNodeConfigValues(nodeHWID string, params types.NodeAttrMap) (changed bool) {
 
-	node := regNodes.GetNodeByDeviceID(deviceID)
+	node := regNodes.GetNodeByHWID(nodeHWID)
 	if node == nil || params == nil {
 		return false
 	}
@@ -472,8 +488,8 @@ func (regNodes *RegisteredNodes) UpdateNodeConfigValues(deviceID string, params 
 //
 // If a config already exists then its value is retained but its configuration parameters are replaced.
 // Nodes are immutable. A new node is created and published and the old node instance is discarded.
-func (regNodes *RegisteredNodes) UpdateNodeConfig(deviceID string, attrName types.NodeAttr, configAttr *types.ConfigAttr) {
-	node := regNodes.GetNodeByDeviceID(deviceID)
+func (regNodes *RegisteredNodes) UpdateNodeConfig(nodeHWID string, attrName types.NodeAttr, configAttr *types.ConfigAttr) {
+	node := regNodes.GetNodeByHWID(nodeHWID)
 	if node == nil || configAttr == nil || attrName == "" {
 		return
 	}
@@ -502,7 +518,7 @@ func (regNodes *RegisteredNodes) UpdateNodes(updates []*types.NodeDiscoveryMessa
 				node.Config = map[types.NodeAttr]types.ConfigAttr{}
 			}
 			if node.Status == nil {
-				node.Status = make(map[types.NodeStatus]string)
+				node.Status = make(map[types.NodeStatusAttr]string)
 			}
 			regNodes.updateNode(node)
 		}
@@ -513,9 +529,9 @@ func (regNodes *RegisteredNodes) UpdateNodes(updates []*types.NodeDiscoveryMessa
 // Nodes are immutable. If one or more status values have changed then a new node is created and
 // published. The old node instance is discarded.
 //  statusAttr is the map with key-value pairs of updated node statusses
-func (regNodes *RegisteredNodes) UpdateNodeStatus(deviceID string, statusAttr map[types.NodeStatus]string) (changed bool) {
+func (regNodes *RegisteredNodes) UpdateNodeStatus(nodeHWID string, statusAttr map[types.NodeStatusAttr]string) (changed bool) {
 
-	node := regNodes.GetNodeByDeviceID(deviceID)
+	node := regNodes.GetNodeByHWID(nodeHWID)
 	if node == nil {
 		return
 	}
@@ -545,7 +561,7 @@ func (regNodes *RegisteredNodes) updateNode(node *types.NodeDiscoveryMessage) {
 		return
 	}
 	regNodes.nodeMap[node.NodeID] = node
-	regNodes.deviceMap[node.DeviceID] = node
+	regNodes.deviceMap[node.HWID] = node
 	if regNodes.updatedNodes == nil {
 		regNodes.updatedNodes = make(map[string]*types.NodeDiscoveryMessage)
 	}
@@ -594,24 +610,25 @@ func NewNodeConfig(dataType types.DataType, description string, defaultValue str
 }
 
 // NewNode returns a new instance of a node.
-func NewNode(domain string, publisherID string, deviceID string, nodeType types.NodeType) *types.NodeDiscoveryMessage {
-	if domain == "" || publisherID == "" || deviceID == "" || nodeType == "" {
-		logrus.Errorf("NewNode: empty argument, one of domain (%s), publisherID (%s), deviceID (%s) or nodeType (%s) ",
-			domain, publisherID, deviceID, nodeType)
+func NewNode(domain string, publisherID string, nodeHWID string, nodeType types.NodeType) *types.NodeDiscoveryMessage {
+
+	if domain == "" || publisherID == "" || nodeHWID == "" || nodeType == "" {
+		logrus.Errorf("NewNode: empty argument, one of domain (%s), publisherID (%s), hwID (%s) or nodeType (%s) ",
+			domain, publisherID, nodeHWID, nodeType)
 		return nil
 	}
-	address := MakeNodeAddress(domain, publisherID, deviceID, types.MessageTypeNodeDiscovery)
+	address := MakeNodeAddress(domain, publisherID, nodeHWID, types.MessageTypeNodeDiscovery)
 	newNode := &types.NodeDiscoveryMessage{
 		Address:     address,
-		Attr:        map[types.NodeAttr]string{},
+		Attr:        types.NodeAttrMap{},
 		Config:      map[types.NodeAttr]types.ConfigAttr{},
-		DeviceID:    deviceID,
-		NodeID:      deviceID,
+		HWID:        nodeHWID,
+		NodeID:      nodeHWID,
 		PublisherID: publisherID,
-		Status:      make(map[types.NodeStatus]string),
-		NodeType:    nodeType,
+		Status:      make(map[types.NodeStatusAttr]string),
 		Timestamp:   time.Now().Format(types.TimeFormat),
 	}
+	newNode.Attr[types.NodeAttrType] = string(nodeType)
 	newNode.Config[types.NodeAttrName] = *NewNodeConfig(types.DataTypeString, "Human friendly node name", "")
 	newNode.Config[types.NodeAttrPublishEvent] = *NewNodeConfig(types.DataTypeString, "Enable publishing outputs as event", "false")
 	newNode.Config[types.NodeAttrPublishHistory] = *NewNodeConfig(types.DataTypeBool, "Enable publishing output history", "true")
@@ -621,6 +638,7 @@ func NewNode(domain string, publisherID string, deviceID string, nodeType types.
 }
 
 // NewRegisteredNodes creates a new instance for node management.
+// onSetNodeID is the handler for changes in nodeID configuration. Use this to update input and output addresses
 func NewRegisteredNodes(domain string, publisherID string) *RegisteredNodes {
 	nodes := RegisteredNodes{
 		domain:       domain,

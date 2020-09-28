@@ -16,14 +16,10 @@ const domain = "test"
 
 const node1ID = "node1"
 const node2ID = "node2"
-const node1AliasID = "alias1"
 const publisher1ID = "publisher1"
 
 var node1Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node1ID)
 var node2Base = fmt.Sprintf("%s/%s/%s", domain, publisher1ID, node2ID)
-
-// var node1Alias = fmt.Sprintf("%s/%s/%s", domain1ID, publisher1ID, node1AliasID)
-// var node1Addr = node1Base + "/$node"
 
 var node1InputAddr = node1Base + "/switch/0/$input"
 var node1InputSetAddr = node1Base + "/switch/0/$set"
@@ -39,7 +35,7 @@ func TestNewRegisteredInput(t *testing.T) {
 	require.NotNil(t, input, "Failed creating input")
 
 	// must be able to get the newly created input
-	input2 := collection.GetInputByDevice(node1ID, node1Input1Type, types.DefaultInputInstance)
+	input2 := collection.GetInputByNodeHWID(node1ID, node1Input1Type, types.DefaultInputInstance)
 	require.NotNil(t, input2, "Failed getting created input")
 	input2 = collection.GetInputByAddress(node1InputAddr)
 	require.NotNil(t, input2, "Failed getting created input")
@@ -93,19 +89,19 @@ func TestUpdateInput(t *testing.T) {
 	assert.Equal(t, "hello", input1b.Source, "Updating input not successful")
 }
 
-func TestAlias(t *testing.T) {
-	const Alias1 = "bob"
+func TestChangeNodeID(t *testing.T) {
+	const newNodeId = "bob"
 	collection := inputs.NewRegisteredInputs(domain, publisher1ID)
 	collection.CreateInput(node1ID, types.InputTypeSwitch, types.DefaultInputInstance, nil)
-	collection.SetAlias(node1ID, Alias1)
+	collection.SetNodeID(node1ID, newNodeId)
 
-	aliasAddr := inputs.MakeInputDiscoveryAddress(domain, publisher1ID, Alias1, types.InputTypeSwitch, types.DefaultInputInstance)
-	input1b := collection.GetInputByAddress(aliasAddr)
-	require.NotNilf(t, input1b, "Input not retrievable using alias nodeID")
-	assert.Equal(t, aliasAddr, input1b.Address, "Input doesn't have the alias NodeID")
+	newInputAddr := inputs.MakeInputDiscoveryAddress(domain, publisher1ID, newNodeId, types.InputTypeSwitch, types.DefaultInputInstance)
+	input1b := collection.GetInputByAddress(newInputAddr)
+	require.NotNilf(t, input1b, "Input not retrievable using new nodeID")
+	assert.Equal(t, newInputAddr, input1b.Address, "Input doesn't have the new NodeID")
 
-	input1c := collection.GetInputByDevice(node1ID, types.InputTypeSwitch, types.DefaultInputInstance)
-	assert.Equal(t, aliasAddr, input1c.Address, "Input doesn't have the alias NodeID")
+	input1c := collection.GetInputByNodeHWID(node1ID, types.InputTypeSwitch, types.DefaultInputInstance)
+	assert.Equal(t, newInputAddr, input1c.Address, "Input doesn't have the new NodeID")
 }
 
 func TestPublish(t *testing.T) {

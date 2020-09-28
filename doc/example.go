@@ -120,10 +120,10 @@ func UpdateWeather(pub *publisher.Publisher) {
 		hum := fmt.Sprintf("%d", weather.Main.Humidity)
 		pub.UpdateOutputValue(nodeID, types.OutputTypeTemperature, types.DefaultOutputInstance, temp)
 		pub.UpdateOutputValue(nodeID, types.OutputTypeHumidity, types.DefaultOutputInstance, hum)
-		pub.UpdateNodeErrorStatus(nodeID, types.NodeRunStateReady, "Forecast loaded successfully")
+		pub.UpdateNodeErrorStatus(nodeID, types.NodeStateReady, "Forecast loaded successfully")
 	} else {
 		// pub.SetOutputError(nodeID, OutputType, OutputTypeTemperature, "Forecast not available")
-		pub.UpdateNodeErrorStatus(nodeID, types.NodeRunStateError, "Forecast not available")
+		pub.UpdateNodeErrorStatus(nodeID, types.NodeStateError, "Forecast not available")
 	}
 }
 

@@ -43,7 +43,7 @@ type TopicSubscription struct {
 
 // Connect to the MQTT broker and set the LWT
 // If a previous connection exists then it is disconnected first.
-// This publishes the LWT on the address baseTopic/deviceID/$state.
+// This publishes the LWT on the address baseTopic/nodeHWID/$state.
 // @param lastWillTopic optional last will and testament address for publishing device state on accidental disconnect.
 //                       Use "" to ignore LWT feature.
 // @param lastWillValue to use as the last will
@@ -93,7 +93,6 @@ func (messenger *MqttMessenger) Connect(lastWillAddress string, lastWillValue st
 			brokerURL, err, config.ClientID)
 	})
 	if lastWillAddress != "" {
-		//lastWillTopic := fmt.Sprintf("%s/%s/$state", messenger.config.Base, deviceId)
 		opts.SetWill(lastWillAddress, lastWillValue, 1, false)
 	}
 	// Use TLS if a CA certificate is given
@@ -173,7 +172,6 @@ func (messenger *MqttMessenger) Disconnect() {
 func (messenger *MqttMessenger) Publish(address string, retained bool, message string) error {
 	var err error
 
-	//fullTopic := fmt.Sprintf("%s/%s/%s", messenger.config.Base, messenger.deviceId, addressLevels)
 	if messenger.pahoClient == nil || !messenger.pahoClient.IsConnected() {
 		logrus.Warnf("MqttMessenger.Publish: Unable to publish. No connection with server.")
 		return errors.New("no connection with server")

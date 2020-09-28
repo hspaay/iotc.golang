@@ -47,7 +47,7 @@ func (publisher *Publisher) PublishUpdatedOutputValues(
 		if output == nil {
 			logrus.Warningf("PublishOutputValues: output with ID %s. This is unexpected", outputID)
 		} else {
-			node = publisher.registeredNodes.GetNodeByDeviceID(output.DeviceID)
+			node = publisher.registeredNodes.GetNodeByHWID(output.NodeHWID)
 		}
 		if node == nil {
 			logrus.Warningf("PublishOutputValues: no node for output %s. This is unexpected", outputID)
@@ -88,7 +88,7 @@ func PublishOutputEvent(
 	aliasAddress := outputs.ReplaceMessageType(node.Address, types.MessageTypeEvent)
 	logrus.Infof("Publisher.publishEvent: %s", aliasAddress)
 
-	nodeOutputs := registeredOutputs.GetOutputsByDeviceID(node.DeviceID)
+	nodeOutputs := registeredOutputs.GetOutputsByNodeHWID(node.HWID)
 	event := make(map[string]string)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
 	if len(nodeOutputs) == 0 {

@@ -25,7 +25,7 @@ func TestCreateOutputs(t *testing.T) {
 
 	require.NotNil(t, output, "Failed creating output")
 
-	output2 := collection.GetOutputByDevice(node1ID, node1Output1Type, types.DefaultOutputInstance)
+	output2 := collection.GetOutputByNodeHWID(node1ID, node1Output1Type, types.DefaultOutputInstance)
 	require.NotNil(t, output2, "Failed getting created output")
 
 	output2 = collection.GetOutputByAddress(node1Output1Addr)
@@ -42,7 +42,7 @@ func TestCreateOutputs(t *testing.T) {
 	outs := collection.GetAllOutputs()
 	assert.Equal(t, 1, len(outs), "Expected 1 output")
 
-	nodeOuts := collection.GetOutputsByDeviceID(node1ID)
+	nodeOuts := collection.GetOutputsByNodeHWID(node1ID)
 	assert.Equal(t, 1, len(nodeOuts), "Expected 1 output")
 
 }
@@ -78,7 +78,7 @@ func TestAlias(t *testing.T) {
 	alias1Address := outputs.MakeOutputDiscoveryAddress(domain, publisher1ID, Alias1, types.OutputTypeSwitch, types.DefaultOutputInstance)
 	collection := outputs.NewRegisteredOutputs(domain, publisher1ID)
 	collection.CreateOutput(device1ID, types.OutputTypeSwitch, types.DefaultOutputInstance)
-	collection.SetAlias(device1ID, Alias1)
+	collection.SetNodeID(device1ID, Alias1)
 
 	output1b := collection.GetOutputByAddress(alias1Address)
 	require.NotNilf(t, output1b, "Output not retrievable using alias nodeID")

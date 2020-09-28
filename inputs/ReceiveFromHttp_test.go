@@ -31,10 +31,10 @@ func TestCreateInputFromHttp(t *testing.T) {
 	i := inputs.NewReceiveFromHTTP(regInputs)
 	i.Start()
 
-	input1 := i.CreateHttpInput(node1ID, inputType, instance1, imageUrl, login, password, interval, handler)
+	input1 := i.CreateHTTPInput(node1ID, inputType, instance1, imageUrl, login, password, interval, handler)
 	assert.NotNil(t, input1, "Input1 not created")
 
-	input2 := i.CreateHttpInput(node1ID, inputType, instance2, badUrl, "", "", interval, handler)
+	input2 := i.CreateHTTPInput(node1ID, inputType, instance2, badUrl, "", "", interval, handler)
 	assert.NotEmpty(t, input2, "Input2 not created")
 
 	inputList := regInputs.GetAllInputs()

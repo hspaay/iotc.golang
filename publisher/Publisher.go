@@ -46,7 +46,7 @@ type PublisherConfig struct {
 	CacheNodes        bool   `yaml:"cacheNodes"`        // load/save discovered nodes
 	CacheFolder       string `yaml:"cacheFolder"`       // location of discovered nodes and identities
 	ConfigFolder      string `yaml:"configFolder"`      // location of yaml configuration files and configuration changes
-	Domain            string `yaml:"domain"`            // optional override per publisher
+	Domain            string `yaml:"domain"`            // optional override per publisher. Default is local
 	PublisherID       string `yaml:"publisherId"`       // this publisher's ID
 	Loglevel          string `yaml:"loglevel"`          // error, warning, info, debug
 	Logfile           string `yaml:"logfile"`           //
@@ -74,7 +74,7 @@ type Publisher struct {
 	receiveMyIdentityUpdate *identities.ReceiveRegisteredIdentityUpdate
 	receiveDomainIdentities *identities.ReceiveDomainPublisherIdentities // listener for identity updates
 	receiveNodeConfigure    *nodes.ReceiveNodeConfigure                  // listener for node configure for registered nodes
-	receiveNodeSetAlias     *nodes.ReceiveNodeAlias                      // listener for set node alias
+	receiveSetNodeID        *nodes.ReceiveSetNodeID                      // listener for set node alias
 
 	registeredForecastValues *outputs.RegisteredForecastValues // output forecasts values published by this publisher
 	registeredIdentity       *identities.RegisteredIdentity    // registered/published identity of this publisher
@@ -85,7 +85,9 @@ type Publisher struct {
 
 	// fullIdentity        *types.PublisherFullIdentity                         // this publishers identity
 	// identityPrivateKey  *ecdsa.PrivateKey                                    // key for signing and encryption
-	isRunning           bool                                                 // publisher was started and is running
+	isRunning bool // publisher was started and is running
+	// runStateAddress string
+
 	messenger           messaging.IMessenger                                 // Message bus messenger to use
 	messageSigner       *messaging.MessageSigner                             // publishing signed messages
 	onNodeConfigHandler nodes.NodeConfigureHandler                           // handle before applying configuration
@@ -97,6 +99,18 @@ type Publisher struct {
 	// background publications require a mutex to prevent concurrent access
 	heartbeatChannel chan bool
 	updateMutex      *sync.Mutex // mutex for async updating and publishing
+}
+
+// HandleSetNodeIDCommand handles the command to change the ID of a node. This updates the address
+// of a node, its inputs and its outputs.
+func (pub *Publisher) HandleSetNodeIDCommand(address string, message *types.SetNodeIDMessage) {
+	node := pub.registeredNodes.GetNodeByAddress(address)
+	if node == nil {
+		return
+	}
+	pub.registeredNodes.SetNodeID(node, message.NodeID)
+	pub.registeredInputs.SetNodeID(node.HWID, message.NodeID)
+	pub.registeredOutputs.SetNodeID(node.HWID, message.NodeID)
 }
 
 // LoadCachedIdentities loads discovered publisher identities from the cache folder.
@@ -150,6 +164,16 @@ func (pub *Publisher) SetPollInterval(seconds int, handler func(pub *Publisher))
 	pub.pollHandler = handler
 }
 
+// SetPublisherStatus sets the publisher runtime status and publishes the message
+func (pub *Publisher) SetPublisherStatus(status types.PublisherState) {
+	addr := identities.MakePublisherStatusAddress(pub.Domain(), pub.PublisherID())
+	msg := types.PublisherStatusMessage{
+		Address: addr,
+		Status:  status,
+	}
+	identities.PublishStatus(&msg, pub.messageSigner)
+}
+
 // Start starts publishing registered nodes, inputs and outputs, and listens for command messages.
 // Start will fail if no messenger has been provided.
 func (pub *Publisher) Start() {
@@ -183,7 +207,7 @@ func (pub *Publisher) Start() {
 		}
 		// receive registered input set commands
 		if !pub.config.DisableInput {
-			pub.receiveNodeSetAlias.Start()
+			pub.receiveSetNodeID.Start()
 		}
 		// Receive registered node configuration commands
 		if !pub.config.DisableConfig {
@@ -194,15 +218,16 @@ func (pub *Publisher) Start() {
 			pub.receiveMyIdentityUpdate.Start()
 		}
 		//  listening
-		// TODO: support LWT
-		pub.messenger.Connect("", "")
+		lwtStatusAddress := identities.MakePublisherStatusAddress(pub.Domain(), pub.PublisherID())
+		pub.messenger.Connect(lwtStatusAddress, string(types.PublisherStateLost))
 
+		pub.SetPublisherStatus(types.PublisherStateConnected)
 		identities.PublishIdentity(&myIdent.PublisherIdentityMessage, pub.messageSigner)
 	}
 }
 
-// Stop publishing
-// Wait until the heartbeat loop has finished processing messages
+// Stop publishing, and set the run status to disconnected and disconnect from the
+// message bus. Wait until the heartbeat loop has finished processing messages
 func (pub *Publisher) Stop() {
 	logrus.Warningf("Publisher.Stop: Stopping publisher %s", pub.PublisherID())
 	pub.updateMutex.Lock()
@@ -212,7 +237,7 @@ func (pub *Publisher) Stop() {
 		pub.receiveMyIdentityUpdate.Stop()
 		pub.receiveDomainIdentities.Stop()
 		pub.receiveNodeConfigure.Stop()
-		pub.receiveNodeSetAlias.Stop()
+		pub.receiveSetNodeID.Stop()
 
 		pub.updateMutex.Unlock()
 		// wait for heartbeat to end
@@ -220,6 +245,8 @@ func (pub *Publisher) Stop() {
 	} else {
 		pub.updateMutex.Unlock()
 	}
+	pub.SetPublisherStatus(types.PublisherStateDisconnected)
+	pub.messenger.Disconnect()
 	logrus.Info("... bye bye")
 }
 
@@ -375,7 +402,7 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 		domainIdentities, messageSigner)
 	receiveNodeConfigure := nodes.NewReceiveNodeConfigure(
 		config.Domain, config.PublisherID, nil, messageSigner, registeredNodes, privKey)
-	receiveNodeSetAlias := nodes.NewReceiveNodeAlias(
+	receiveSetNodeID := nodes.NewReceiveSetNodeID(
 		config.Domain, config.PublisherID, nil, messageSigner, privKey)
 
 	var pub = &Publisher{
@@ -395,6 +422,7 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 		heartbeatChannel: make(chan bool),
 		// fullIdentity:       identity,
 		// identityPrivateKey: privateKey,
+		// runStateAddress: fmt.Sprintf("%s/%s/%s", config.Domain, config.PublisherID, types.MessageTypeRunState),
 
 		messenger:               messenger,
 		messageSigner:           messageSigner,
@@ -403,7 +431,7 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 		receiveDomainIdentities: receiveDomainIdentities,
 		receiveMyIdentityUpdate: receiveMyIdentityUpdate,
 		receiveNodeConfigure:    receiveNodeConfigure,
-		receiveNodeSetAlias:     receiveNodeSetAlias,
+		receiveSetNodeID:        receiveSetNodeID,
 
 		registeredForecastValues: registeredForecastValues,
 		registeredIdentity:       registeredIdentity,
@@ -414,7 +442,7 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 
 		updateMutex: &sync.Mutex{},
 	}
-	receiveNodeSetAlias.SetAliasHandler(pub.HandleAliasCommand)
+	receiveSetNodeID.SetNodeIDHandler(pub.HandleSetNodeIDCommand)
 
 	// Load configuration of previously registered nodes from config
 	pub.LoadRegisteredNodes()

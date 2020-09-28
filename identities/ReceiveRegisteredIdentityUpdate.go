@@ -21,13 +21,13 @@ type ReceiveRegisteredIdentityUpdate struct {
 // Start listening for updates to the registered identity
 // Intended to receive new keys from the DSS
 func (rxIdentity *ReceiveRegisteredIdentityUpdate) Start() {
-	addr := fmt.Sprintf("%s/%s/%s", rxIdentity.domain, "+", types.MessageTypeSet)
+	addr := fmt.Sprintf("%s/%s/%s", rxIdentity.domain, "+", types.MessageTypeSetInput)
 	rxIdentity.messageSigner.Subscribe(addr, rxIdentity.ReceiveIdentityUpdate)
 }
 
 // Stop listening
 func (rxIdentity *ReceiveRegisteredIdentityUpdate) Stop() {
-	addr := fmt.Sprintf("%s/%s/%s", rxIdentity.domain, rxIdentity.publisherID, types.MessageTypeSet)
+	addr := fmt.Sprintf("%s/%s/%s", rxIdentity.domain, rxIdentity.publisherID, types.MessageTypeSetInput)
 	rxIdentity.messageSigner.Unsubscribe(addr, rxIdentity.ReceiveIdentityUpdate)
 }
 

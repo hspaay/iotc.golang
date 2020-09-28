@@ -25,14 +25,14 @@ type ReceiveFromFiles struct {
 // The file must exist when creating the input (the file watcher requires it).
 // If the input already exists, the existing input is returned.
 func (iffile *ReceiveFromFiles) CreateInput(
-	deviceID string, inputType types.InputType, instance string,
+	nodeHWID string, inputType types.InputType, instance string,
 	path string, handler func(input *types.InputDiscoveryMessage, sender string, path string)) *types.InputDiscoveryMessage {
 
 	iffile.updateMutex.Lock()
 	defer iffile.updateMutex.Unlock()
 
 	// prevent input to be added multiple times
-	existingInput := iffile.registeredInputs.GetInputByDevice(deviceID, inputType, instance)
+	existingInput := iffile.registeredInputs.GetInputByNodeHWID(nodeHWID, inputType, instance)
 	if existingInput != nil {
 		logrus.Errorf("AddInput: Input %s already exists. Ignored.", existingInput.InputID)
 		return existingInput
@@ -41,22 +41,22 @@ func (iffile *ReceiveFromFiles) CreateInput(
 	fullPath := iffile.watchFile(path)
 
 	if fullPath == "" {
-		inputID := MakeInputID(deviceID, inputType, instance)
+		inputID := MakeInputHWID(nodeHWID, inputType, instance)
 		logrus.Errorf("AddInput: Source path '%s' for input '%s' is invalid. Ignored.", path, inputID)
 		return nil
 	}
 	input := iffile.registeredInputs.CreateInputWithSource(
-		deviceID, inputType, instance, fullPath, handler)
+		nodeHWID, inputType, instance, fullPath, handler)
 
 	return input
 }
 
 // DeleteInput deletes the input and unsubscribes from the file watcher
-func (iffile *ReceiveFromFiles) DeleteInput(deviceID string, inputType types.InputType, instance string) {
+func (iffile *ReceiveFromFiles) DeleteInput(nodeHWID string, inputType types.InputType, instance string) {
 	iffile.updateMutex.Lock()
 	iffile.updateMutex.Unlock()
 
-	inputID := MakeInputID(deviceID, inputType, instance)
+	inputID := MakeInputHWID(nodeHWID, inputType, instance)
 	existingInput := iffile.registeredInputs.GetInputByID(inputID)
 	if existingInput == nil {
 		logrus.Errorf("DeleteInput: input %s not found", inputID)
@@ -94,7 +94,7 @@ func (iffile *ReceiveFromFiles) Stop() {
 func (iffile *ReceiveFromFiles) onFileWatcherEvent(fullPath string) {
 	sourceInputs := iffile.registeredInputs.GetInputsWithSource(fullPath)
 	for _, input := range sourceInputs {
-		inputID := MakeInputID(input.DeviceID, input.InputType, input.Instance)
+		inputID := MakeInputHWID(input.NodeHWID, input.InputType, input.Instance)
 		iffile.registeredInputs.NotifyInputHandler(inputID, "", fullPath)
 	}
 }

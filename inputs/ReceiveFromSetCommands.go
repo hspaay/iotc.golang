@@ -30,16 +30,16 @@ type ReceiveFromSetCommands struct {
 }
 
 // CreateInput creates a new input that responds to a set command from the message bus.
-// If an input of the given deviceID, type and instance already exist it will be replaced.
+// If an input of the given nodeHWID, type and instance already exist it will be replaced.
 // This returns the new input
 func (ifset *ReceiveFromSetCommands) CreateInput(
-	deviceID string, inputType types.InputType, instance string,
+	nodeHWID string, inputType types.InputType, instance string,
 	handler func(input *types.InputDiscoveryMessage, sender string, value string)) *types.InputDiscoveryMessage {
 
 	ifset.updateMutex.Lock()
 	defer ifset.updateMutex.Unlock()
 
-	input := ifset.registeredInputs.CreateInput(deviceID, inputType, instance, handler)
+	input := ifset.registeredInputs.CreateInput(nodeHWID, inputType, instance, handler)
 	// only subscribe if this is a new input
 	ifset.subscribeToSetCommand(input)
 	return input
@@ -73,9 +73,9 @@ func (ifset *ReceiveFromSetCommands) decodeSetCommand(address string, message st
 	isEncrypted, isSigned, err := ifset.messageSigner.DecodeMessage(message, &setMessage)
 
 	if !isEncrypted {
-		return lib.MakeErrorf("decodeSetCommand: Alias update of '%s' is not encrypted. Message discarded.", address)
+		return lib.MakeErrorf("decodeSetCommand: Set command '%s' is not encrypted. Message discarded.", address)
 	} else if !isSigned {
-		return lib.MakeErrorf("decodeSetCommand: Alias update of '%s' is not signed. Message discarded.", address)
+		return lib.MakeErrorf("decodeSetCommand: Set command '%s' is not signed. Message discarded.", address)
 	} else if err != nil {
 		return lib.MakeErrorf("decodeSetCommand: Message to %s. Error %s'. Message discarded.", address, err)
 	}
@@ -102,7 +102,7 @@ func (ifset *ReceiveFromSetCommands) decodeSetCommand(address string, message st
 func (ifset *ReceiveFromSetCommands) subscribeToSetCommand(input *types.InputDiscoveryMessage) {
 	// change message type $input to $set to make the set address from the input address
 	segments := strings.Split(input.Address, "/")
-	segments[5] = types.MessageTypeSet
+	segments[5] = types.MessageTypeSetInput
 	setAddr := strings.Join(segments, "/")
 
 	// prevent double subscription
@@ -118,7 +118,7 @@ func (ifset *ReceiveFromSetCommands) unsubscribeFromSetCommand(inputID string) {
 	// change message type $input to $set to make the set address from the input address
 	input := ifset.registeredInputs.GetInputByID(inputID)
 	segments := strings.Split(input.Address, "/")
-	segments[5] = types.MessageTypeSet
+	segments[5] = types.MessageTypeSetInput
 	setAddr := strings.Join(segments, "/")
 
 	_, hasSubscription := ifset.subscriptions[setAddr]
@@ -133,7 +133,7 @@ func (ifset *ReceiveFromSetCommands) unsubscribeFromSetCommand(inputID string) {
 func MakeSetInputAddress(domain string, publisherID string, nodeID string,
 	inputType types.InputType, instance string) string {
 
-	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+types.MessageTypeSet,
+	address := fmt.Sprintf("%s/%s/%s"+"/%s/%s/"+types.MessageTypeSetInput,
 		domain, publisherID, nodeID, inputType, instance)
 	return address
 }

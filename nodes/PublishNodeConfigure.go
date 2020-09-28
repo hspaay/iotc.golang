@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PublishNodeConfigure updates the configuration of a remote node by this publisher
+// PublishNodeConfigure sends a command to update the configuration of a remote node.
 // If an encryption key is given then the signed message will be encrypted, otherwise just signed.
 func PublishNodeConfigure(
 	destinationAddress string, attr types.NodeAttrMap, sender string,

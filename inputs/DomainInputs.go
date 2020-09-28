@@ -40,7 +40,7 @@ func (domainInputs *DomainInputs) GetNodeInputs(nodeAddress string) []*types.Inp
 }
 
 // GetInputByAddress returns an input by its address
-// inputAddr must contain the full input address, eg <zone>/<publisher>/<node>/"$input"/<type>/<instance>
+// inputAddr must contain the full input address, eg <zone>/<publisherId>/<nodeId>/"$input"/<type>/<instance>
 // Returns nil if address has no known input
 func (domainInputs *DomainInputs) GetInputByAddress(inputAddr string) *types.InputDiscoveryMessage {
 	var inputObject = domainInputs.c.GetByAddress(inputAddr)

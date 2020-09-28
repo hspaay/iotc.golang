@@ -32,7 +32,7 @@ func PublishSetInput(
 		return errors.New(errText)
 	}
 	// zone/pub/node/inputtype/instance/$set
-	segments[5] = types.MessageTypeSet
+	segments[5] = types.MessageTypeSetInput
 	inputAddr := strings.Join(segments, "/")
 
 	// Encecode the SetMessage

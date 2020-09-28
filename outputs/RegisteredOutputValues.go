@@ -47,10 +47,10 @@ func (outputValues *RegisteredOutputValues) GetOutputValueByID(outputID string) 
 	return latest
 }
 
-// GetOutputValueByType returns the current output value by deviceID, output type and instance
+// GetOutputValueByType returns the current output value by nodeHWID, output type and instance
 func (outputValues *RegisteredOutputValues) GetOutputValueByType(
-	deviceID string, outputType types.OutputType, instance string) *types.OutputValue {
-	outputID := MakeOutputID(deviceID, outputType, instance)
+	nodeHWID string, outputType types.OutputType, instance string) *types.OutputValue {
+	outputID := MakeOutputID(nodeHWID, outputType, instance)
 	return outputValues.GetOutputValueByID(outputID)
 }
 

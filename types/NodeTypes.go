@@ -1,6 +1,9 @@
 // Package types with IoTDomain node message type definitions
 package types
 
+// NodeAttr with predefined names of node attributes and configuration
+type NodeAttr string
+
 // Predefined node attribute names that describe the node.
 // When they are configurable they also appear in Node Config section.
 const (
@@ -23,7 +26,7 @@ const (
 	NodeAttrMax             NodeAttr = "max"             // maximum value of sensor or config
 	NodeAttrMin             NodeAttr = "min"             // minimum value of sensor or config
 	NodeAttrModel           NodeAttr = "model"           // device model
-	NodeAttrName            NodeAttr = "name"            // Name of device, sensor
+	NodeAttrName            NodeAttr = "name"            // Name of device or service
 	NodeAttrNetmask         NodeAttr = "netmask"         // IP network mask
 	NodeAttrPassword        NodeAttr = "password"        // password to connect. Value is not published.
 	NodeAttrPublishBatch    NodeAttr = "publishBatch"    // int with nr of events per batch, 0 to disable
@@ -38,33 +41,39 @@ const (
 	NodeAttrPublicKey       NodeAttr = "publicKey"       // public key for encrypting sensitive configuration settings
 	NodeAttrSoftwareVersion NodeAttr = "softwareVersion" // version of the software running the node
 	NodeAttrSubnet          NodeAttr = "subnet"          // IP subnets configuration
-	NodeAttrURL             NodeAttr = "url"             // device URL
+	NodeAttrType            NodeAttr = "type"            // Node type
+	NodeAttrURL             NodeAttr = "url"             // node URL
 )
 
-// Various NodeStatus attributes that describe the recent status of the node
+// NodeIDGateway is the standard nodeOD of a gateway device. Intended as a convention for
+// identifying gateway devices.
+const NodeIDGateway = "gateway"
+
+// NodeStatusAttr various node status attributes
+type NodeStatusAttr string
+
+// Various NodeStatusAttr attributes that describe the recent status of the node
 // These indicate how the node is performing and are updated with each publication, typically once a day
 const (
-	NodeStatusErrorCount    NodeStatus = "errorCount"    // nr of errors reported on this device
-	NodeStatusHealth        NodeStatus = "health"        // health status of the device 0-100%
-	NodeStatusLastError     NodeStatus = "lastError"     // most recent error message, or "" if no error
-	NodeStatusLastSeen      NodeStatus = "lastSeen"      // ISO time the device was last seen
-	NodeStatusLatencyMSec   NodeStatus = "latencymsec"   // duration connect to sensor in milliseconds
-	NodeStatusNeighborCount NodeStatus = "neighborCount" // mesh network nr of neighbors
-	NodeStatusNeighborIDs   NodeStatus = "neighborIDs"   // mesh network device neighbors ID list [id,id,...]
-	NodeStatusRxCount       NodeStatus = "rxCount"       // Nr of messages received from device
-	NodeStatusTxCount       NodeStatus = "txCount"       // Nr of messages send to device
-	NodeStatusRunState      NodeStatus = "runState"      // Node runstate as per below
+	NodeStatusAttrErrorCount    NodeStatusAttr = "errorCount"    // nr of errors reported on this device
+	NodeStatusAttrHealth        NodeStatusAttr = "health"        // health status of the device 0-100%
+	NodeStatusAttrLastError     NodeStatusAttr = "lastError"     // most recent error message, or "" if no error
+	NodeStatusAttrLastSeen      NodeStatusAttr = "lastSeen"      // ISO time the device was last seen
+	NodeStatusAttrLatencyMSec   NodeStatusAttr = "latencymsec"   // duration connect to sensor in milliseconds
+	NodeStatusAttrNeighborCount NodeStatusAttr = "neighborCount" // mesh network nr of neighbors
+	NodeStatusAttrNeighborIDs   NodeStatusAttr = "neighborIDs"   // mesh network device neighbors ID list [id,id,...]
+	NodeStatusAttrRxCount       NodeStatusAttr = "rxCount"       // Nr of messages received from device
+	NodeStatusAttrTxCount       NodeStatusAttr = "txCount"       // Nr of messages send to device
+	NodeStatusAttrState         NodeStatusAttr = "state"         // Node run-state as per below
 )
 
-// Values for NodeStatusRunState
+// Values for Node State
 // These reflect whether a node is ready, sleeping or in error
 const (
-	NodeRunStateError        string = "error"        // Node needs servicing
-	NodeRunStateDisconnected string = "disconnected" // Node has cleanly disconnected
-	NodeRunStateFailed       string = "failed"       // Node failed to start
-	NodeRunStateInitializing string = "initializing" // Node is initializing
-	NodeRunStateReady        string = "ready"        // Node is ready for use
-	NodeRunStateSleeping     string = "sleeping"     // Node has gone into sleep mode, often a battery powered devie
+	NodeStateError    string = "error"    // Node reports an error
+	NodeStateReady    string = "ready"    // Node is ready for use
+	NodeStateSleeping string = "sleeping" // Node has gone into sleep mode, often a battery powered devie
+	NodeStateLost     string = "lost"     // Node is is no longer reachable
 )
 
 // NodeType identifying  the purpose of the node
@@ -106,17 +115,11 @@ const (
 	NodeTypeWeighScale     NodeType = "weighScale"     // Node is an electronic weight scale
 )
 
-// NodeAttr with predefined names of node attributes and configuration
-type NodeAttr string
-
 // NodeAttrMap for storing node attributes
 type NodeAttrMap map[NodeAttr]string
 
-// NodeStatus various node status attributes
-type NodeStatus string
-
 // NodeStatusMap for storing status attributes
-type NodeStatusMap map[NodeStatus]string
+type NodeStatusMap map[NodeStatusAttr]string
 
 // ConfigAttrMap for storing node configuration
 type ConfigAttrMap map[NodeAttr]ConfigAttr
@@ -132,14 +135,6 @@ type ConfigAttr struct {
 	Secret      bool     `json:"secret,omitempty"`      // The configuration attribute is secret. Don't show with attributes.
 }
 
-// NodeAliasMessage with values to update a node alias
-type NodeAliasMessage struct {
-	Address   string `json:"address"` // zone/publisher/node/$alias
-	Alias     string `json:"alias"`   // new alias to set
-	Sender    string `json:"sender"`  // sending node: zone/publisher/node
-	Timestamp string `json:"timestamp"`
-}
-
 // NodeConfigureMessage with values to update a node configuration
 type NodeConfigureMessage struct {
 	Address   string      `json:"address"` // zone/publisher/node/$configure
@@ -150,14 +145,21 @@ type NodeConfigureMessage struct {
 
 // NodeDiscoveryMessage definition published in node discovery
 type NodeDiscoveryMessage struct {
-	Address   string        `json:"address"`          // Node discovery address
+	Address   string        `json:"address"`          // Node discovery address using NodeID
 	Attr      NodeAttrMap   `json:"attr,omitempty"`   // Attributes describing this node
 	Config    ConfigAttrMap `json:"config,omitempty"` // Description of configurable attributes
-	DeviceID  string        `json:"deviceid"`         // Device hardware or service ID
-	NodeID    string        `json:"nodeid"`           // nodeID used in address
-	NodeType  NodeType      `json:"nodeType"`         // node type see NodeTypeXxx
+	HWID      string        `json:"hwID"`             // The node or service immutable hardware related ID
+	NodeID    string        `json:"nodeId"`           // nodeID used in address. Mutable. Default is HWAddress
 	Status    NodeStatusMap `json:"status,omitempty"` // Node performance status information
 	Timestamp string        `json:"timestamp"`        // time the record is last updated
 	// For convenience, filled when registering or receiving
 	PublisherID string `json:"-"`
+}
+
+// SetNodeIDMessage to change a node's ID
+type SetNodeIDMessage struct {
+	Address   string `json:"address"` // zone/publisher/node/$alias - existing address
+	NodeID    string `json:"nodeId"`  // new node ID to set
+	Sender    string `json:"sender"`  // sending node: zone/publisher/node
+	Timestamp string `json:"timestamp"`
 }

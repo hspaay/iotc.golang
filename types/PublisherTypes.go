@@ -4,14 +4,17 @@ package types
 // DSSPublisherID contains the publisherID of a domain's security service
 const DSSPublisherID = "$dss"
 
-// LWTStatusConnected when currently connectioned
-const LWTStatusConnected = "connected"
+// PublisherState indicates the operating status of the publisher. Used in LWT.
+type PublisherState string
 
-// LWTStatusDisconnected when connection is purposefully ended
-const LWTStatusDisconnected = "disconnected"
-
-// LWTStatusLost when connection unexpectedly drops
-const LWTStatusLost = "lost"
+// PublisherState values
+const (
+	PublisherStateConnected    PublisherState = "connected"    // Publisher is connected and working
+	PublisherStateDisconnected PublisherState = "disconnected" // Publisher has cleanly disconnected
+	PublisherStateFailed       PublisherState = "failed"       // Publisher failed to start
+	PublisherStateInitializing PublisherState = "initializing" // Publisher is initializing
+	PublisherStateLost         PublisherState = "lost"         // Publisher unexpectedly disconnected
+)
 
 // PublisherIdentityMessage contains the public identity of a publisher
 type PublisherIdentityMessage struct {
@@ -37,8 +40,8 @@ type PublisherFullIdentity struct {
 	Sender     string `json:"sender"`     // sender of this update, usually the DSS
 }
 
-// PublisherLWTMessage containing 'alive' status
-type PublisherLWTMessage struct {
-	Address string `json:"address"` // publication address of this message
-	Status  string `json:"status"`  //  LWTStatusXxx
+// PublisherStatusMessage containing 'alive' status, used in LWT
+type PublisherStatusMessage struct {
+	Address string         `json:"address"` // publication address of this message
+	Status  PublisherState `json:"status"`
 }

@@ -85,7 +85,7 @@ func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(nodeAddress s
 	}
 	// process the requested configuration, or ignore if none are applicable
 	if params != nil {
-		nodeConfigure.registeredNodes.UpdateNodeConfigValues(node.DeviceID, params)
+		nodeConfigure.registeredNodes.UpdateNodeConfigValues(node.HWID, params)
 	}
 	return nil
 }

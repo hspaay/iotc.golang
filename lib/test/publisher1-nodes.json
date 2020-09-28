@@ -27,8 +27,8 @@
         "description": "Enable publishing raw outputs"
       }
     },
-    "deviceid": "node1",
-    "nodeid": "node1",
+    "hwID": "node1",
+    "nodeId": "node1",
     "nodeType": "adapter",
     "timestamp": "2020-08-03T18:13:18.543-0700"
   }

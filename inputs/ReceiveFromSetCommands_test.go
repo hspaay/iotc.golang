@@ -30,7 +30,7 @@ func TestCreateSetInput(t *testing.T) {
 	receiver := inputs.NewReceiveFromSetCommands(domain, publisher1ID,
 		signer, registeredInputs)
 
-	inputID := inputs.MakeInputID(node1ID, input1Type, types.DefaultInputInstance)
+	inputID := inputs.MakeInputHWID(node1ID, input1Type, types.DefaultInputInstance)
 	receiver.CreateInput(node1ID, input1Type, types.DefaultInputInstance, nil)
 	receiver.DeleteInput(inputID)
 

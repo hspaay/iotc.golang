@@ -27,9 +27,43 @@
         "description": "Enable publishing raw outputs"
       }
     },
-    "deviceid": "node1",
-    "nodeid": "alias1",
-    "nodeType": "unknown",
-    "timestamp": "2020-08-08T22:48:01.781-0700"
+    "hwID": "",
+    "nodeId": "alias1",
+    "timestamp": "2020-09-27T22:03:10.741-0700"
+  },
+  {
+    "address": "test/publisher1/node1/$node",
+    "attr": {
+      "type": "unknown"
+    },
+    "config": {
+      "name": {
+        "datatype": "string",
+        "description": "Human friendly node name"
+      },
+      "publishEvent": {
+        "datatype": "string",
+        "default": "false",
+        "description": "Enable publishing outputs as event"
+      },
+      "publishHistory": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing output history"
+      },
+      "publishLatest": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing latest output"
+      },
+      "publishRaw": {
+        "datatype": "boolean",
+        "default": "true",
+        "description": "Enable publishing raw outputs"
+      }
+    },
+    "hwID": "node1",
+    "nodeId": "node1",
+    "timestamp": "2020-09-27T22:03:10.741-0700"
   }
 ]

@@ -8,6 +8,7 @@ import (
 	"github.com/iotdomain/iotdomain-go/messaging"
 	"github.com/iotdomain/iotdomain-go/nodes"
 	"github.com/iotdomain/iotdomain-go/types"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,7 +85,7 @@ func TestAttrStatus(t *testing.T) {
 	const node1ID = "node1"
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 	collection.CreateNode(node1ID, types.NodeTypeUnknown)
-	changed := collection.UpdateNodeStatus(node1ID, map[types.NodeStatus]string{types.NodeStatusLastError: "All is well"})
+	changed := collection.UpdateNodeStatus(node1ID, map[types.NodeStatusAttr]string{types.NodeStatusAttrLastError: "All is well"})
 	assert.True(t, changed)
 
 	newAttr := map[types.NodeAttr]string{types.NodeAttrManufacturer: "Bob"}
@@ -93,7 +94,7 @@ func TestAttrStatus(t *testing.T) {
 	changed = collection.UpdateNodeAttr("invalid Node", newAttr)
 	assert.False(t, changed)
 
-	newStatus := map[types.NodeStatus]string{"LastUpdated": "now"}
+	newStatus := map[types.NodeStatusAttr]string{"LastUpdated": "now"}
 	collection.UpdateNodeStatus(node1ID, newStatus)
 
 	node1 := collection.GetNodeByAddress(node1Addr)
@@ -256,25 +257,25 @@ func TestLoadSave(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAlias(t *testing.T) {
-	const node1AliasID = "alias1"
+func TestChangeNodeID(t *testing.T) {
+	const newNodeID = "newID"
 
 	// msgConfig := messaging.MessengerConfig{}
 	// var testMessenger = messaging.NewDummyMessenger(&msgConfig)
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 
 	node1 := collection.CreateNode(node1ID, types.NodeTypeUnknown)
-	collection.SetAlias(node1, node1AliasID)
+	collection.SetNodeID(node1, newNodeID)
 
-	node2 := collection.GetNodeByNodeID(node1AliasID)
-	assert.NotNil(t, node2, "Node not found using alias")
-	collection.SetAlias(node2, "") // clear alias
-	node2 = collection.GetNodeByNodeID(node1AliasID)
+	node2 := collection.GetNodeByNodeID(newNodeID)
+	assert.NotNil(t, node2, "Node not found using newNodeID")
+	collection.SetNodeID(node2, "") // clear changed node ID
+	node2 = collection.GetNodeByNodeID(newNodeID)
 	// assert.Nil(t, node2, "Node found using alias")
 
 	// error cases
-	collection.SetAlias(nil, node1AliasID) // invalid nodeID
-	collection.SetAlias(node2, node1ID)    // ignored as this is an existing device
+	collection.SetNodeID(nil, newNodeID) // invalid nodeID
+	collection.SetNodeID(node2, node1ID) // ignored as this is an existing device
 
 	var privKey = messaging.CreateAsymKeys()
 
@@ -284,22 +285,20 @@ func TestAlias(t *testing.T) {
 
 	msgr := messaging.NewDummyMessenger(nil)
 	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
-	aliasHandler := func(address string, message *types.NodeAliasMessage) {
-		collection.HandleSetAliasMessage(address, message)
+	setNodeIDHandler := func(address string, message *types.SetNodeIDMessage) {
+		logrus.Infof("Received new node ID '%s' for node '%s'", message.NodeID, address)
+		hwAddress := collection.GetNodeByAddress(address)
+		collection.SetNodeID(hwAddress, message.NodeID)
 	}
-	receiver := nodes.NewReceiveNodeAlias(domain, publisher1ID, nil, signer, privKey)
-	receiver.SetAliasHandler(aliasHandler)
+	receiver := nodes.NewReceiveSetNodeID(domain, publisher1ID, nil, signer, privKey)
+	receiver.SetNodeIDHandler(setNodeIDHandler)
 	receiver.Start()
 
 	//
-	err := nodes.PublishNodeAliasCommand(node1Addr, node1AliasID, "sender", signer, &privKey.PublicKey)
-	assert.NoErrorf(t, err, "Publish set alias failed: %s", err)
-	node2 = collection.GetNodeByNodeID(node1AliasID)
-	assert.NotNil(t, node2, "Node not found using alias")
-
-	// error case - publish alias command to non existing address
-	err = nodes.PublishNodeAliasCommand("Invalid Address", node1AliasID, "sender", signer, &privKey.PublicKey)
-	assert.Errorf(t, err, "Publish with invalid address didnt fail")
+	err := nodes.PublishSetNodeID(node1Addr, newNodeID, "sender", signer, &privKey.PublicKey)
+	assert.NoErrorf(t, err, "Publish SetNodeID failed: %s", err)
+	node2 = collection.GetNodeByNodeID(newNodeID)
+	assert.NotNil(t, node2, "Node not found afterpublishing a new ID")
 
 	receiver.Stop()
 
@@ -307,9 +306,9 @@ func TestAlias(t *testing.T) {
 func TestError(t *testing.T) {
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 	collection.CreateNode(node1ID, types.NodeTypeUnknown)
-	collection.UpdateErrorStatus("notanode", types.NodeRunStateError, "This is an error")
-	collection.UpdateErrorStatus(node1ID, types.NodeRunStateError, "This is an error")
-	collection.UpdateNodeStatus("unknownNode", map[types.NodeStatus]string{types.NodeStatusLastError: "This is an error"})
+	collection.UpdateErrorStatus("notanode", types.NodeStateError, "This is an error")
+	collection.UpdateErrorStatus(node1ID, types.NodeStateError, "This is an error")
+	collection.UpdateNodeStatus("unknownNode", map[types.NodeStatusAttr]string{types.NodeStatusAttrLastError: "This is an error"})
 }
 
 func TestPublishReceive(t *testing.T) {
