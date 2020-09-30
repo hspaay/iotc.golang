@@ -29,8 +29,8 @@ func TestCreateCollection(t *testing.T) {
 
 	c := lib.NewDomainCollection(reflect.TypeOf(&item1), signer.GetPublicKey)
 	require.NotNil(t, c)
-	c.Add(item1Addr, &item1)
-	c.Add(item2InputAddr, &item2)
+	c.Update(item1Addr, &item1)
+	c.Update(item2InputAddr, &item2)
 
 	// test getby address
 	item1b := c.GetByAddress(item1Addr)

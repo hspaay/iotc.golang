@@ -19,6 +19,7 @@ func PublishOutputHistory(
 	// output values are published using their alias address, if any
 	addr := ReplaceMessageType(output.Address, types.MessageTypeHistory)
 	timeStampStr := time.Now().Format("2006-01-02T15:04:05.000-0700")
+	logrus.Infof("PublishOutputHistory to: %s", addr)
 
 	// todo: use output configuration to determine if history is published for this output
 	historyMessage := &types.OutputHistoryMessage{

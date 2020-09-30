@@ -1,8 +1,15 @@
 // Package types with IoTDomain node message type definitions
 package types
 
+// NodeIDGateway is the standard nodeOD of a gateway device. Intended as a convention for
+// identifying gateway devices.
+const NodeIDGateway = "gateway"
+
 // NodeAttr with predefined names of node attributes and configuration
 type NodeAttr string
+
+// NodeAttrMap for storing node attributes
+type NodeAttrMap map[NodeAttr]string
 
 // Predefined node attribute names that describe the node.
 // When they are configurable they also appear in Node Config section.
@@ -45,35 +52,34 @@ const (
 	NodeAttrURL             NodeAttr = "url"             // node URL
 )
 
-// NodeIDGateway is the standard nodeOD of a gateway device. Intended as a convention for
-// identifying gateway devices.
-const NodeIDGateway = "gateway"
+// NodeStatus various node status attributes
+type NodeStatus string
 
-// NodeStatusAttr various node status attributes
-type NodeStatusAttr string
+// NodeStatusMap for storing status attributes
+type NodeStatusMap map[NodeStatus]string
 
-// Various NodeStatusAttr attributes that describe the recent status of the node
+// Various NodeStatus attributes that describe the recent status of the node
 // These indicate how the node is performing and are updated with each publication, typically once a day
 const (
-	NodeStatusAttrErrorCount    NodeStatusAttr = "errorCount"    // nr of errors reported on this device
-	NodeStatusAttrHealth        NodeStatusAttr = "health"        // health status of the device 0-100%
-	NodeStatusAttrLastError     NodeStatusAttr = "lastError"     // most recent error message, or "" if no error
-	NodeStatusAttrLastSeen      NodeStatusAttr = "lastSeen"      // ISO time the device was last seen
-	NodeStatusAttrLatencyMSec   NodeStatusAttr = "latencymsec"   // duration connect to sensor in milliseconds
-	NodeStatusAttrNeighborCount NodeStatusAttr = "neighborCount" // mesh network nr of neighbors
-	NodeStatusAttrNeighborIDs   NodeStatusAttr = "neighborIDs"   // mesh network device neighbors ID list [id,id,...]
-	NodeStatusAttrRxCount       NodeStatusAttr = "rxCount"       // Nr of messages received from device
-	NodeStatusAttrTxCount       NodeStatusAttr = "txCount"       // Nr of messages send to device
-	NodeStatusAttrState         NodeStatusAttr = "state"         // Node run-state as per below
+	NodeStatusErrorCount    NodeStatus = "errorCount"    // nr of errors reported on this device
+	NodeStatusHealth        NodeStatus = "health"        // health status of the device 0-100%
+	NodeStatusLastError     NodeStatus = "lastError"     // most recent error message, or "" if no error
+	NodeStatusLastSeen      NodeStatus = "lastSeen"      // ISO time the device was last seen
+	NodeStatusLatencyMSec   NodeStatus = "latencymsec"   // duration connect to sensor in milliseconds
+	NodeStatusNeighborCount NodeStatus = "neighborCount" // mesh network nr of neighbors
+	NodeStatusNeighborIDs   NodeStatus = "neighborIDs"   // mesh network device neighbors ID list [id,id,...]
+	NodeStatusRxCount       NodeStatus = "rxCount"       // Nr of messages received from device
+	NodeStatusTxCount       NodeStatus = "txCount"       // Nr of messages send to device
+	NodeStatusRunState      NodeStatus = "runState"      // Node run-state as per below
 )
 
 // Values for Node State
 // These reflect whether a node is ready, sleeping or in error
 const (
-	NodeStateError    string = "error"    // Node reports an error
-	NodeStateReady    string = "ready"    // Node is ready for use
-	NodeStateSleeping string = "sleeping" // Node has gone into sleep mode, often a battery powered devie
-	NodeStateLost     string = "lost"     // Node is is no longer reachable
+	NodeRunStateError    string = "error"    // Node reports an error
+	NodeRunStateReady    string = "ready"    // Node is ready for use
+	NodeRunStateSleeping string = "sleeping" // Node has gone into sleep mode, often a battery powered devie
+	NodeRunStateLost     string = "lost"     // Node is is no longer reachable
 )
 
 // NodeType identifying  the purpose of the node
@@ -114,12 +120,6 @@ const (
 	NodeTypeWeatherStation NodeType = "weatherStation" // Node is a weatherstation device
 	NodeTypeWeighScale     NodeType = "weighScale"     // Node is an electronic weight scale
 )
-
-// NodeAttrMap for storing node attributes
-type NodeAttrMap map[NodeAttr]string
-
-// NodeStatusMap for storing status attributes
-type NodeStatusMap map[NodeStatusAttr]string
 
 // ConfigAttrMap for storing node configuration
 type ConfigAttrMap map[NodeAttr]ConfigAttr

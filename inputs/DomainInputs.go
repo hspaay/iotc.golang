@@ -21,7 +21,7 @@ type DomainInputs struct {
 
 // AddInput adds or replaces the input.
 func (domainInputs *DomainInputs) AddInput(input *types.InputDiscoveryMessage) {
-	domainInputs.c.Add(input.Address, input)
+	domainInputs.c.Update(input.Address, input)
 }
 
 // GetAllInputs returns a new list with the inputs from this collection

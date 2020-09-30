@@ -18,15 +18,7 @@ type DomainCollection struct {
 	GetPublicKey func(string) *ecdsa.PublicKey // get the public key for signature verification
 	UpdateMutex  *sync.Mutex                   // mutex for async updating
 	ItemPtr      reflect.Type                  // pointer type of item in map
-}
-
-// Add adds or replaces the discovered object
-// objectPtr must be a pointer to the instance
-func (dc *DomainCollection) Add(address string, objectPtr interface{}) {
-	dc.UpdateMutex.Lock()
-	defer dc.UpdateMutex.Unlock()
-	base := MakeBaseAddress(address)
-	dc.DiscoMap[base] = objectPtr
+	updateCount  int                           // nr of updates to this collection
 }
 
 // Get returns an item by node address and optionally ioType and instance
@@ -129,7 +121,7 @@ func (dc *DomainCollection) HandleDiscovery(
 		setObjectField(newItem, "Instance", segments[4])
 	}
 
-	dc.Add(address, newItem)
+	dc.Update(address, newItem)
 	return nil
 }
 
@@ -140,6 +132,31 @@ func (dc *DomainCollection) Remove(address string) {
 	dc.UpdateMutex.Lock()
 	defer dc.UpdateMutex.Unlock()
 	delete(dc.DiscoMap, base)
+	dc.updateCount++
+}
+
+// ResetUpdateCount sets the update count to zero and returns the old update count
+func (dc *DomainCollection) ResetUpdateCount() int {
+	dc.UpdateMutex.Lock()
+	defer dc.UpdateMutex.Unlock()
+	lastUpdateCount := dc.updateCount
+	dc.updateCount = 0
+	return lastUpdateCount
+}
+
+// Update adds or replaces the discovered object
+// objectPtr must be a pointer to the instance
+func (dc *DomainCollection) Update(address string, objectPtr interface{}) {
+	dc.UpdateMutex.Lock()
+	defer dc.UpdateMutex.Unlock()
+	base := MakeBaseAddress(address)
+	dc.DiscoMap[base] = objectPtr
+	dc.updateCount++
+}
+
+// UpdateCount returns the nr of updates taken place.
+func (dc *DomainCollection) UpdateCount() int {
+	return dc.updateCount
 }
 
 // MakeBaseAddress returns the base address without messagetype suffix

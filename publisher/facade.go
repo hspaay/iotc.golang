@@ -214,7 +214,7 @@ func (pub *Publisher) GetNodes() []*types.NodeDiscoveryMessage {
 }
 
 // GetNodeStatus returns a status attribute of a registered node
-func (pub *Publisher) GetNodeStatus(nodeHWID string, attrName types.NodeStatusAttr) (value string, exists bool) {
+func (pub *Publisher) GetNodeStatus(nodeHWID string, attrName types.NodeStatus) (value string, exists bool) {
 	node := pub.registeredNodes.GetNodeByHWID(nodeHWID)
 	if node == nil {
 		return "", false
@@ -390,7 +390,7 @@ func (pub *Publisher) UpdateNodeConfigValues(nodeHWID string, params types.NodeA
 
 // UpdateNodeStatus updates one or more status attributes of a registered node
 // This only updates the node if the status changes
-func (pub *Publisher) UpdateNodeStatus(nodeHWID string, status map[types.NodeStatusAttr]string) (changed bool) {
+func (pub *Publisher) UpdateNodeStatus(nodeHWID string, status map[types.NodeStatus]string) (changed bool) {
 	return pub.registeredNodes.UpdateNodeStatus(nodeHWID, status)
 }
 

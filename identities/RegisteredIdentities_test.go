@@ -26,8 +26,8 @@ func TestPersistIdentity(t *testing.T) {
 	identityFile := configFolder + "/testpersistidentity.json"
 
 	// setup - create and save an identity
-	regIdent2 := identities.NewRegisteredIdentity(domain, publisherID)
-	regIdent2.LoadIdentity(identityFile)
+	regIdent2 := identities.NewRegisteredIdentity(domain, publisherID, identityFile)
+	regIdent2.LoadIdentity()
 	ident, privKey := regIdent2.GetFullIdentity()
 	require.NotEmpty(t, ident, "Identity not created")
 	require.Equal(t, domain, ident.Domain)
@@ -36,7 +36,7 @@ func TestPersistIdentity(t *testing.T) {
 	require.NoError(t, err, "Failed saving identity")
 
 	// load and compare identity
-	ident2, privKey2, err := regIdent2.LoadIdentity(identityFile)
+	ident2, privKey2, err := regIdent2.LoadIdentity()
 	require.NoError(t, err, "Failed loading identity")
 	require.NotNil(t, ident2, "Unable to read identity")
 	assert.Equal(t, domain, ident2.Domain, "Loaded identity doesn't match saved identity")
@@ -46,8 +46,8 @@ func TestPersistIdentity(t *testing.T) {
 	assert.Equal(t, pe1, pe2, "public key not identical")
 
 	// error case using default identity folder and a not yet existing identity
-	regIdent3 := identities.NewRegisteredIdentity(domain3, publisherID3)
-	ident3, privKey3, err := regIdent3.LoadIdentity("/root/nofileaccess")
+	regIdent3 := identities.NewRegisteredIdentity(domain3, publisherID3, "/root/nofileaccess")
+	ident3, privKey3, err := regIdent3.LoadIdentity()
 	require.NotNil(t, err, "Expected error loading non existing identity")
 	require.Nil(t, ident3, "Unable to create identity")
 	require.Nil(t, privKey3, "Unable to create identity keys")
@@ -68,7 +68,7 @@ func TestUpdateIdentity(t *testing.T) {
 	var pubKeys = make(map[string]*ecdsa.PublicKey)
 	// identityFile := configFolder + "/testpersistidentity.json"
 
-	regIdentity := identities.NewRegisteredIdentity(domain, publisher1ID)
+	regIdentity := identities.NewRegisteredIdentity(domain, publisher1ID, "")
 	privKey := regIdentity.GetPrivateKey()
 	pubKeys[regIdentity.GetAddress()] = &privKey.PublicKey
 

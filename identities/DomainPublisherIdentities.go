@@ -25,7 +25,7 @@ type DomainPublisherIdentities struct {
 // AddIdentity adds a new public identity and generate its public key in the cache
 // If the identity already exists, it will be replaced
 func (pubIdentities *DomainPublisherIdentities) AddIdentity(identity *types.PublisherIdentityMessage) {
-	pubIdentities.c.Add(identity.Address, identity)
+	pubIdentities.c.Update(identity.Address, identity)
 	pubKey := messaging.PublicKeyFromPem(identity.PublicKey)
 	pubIdentities.publicKeyCache[identity.Address] = pubKey
 }
@@ -100,11 +100,11 @@ func (pubIdentities *DomainPublisherIdentities) LoadIdentities(filename string) 
 		pubIdentities.AddIdentity(ident)
 	}
 	return nil
-
 }
 
-// SaveIdentities saves previously added identities to file
+// SaveIdentities saves previously added identities to file and resets the update count
 func (pubIdentities *DomainPublisherIdentities) SaveIdentities(filename string) error {
+	pubIdentities.c.ResetUpdateCount()
 	collection := pubIdentities.GetAllPublishers()
 	jsonText, err := json.MarshalIndent(collection, "", "  ")
 	if err != nil {
@@ -116,6 +116,11 @@ func (pubIdentities *DomainPublisherIdentities) SaveIdentities(filename string) 
 	}
 	logrus.Infof("SaveIdentities: Collection saved successfully to JSON file %s", filename)
 	return nil
+}
+
+// UpdateCount returns the nr of updates to identities since the last SaveIdentities call
+func (pubIdentities *DomainPublisherIdentities) UpdateCount() int {
+	return pubIdentities.c.UpdateCount()
 }
 
 // VerifyPublisherIdentity verifies the integrity of the given identity record

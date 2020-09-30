@@ -33,8 +33,10 @@ var node1Output1Addr = node1Base + "/switch/0/$output"
 var node1Output1Type = types.OutputTypeSwitch // "switch"
 
 var msgConfig *messaging.MessengerConfig = &messaging.MessengerConfig{}
+
 var test1Config = &publisher.PublisherConfig{
 	ConfigFolder:  "../test",
+	CacheFolder:   "../test",
 	Domain:        "test",
 	PublisherID:   "publisher1",
 	SecuredDomain: true,
@@ -57,7 +59,7 @@ type s struct{ Item1 string }
 func TestNewAppPublisher(t *testing.T) {
 	appID := "testapp"
 	var appConfig struct{ Item1 string }
-	appPub, err := publisher.NewAppPublisher(appID, test1Config.ConfigFolder, &appConfig, false)
+	appPub, err := publisher.NewAppPublisher(appID, test1Config.ConfigFolder, &appConfig, "", false)
 	assert.NotNil(t, appPub)
 	assert.Error(t, err) // no messenger config
 }
@@ -112,7 +114,7 @@ func TestLoadNodes(t *testing.T) {
 	pub1 := publisher.NewPublisher(test1Config, testMessenger)
 	pub1.CreateNode(device1ID, device1Type)
 
-	err := pub1.LoadCachedIdentities()
+	err := pub1.LoadDomainPublishers()
 	assert.Errorf(t, err, "Unexpectedly loaded cached identities")
 
 	err = pub1.LoadRegisteredNodes()
@@ -253,7 +255,7 @@ func TestErrors(t *testing.T) {
 	pub1.SetSigningOnOff(true)
 	pub1.Subscribe("", "")
 	pub1.Unsubscribe("", "")
-	pub1.UpdateNodeErrorStatus("fakeid", types.NodeStateError, "fake status")
+	pub1.UpdateNodeErrorStatus("fakeid", types.NodeRunStateError, "fake status")
 	pub1.UpdateNodeAttr("fakeid", types.NodeAttrMap{})
 	pub1.UpdateNodeConfig("fakeid", types.NodeAttrName, nil)
 	pub1.UpdateNodeConfigValues("fakeid", types.NodeAttrMap{})

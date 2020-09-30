@@ -57,13 +57,15 @@ func (regIdentity *RegisteredIdentity) GetFullIdentity() (fullIdentity *types.Pu
 //  Returns the identity with corresponding ECDSA private key.
 //  If the identity doesn't exist, has a different domain/publisherId, or is invalid
 // then an error will be returned and the existing identity remains unchanged.
-// Use SaveIdentity to save updates to the given filename
-func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
+func (regIdentity *RegisteredIdentity) LoadIdentity() (
 	fullIdentity *types.PublisherFullIdentity, privKey *ecdsa.PrivateKey, err error) {
 
-	// load the identity
-	regIdentity.filename = jsonFilename
-	identityJSON, err := ioutil.ReadFile(jsonFilename)
+	if regIdentity.filename == "" {
+		err := lib.MakeErrorf("LoadIdentity: Missing filename")
+		return regIdentity.fullIdentity, regIdentity.privateKey, err
+	}
+
+	identityJSON, err := ioutil.ReadFile(regIdentity.filename)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,13 +87,14 @@ func (regIdentity *RegisteredIdentity) LoadIdentity(jsonFilename string) (
 	return regIdentity.fullIdentity, regIdentity.privateKey, err
 }
 
-// SaveIdentity save the full identity of the publisher to the json filename provided
-// in LoadIdentity.
+// SaveIdentity saves the full identity of the publisher
 // see also https://stackoverflow.com/questions/21322182/how-to-store-ecdsa-private-key-in-go
 func (regIdentity *RegisteredIdentity) SaveIdentity() error {
+
 	if regIdentity.filename == "" {
-		return lib.MakeErrorf("No filename to save under. LoadIdentity must be called first.")
+		return lib.MakeErrorf("SaveIdentity: Missing filename")
 	}
+
 	// save the identity as JSON. Remove the existing file first as they are read-only
 	identityJSON, _ := json.MarshalIndent(regIdentity.fullIdentity, " ", " ")
 	// move the identity before deleting
@@ -221,13 +224,16 @@ func VerifyFullIdentity(ident *types.PublisherFullIdentity, domain string,
 	return nil
 }
 
-// NewRegisteredIdentity creates a new registered identity
-func NewRegisteredIdentity(domain string, publisherID string) (regIdent *RegisteredIdentity) {
+// NewRegisteredIdentity creates a new persistent registered identity
+// Use LoadIdentity to load the previously saved identity before use.
+// If no filename is provided, the identity will not be loaded or saved
+func NewRegisteredIdentity(domain string, publisherID string, identityFile string) (regIdent *RegisteredIdentity) {
 
 	fullIdentity, privKey := CreateIdentity(domain, publisherID)
 
 	regIdent = &RegisteredIdentity{
 		domain:       domain,
+		filename:     identityFile,
 		fullIdentity: fullIdentity,
 		privateKey:   privKey,
 		publisherID:  publisherID,

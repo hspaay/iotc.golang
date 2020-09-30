@@ -18,7 +18,7 @@ type DomainOutputs struct {
 
 // AddOutput adds or replaces the output
 func (domainOutputs *DomainOutputs) AddOutput(output *types.OutputDiscoveryMessage) {
-	domainOutputs.c.Add(output.Address, output)
+	domainOutputs.c.Update(output.Address, output)
 }
 
 // GetAllOutputs returns a new list with the outputs from this collection

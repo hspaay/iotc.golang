@@ -85,7 +85,7 @@ func TestAttrStatus(t *testing.T) {
 	const node1ID = "node1"
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 	collection.CreateNode(node1ID, types.NodeTypeUnknown)
-	changed := collection.UpdateNodeStatus(node1ID, map[types.NodeStatusAttr]string{types.NodeStatusAttrLastError: "All is well"})
+	changed := collection.UpdateNodeStatus(node1ID, map[types.NodeStatus]string{types.NodeStatusLastError: "All is well"})
 	assert.True(t, changed)
 
 	newAttr := map[types.NodeAttr]string{types.NodeAttrManufacturer: "Bob"}
@@ -94,7 +94,7 @@ func TestAttrStatus(t *testing.T) {
 	changed = collection.UpdateNodeAttr("invalid Node", newAttr)
 	assert.False(t, changed)
 
-	newStatus := map[types.NodeStatusAttr]string{"LastUpdated": "now"}
+	newStatus := map[types.NodeStatus]string{"LastUpdated": "now"}
 	collection.UpdateNodeStatus(node1ID, newStatus)
 
 	node1 := collection.GetNodeByAddress(node1Addr)
@@ -204,15 +204,19 @@ func TestReceiveConfig(t *testing.T) {
 	const node1ID = "node1"
 	const publisher1ID = "publisher1"
 	var privKey = messaging.CreateAsymKeys()
+	var rxCount = 0
+
+	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
+	node1 := collection.CreateNode(node1ID, types.NodeTypeUnknown)
 
 	getPublisherKey := func(addr string) *ecdsa.PublicKey {
 		return &privKey.PublicKey
 	}
-	handler := func(address string, params types.NodeAttrMap) types.NodeAttrMap {
-		return params
+	handler := func(hwID string, params types.NodeAttrMap) {
+		logrus.Infof("TestReceiveConfig: receive config for node %s", hwID)
+		collection.UpdateNodeConfigValues(hwID, params)
+		rxCount++
 	}
-	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
-	node1 := collection.CreateNode(node1ID, types.NodeTypeUnknown)
 
 	msgr := messaging.NewDummyMessenger(nil)
 	signer := messaging.NewMessageSigner(msgr, privKey, getPublisherKey)
@@ -306,9 +310,9 @@ func TestChangeNodeID(t *testing.T) {
 func TestError(t *testing.T) {
 	collection := nodes.NewRegisteredNodes(domain, publisher1ID)
 	collection.CreateNode(node1ID, types.NodeTypeUnknown)
-	collection.UpdateErrorStatus("notanode", types.NodeStateError, "This is an error")
-	collection.UpdateErrorStatus(node1ID, types.NodeStateError, "This is an error")
-	collection.UpdateNodeStatus("unknownNode", map[types.NodeStatusAttr]string{types.NodeStatusAttrLastError: "This is an error"})
+	collection.UpdateErrorStatus("notanode", types.NodeRunStateError, "This is an error")
+	collection.UpdateErrorStatus(node1ID, types.NodeRunStateError, "This is an error")
+	collection.UpdateNodeStatus("unknownNode", map[types.NodeStatus]string{types.NodeStatusLastError: "This is an error"})
 }
 
 func TestPublishReceive(t *testing.T) {

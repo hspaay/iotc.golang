@@ -32,28 +32,29 @@ const (
 	// polling based sources
 	DefaultPollInterval = 600
 
-	// NodesFileSuffix to append to name of the file containing saved nodes
-	NodesFileSuffix = "-nodes.json"
-	// IdentityFileSuffix to append to the name of the file containing publisher saved identity
-	IdentityFileSuffix = "-identity.json"
+	// RegisteredNodesFileSuffix to append to name of the file containing registered nodes
+	RegisteredNodesFileSuffix = "-nodes.json"
+	// RegisteredIdentityFileSuffix to append to the name of the file containing publisher saved identity
+	RegisteredIdentityFileSuffix = "-identity.json"
 	// DomainPublishersFileSuffix to append to the name of the file containing domain publisher identities
-	DomainPublishersFileSuffix = "-publishers.json"
+	DomainPublishersFileSuffix = "-domainpublishers.json"
+	// note, domain nodes are not saved
 )
 
 // PublisherConfig defined configuration fields read from the application configuration
 type PublisherConfig struct {
-	CachePublishers   bool   `yaml:"cachePublishers"`   // load/save discovered publisher identities
-	CacheNodes        bool   `yaml:"cacheNodes"`        // load/save discovered nodes
-	CacheFolder       string `yaml:"cacheFolder"`       // location of discovered nodes and identities
-	ConfigFolder      string `yaml:"configFolder"`      // location of yaml configuration files and configuration changes
-	Domain            string `yaml:"domain"`            // optional override per publisher. Default is local
-	PublisherID       string `yaml:"publisherId"`       // this publisher's ID
-	Loglevel          string `yaml:"loglevel"`          // error, warning, info, debug
-	Logfile           string `yaml:"logfile"`           //
-	DisableConfig     bool   `yaml:"disableConfig"`     // disable configuration over the bus, default is enabled
-	DisableInput      bool   `yaml:"disableInput"`      // disable inputs over the bus, default is enabled
-	DisablePublishers bool   `yaml:"disablePublishers"` // disable listening for available publishers (enable for signature verification)
-	SecuredDomain     bool   `yaml:"securedDomain"`     // require secured domain and signed messages
+	SaveDiscoveredPublishers bool   `yaml:"cachePublishers"`   // load/save discovered publisher identities to cache
+	SaveDiscoveredNodes      bool   `yaml:"cacheNodes"`        // load/save discovered nodes to cache
+	CacheFolder              string `yaml:"cacheFolder"`       // location of discovered domain nodes and publishers
+	ConfigFolder             string `yaml:"configFolder"`      // location of yaml configuration files and registered nodes and identity
+	Domain                   string `yaml:"domain"`            // optional override per publisher. Default is local
+	PublisherID              string `yaml:"publisherId"`       // this publisher's ID
+	Loglevel                 string `yaml:"loglevel"`          // error, warning, info, debug
+	Logfile                  string `yaml:"logfile"`           //
+	DisableConfig            bool   `yaml:"disableConfig"`     // disable configuration over the bus, default is enabled
+	DisableInput             bool   `yaml:"disableInput"`      // disable inputs over the bus, default is enabled
+	DisablePublishers        bool   `yaml:"disablePublishers"` // disable listening for available publishers (enable for signature verification)
+	SecuredDomain            bool   `yaml:"securedDomain"`     // require secured domain and signed messages
 }
 
 // Publisher carries the operating state of 'this' publisher
@@ -113,9 +114,9 @@ func (pub *Publisher) HandleSetNodeIDCommand(address string, message *types.SetN
 	pub.registeredOutputs.SetNodeID(node.HWID, message.NodeID)
 }
 
-// LoadCachedIdentities loads discovered publisher identities from the cache folder.
+// LoadDomainPublishers loads discovered publisher identities from the cache folder.
 // Intended to cache the public signing keys to verify messages from these publishers
-func (pub *Publisher) LoadCachedIdentities() error {
+func (pub *Publisher) LoadDomainPublishers() error {
 	filename := path.Join(pub.config.CacheFolder, pub.PublisherID()+DomainPublishersFileSuffix)
 	err := pub.domainIdentities.LoadIdentities(filename)
 	return err
@@ -124,28 +125,29 @@ func (pub *Publisher) LoadCachedIdentities() error {
 // LoadRegisteredNodes loads saved registered nodes from the config folder.
 // Intended to restore node configuration.
 func (pub *Publisher) LoadRegisteredNodes() error {
-	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+NodesFileSuffix)
+	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+RegisteredNodesFileSuffix)
 	err := pub.registeredNodes.LoadNodes(filename)
 	return err
 }
 
-// SaveDomainPublishers saves known publisher identities
+// SaveDomainPublishers saves discovered domain publisher identities
 func (pub *Publisher) SaveDomainPublishers() error {
-	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+DomainPublishersFileSuffix)
+	filename := path.Join(pub.config.CacheFolder, pub.PublisherID()+DomainPublishersFileSuffix)
 	err := pub.domainIdentities.SaveIdentities(filename)
 	return err
 }
 
-// SaveRegisteredNodes saves current registered nodes
+// SaveRegisteredNodes saves current registered nodes to the config folder
 func (pub *Publisher) SaveRegisteredNodes() error {
-	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+NodesFileSuffix)
+	filename := path.Join(pub.config.ConfigFolder, pub.PublisherID()+RegisteredNodesFileSuffix)
 	err := pub.registeredNodes.SaveNodes(filename)
 	return err
 }
 
-// SetNodeConfigHandler set the handler for updating node configuration
+// SetNodeConfigHandler set the handler for updating node configuration.
+// The handler is invoked if a configuration update for a node is received and the node exists.
 func (pub *Publisher) SetNodeConfigHandler(
-	handler func(nodeAddress string, config types.NodeAttrMap) types.NodeAttrMap) {
+	handler func(nodeHWID string, config types.NodeAttrMap)) {
 
 	pub.receiveNodeConfigure.SetConfigureNodeHandler(handler)
 }
@@ -165,7 +167,7 @@ func (pub *Publisher) SetPollInterval(seconds int, handler func(pub *Publisher))
 }
 
 // SetPublisherStatus sets the publisher runtime status and publishes the message
-func (pub *Publisher) SetPublisherStatus(status types.PublisherState) {
+func (pub *Publisher) SetPublisherStatus(status types.PublisherRunState) {
 	addr := identities.MakePublisherStatusAddress(pub.Domain(), pub.PublisherID())
 	msg := types.PublisherStatusMessage{
 		Address: addr,
@@ -188,16 +190,16 @@ func (pub *Publisher) Start() {
 		// wait for the heartbeat to start
 		<-pub.heartbeatChannel
 
-		// our own identity is first
+		// reload our own identity and nodes
 		myIdent, _ := pub.registeredIdentity.GetFullIdentity()
 		pub.domainIdentities.AddIdentity(&myIdent.PublisherIdentityMessage)
 
 		// reload previously discovered publishers
-		if pub.config.CachePublishers {
+		if pub.config.SaveDiscoveredPublishers {
 			pub.domainIdentities.LoadIdentities(pub.config.CacheFolder)
 		}
 		// reload previously discovered nodes
-		if pub.config.CacheNodes {
+		if pub.config.SaveDiscoveredNodes {
 			pub.domainNodes.LoadNodes(pub.config.CacheFolder)
 		}
 
@@ -219,9 +221,9 @@ func (pub *Publisher) Start() {
 		}
 		//  listening
 		lwtStatusAddress := identities.MakePublisherStatusAddress(pub.Domain(), pub.PublisherID())
-		pub.messenger.Connect(lwtStatusAddress, string(types.PublisherStateLost))
+		pub.messenger.Connect(lwtStatusAddress, string(types.PublisherRunStateLost))
 
-		pub.SetPublisherStatus(types.PublisherStateConnected)
+		pub.SetPublisherStatus(types.PublisherRunStateConnected)
 		identities.PublishIdentity(&myIdent.PublisherIdentityMessage, pub.messageSigner)
 	}
 }
@@ -245,7 +247,7 @@ func (pub *Publisher) Stop() {
 	} else {
 		pub.updateMutex.Unlock()
 	}
-	pub.SetPublisherStatus(types.PublisherStateDisconnected)
+	pub.SetPublisherStatus(types.PublisherRunStateDisconnected)
 	pub.messenger.Disconnect()
 	logrus.Info("... bye bye")
 }
@@ -275,6 +277,10 @@ func (pub *Publisher) heartbeatLoop() {
 
 		// FIXME: The duration of publishing these updates adds to the heartbeat which delays the heartbeat
 		pub.PublishUpdates()
+
+		if pub.config.SaveDiscoveredPublishers && pub.domainIdentities.UpdateCount() > 0 {
+			pub.SaveDomainPublishers()
+		}
 
 		// poll for discovery and values of registered nodes, inputs and outputs
 		if (pub.pollCountdown <= 0) && (pub.pollHandler != nil) {
@@ -373,9 +379,10 @@ func NewPublisher(config *PublisherConfig, messenger messaging.IMessenger,
 	}
 	SetLogging(config.Loglevel, config.Logfile)
 
-	identityFile := path.Join(config.ConfigFolder, config.PublisherID+IdentityFileSuffix)
-	registeredIdentity := identities.NewRegisteredIdentity(config.Domain, config.PublisherID)
-	_, privKey, err := registeredIdentity.LoadIdentity(identityFile)
+	identityFile := path.Join(config.ConfigFolder, config.PublisherID+RegisteredIdentityFileSuffix)
+	registeredIdentity := identities.NewRegisteredIdentity(
+		config.Domain, config.PublisherID, identityFile)
+	_, privKey, err := registeredIdentity.LoadIdentity()
 	if err != nil {
 		// save the identity as the loaded one isnt' valid
 		registeredIdentity.SaveIdentity()

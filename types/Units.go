@@ -4,8 +4,7 @@ package types
 // TimeFormat for publishing messages
 const TimeFormat = "2006-01-02T15:04:05.000-0700"
 
-// Unit constants with unit names.
-// These are defined with the sensor type
+// Unit defines constants with input and output unit names.
 type Unit string
 
 // Defined unit types

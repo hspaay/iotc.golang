@@ -1,38 +1,6 @@
 [
   {
     "address": "test/publisher1/alias1/$node",
-    "config": {
-      "name": {
-        "datatype": "string",
-        "description": "Human friendly node name"
-      },
-      "publishEvent": {
-        "datatype": "string",
-        "default": "false",
-        "description": "Enable publishing outputs as event"
-      },
-      "publishHistory": {
-        "datatype": "boolean",
-        "default": "true",
-        "description": "Enable publishing output history"
-      },
-      "publishLatest": {
-        "datatype": "boolean",
-        "default": "true",
-        "description": "Enable publishing latest output"
-      },
-      "publishRaw": {
-        "datatype": "boolean",
-        "default": "true",
-        "description": "Enable publishing raw outputs"
-      }
-    },
-    "hwID": "",
-    "nodeId": "alias1",
-    "timestamp": "2020-09-27T22:03:10.741-0700"
-  },
-  {
-    "address": "test/publisher1/node1/$node",
     "attr": {
       "type": "unknown"
     },
@@ -63,7 +31,7 @@
       }
     },
     "hwID": "node1",
-    "nodeId": "node1",
-    "timestamp": "2020-09-27T22:03:10.741-0700"
+    "nodeId": "alias1",
+    "timestamp": "2020-09-30T10:26:33.723-0700"
   }
 ]

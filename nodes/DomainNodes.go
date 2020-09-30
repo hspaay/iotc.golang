@@ -22,7 +22,7 @@ type DomainNodes struct {
 
 // AddNode adds or replaces a discovered node
 func (domainNodes *DomainNodes) AddNode(node *types.NodeDiscoveryMessage) {
-	domainNodes.c.Add(node.Address, node)
+	domainNodes.c.Update(node.Address, node)
 }
 
 // GetAllNodes returns a list of all discovered nodes of the domain

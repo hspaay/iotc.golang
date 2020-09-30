@@ -45,7 +45,7 @@ func (regNodes *RegisteredNodes) Clone(node *types.NodeDiscoveryMessage) *types.
 	// Shallow copy of the config list
 	newNode.Config = node.Config
 
-	newNode.Status = make(map[types.NodeStatusAttr]string)
+	newNode.Status = make(map[types.NodeStatus]string)
 	for key, value := range node.Status {
 		newNode.Status[key] = value
 	}
@@ -392,14 +392,14 @@ func (regNodes *RegisteredNodes) UpdateErrorStatus(nodeHWID string, runState str
 
 	newNode := regNodes.Clone(node)
 	changed = false
-	if node.Status[types.NodeStatusAttrLastError] != errorMsg {
-		newNode.Status[types.NodeStatusAttrLastError] = errorMsg
+	if node.Status[types.NodeStatusLastError] != errorMsg {
+		newNode.Status[types.NodeStatusLastError] = errorMsg
 		changed = true
 	}
 
-	if node.Status[types.NodeStatusAttrState] != runState {
+	if node.Status[types.NodeStatusRunState] != runState {
 		changed = true
-		newNode.Status[types.NodeStatusAttrState] = runState
+		newNode.Status[types.NodeStatusRunState] = runState
 	}
 	// Don't unnecesarily republish the node if the status doesnt change
 	if changed {
@@ -456,6 +456,7 @@ func (regNodes *RegisteredNodes) UpdateNodeConfigValues(nodeHWID string, params 
 		_, configExists := node.Config[key]
 		if !configExists {
 			// ignore invalid configuration
+			logrus.Warningf("UpdateNodeConfigValues: Node '%s', attribute '%s' is not a configuration", nodeHWID, key)
 		} else {
 			// update attribute with the new value
 			// TODO: datatype check
@@ -518,7 +519,7 @@ func (regNodes *RegisteredNodes) UpdateNodes(updates []*types.NodeDiscoveryMessa
 				node.Config = map[types.NodeAttr]types.ConfigAttr{}
 			}
 			if node.Status == nil {
-				node.Status = make(map[types.NodeStatusAttr]string)
+				node.Status = make(map[types.NodeStatus]string)
 			}
 			regNodes.updateNode(node)
 		}
@@ -529,7 +530,7 @@ func (regNodes *RegisteredNodes) UpdateNodes(updates []*types.NodeDiscoveryMessa
 // Nodes are immutable. If one or more status values have changed then a new node is created and
 // published. The old node instance is discarded.
 //  statusAttr is the map with key-value pairs of updated node statusses
-func (regNodes *RegisteredNodes) UpdateNodeStatus(nodeHWID string, statusAttr map[types.NodeStatusAttr]string) (changed bool) {
+func (regNodes *RegisteredNodes) UpdateNodeStatus(nodeHWID string, statusAttr map[types.NodeStatus]string) (changed bool) {
 
 	node := regNodes.GetNodeByHWID(nodeHWID)
 	if node == nil {
@@ -625,7 +626,7 @@ func NewNode(domain string, publisherID string, nodeHWID string, nodeType types.
 		HWID:        nodeHWID,
 		NodeID:      nodeHWID,
 		PublisherID: publisherID,
-		Status:      make(map[types.NodeStatusAttr]string),
+		Status:      make(map[types.NodeStatus]string),
 		Timestamp:   time.Now().Format(types.TimeFormat),
 	}
 	newNode.Attr[types.NodeAttrType] = string(nodeType)

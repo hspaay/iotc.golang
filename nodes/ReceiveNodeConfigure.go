@@ -12,8 +12,8 @@ import (
 )
 
 // NodeConfigureHandler application handler when command to update a node's configuration is received
-// This returns a new map with configuration values that can be applied immediately.
-type NodeConfigureHandler func(nodeAddress string, params types.NodeAttrMap) types.NodeAttrMap
+// The handler is only invoked if the node is confirmed to exist.
+type NodeConfigureHandler func(nodeHWID string, params types.NodeAttrMap)
 
 // ReceiveNodeConfigure with handling of node configure commands aimed at nodes managed by this publisher.
 // This decrypts incoming messages determines the sender and verifies the signature with
@@ -30,7 +30,7 @@ type ReceiveNodeConfigure struct {
 
 // SetConfigureNodeHandler set the handler for updating node inputs
 func (nodeConfigure *ReceiveNodeConfigure) SetConfigureNodeHandler(
-	handler func(nodeAddress string, params types.NodeAttrMap) types.NodeAttrMap) {
+	handler func(nodeHWID string, params types.NodeAttrMap)) {
 	nodeConfigure.nodeConfigureHandler = handler
 }
 
@@ -55,7 +55,7 @@ func (nodeConfigure *ReceiveNodeConfigure) Stop() {
 // - check if the message is encrypted
 // - check if the signature is valid
 // - check if the node is valid
-// - pass the configuration update to the actual handler
+// - if a configuration handler is set, let it apply the configuration
 // - save node configuration if persistence is set
 // TODO: support for authorization per node
 func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(nodeAddress string, message string) error {
@@ -80,11 +80,10 @@ func (nodeConfigure *ReceiveNodeConfigure) receiveConfigureCommand(nodeAddress s
 
 	params := configureMessage.Attr
 	if nodeConfigure.nodeConfigureHandler != nil {
-		// A handler can filter which configuration updates take place
-		params = nodeConfigure.nodeConfigureHandler(nodeAddress, params)
-	}
-	// process the requested configuration, or ignore if none are applicable
-	if params != nil {
+		// A handler can determine which configuration updates are applied
+		nodeConfigure.nodeConfigureHandler(node.HWID, params)
+	} else {
+		// Without a handler apply the configuration update
 		nodeConfigure.registeredNodes.UpdateNodeConfigValues(node.HWID, params)
 	}
 	return nil

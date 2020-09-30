@@ -1,19 +1,20 @@
 // Package types with publisher message type definitions
 package types
 
-// DSSPublisherID contains the publisherID of a domain's security service
+// DSSPublisherID defines the publisherID of a domain's security service
+// the DSS is responsible for renewal of keys in a secured domain.
 const DSSPublisherID = "$dss"
 
-// PublisherState indicates the operating status of the publisher. Used in LWT.
-type PublisherState string
+// PublisherRunState indicates the operating status of the publisher. Used in LWT.
+type PublisherRunState string
 
 // PublisherState values
 const (
-	PublisherStateConnected    PublisherState = "connected"    // Publisher is connected and working
-	PublisherStateDisconnected PublisherState = "disconnected" // Publisher has cleanly disconnected
-	PublisherStateFailed       PublisherState = "failed"       // Publisher failed to start
-	PublisherStateInitializing PublisherState = "initializing" // Publisher is initializing
-	PublisherStateLost         PublisherState = "lost"         // Publisher unexpectedly disconnected
+	PublisherRunStateConnected    PublisherRunState = "connected"    // Publisher is connected and working
+	PublisherRunStateDisconnected PublisherRunState = "disconnected" // Publisher has cleanly disconnected
+	PublisherRunStateFailed       PublisherRunState = "failed"       // Publisher failed to start
+	PublisherRunStateInitializing PublisherRunState = "initializing" // Publisher is initializing
+	PublisherRunStateLost         PublisherRunState = "lost"         // Publisher unexpectedly disconnected
 )
 
 // PublisherIdentityMessage contains the public identity of a publisher
@@ -42,6 +43,6 @@ type PublisherFullIdentity struct {
 
 // PublisherStatusMessage containing 'alive' status, used in LWT
 type PublisherStatusMessage struct {
-	Address string         `json:"address"` // publication address of this message
-	Status  PublisherState `json:"status"`
+	Address string            `json:"address"` // publication address of this message
+	Status  PublisherRunState `json:"status"`
 }

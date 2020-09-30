@@ -1,4 +1,4 @@
-/* Example: A Weather Publisher  [Linux]
+/*package main withe example: A Weather Publisher  [Linux]
 
 This example creates a publisher for a weather forecast that updates the forecast every hour.
 The publisher is called myweather, and each node is a city. More cities can be added with more nodes.
@@ -120,17 +120,17 @@ func UpdateWeather(pub *publisher.Publisher) {
 		hum := fmt.Sprintf("%d", weather.Main.Humidity)
 		pub.UpdateOutputValue(nodeID, types.OutputTypeTemperature, types.DefaultOutputInstance, temp)
 		pub.UpdateOutputValue(nodeID, types.OutputTypeHumidity, types.DefaultOutputInstance, hum)
-		pub.UpdateNodeErrorStatus(nodeID, types.NodeStateReady, "Forecast loaded successfully")
+		pub.UpdateNodeErrorStatus(nodeID, types.NodeRunStateReady, "Forecast loaded successfully")
 	} else {
 		// pub.SetOutputError(nodeID, OutputType, OutputTypeTemperature, "Forecast not available")
-		pub.UpdateNodeErrorStatus(nodeID, types.NodeStateError, "Forecast not available")
+		pub.UpdateNodeErrorStatus(nodeID, types.NodeRunStateError, "Forecast not available")
 	}
 }
 
 // Run the example
 func main() {
 	// this auto loads the messenger.yaml and myweather.yaml from ~/.config/iotd
-	pub, _ := publisher.NewAppPublisher(appID, "", "", appConfig, false)
+	pub, _ := publisher.NewAppPublisher(appID, "", appConfig, false)
 
 	SetupNodes(pub, weatherCity)
 	// Update the forecast once an hour
